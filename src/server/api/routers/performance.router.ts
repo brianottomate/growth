@@ -57,7 +57,6 @@ export const performanceRouter = {
       z.object({
         brandId: z.string().min(1),
         patch: launchPatchSchema,
-        expectedRevision: z.number().int().nonnegative(),
       }),
     )
     .handler(({ context: ctx, input }) =>

@@ -314,7 +314,6 @@ export function PitchEditor({
                 }
                 save.mutate({
                   brandId: brand.id,
-                  expectedRevision: revision,
                   fields: result.data,
                 });
               }}
@@ -820,7 +819,6 @@ export function PitchEditor({
             else next.iconUrl = urls[0] ?? "";
             await save.mutateAsync({
               brandId: brand.id,
-              expectedRevision: latest.data.pitchSettings?.revision ?? 0,
               fields: next,
             });
           }}

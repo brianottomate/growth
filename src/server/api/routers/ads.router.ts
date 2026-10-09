@@ -171,7 +171,6 @@ export const adsRouter = {
     .input(
       z.object({
         adId: z.string().min(1),
-        expectedUpdatedAt: z.string().datetime(),
         scope: z.enum(["all", "caption", "image"]),
       }),
     )

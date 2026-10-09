@@ -6,7 +6,6 @@ import { useMutation } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowUp,
-  CircleAlert,
   Images,
   Pencil,
   Plus,
@@ -126,7 +125,6 @@ export function PlatformPostEditDialog({
   const [open, setOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerItemIndex, setPickerItemIndex] = useState(0);
-  const [openedVersion, setOpenedVersion] = useState("");
   const [baseSnapshot, setBaseSnapshot] = useState("");
   const [items, setItems] = useState<EditorItem[]>([]);
   const [firstCommentDraft, setFirstCommentDraft] = useState("");
@@ -156,7 +154,6 @@ export function PlatformPostEditDialog({
     platform === "x" ? 280 : platform === "threads" ? 500 : null;
   const firstCommentMax = firstCommentLimit(platform, format);
   const dirty = persistedSnapshot(items, firstCommentDraft) !== baseSnapshot;
-  const stale = open && openedVersion !== updatedAtISO;
   const invalid =
     items.length === 0 ||
     (!story && items.length > 1 && items.some((item) => !item.text.trim())) ||
@@ -206,7 +203,6 @@ export function PlatformPostEditDialog({
     setItems(next);
     setFirstCommentDraft(firstComment ?? "");
     setBaseSnapshot(persistedSnapshot(next, firstComment ?? ""));
-    setOpenedVersion(updatedAtISO);
     save.reset();
     setOpen(true);
   };
@@ -289,10 +285,6 @@ export function PlatformPostEditDialog({
         onClick={() =>
           save.mutate({
             rootPlatformPostId: platformPostId,
-            // When chat has moved the post underneath an open editor, the
-            // person typing wins. Send the version we are knowingly replacing
-            // so the concurrency guard still catches a genuine race.
-            expectedUpdatedAt: stale ? updatedAtISO : openedVersion,
             items: items.map((item) => ({
               id: item.id,
               text: item.text.trim() ? item.text : null,
@@ -339,28 +331,6 @@ export function PlatformPostEditDialog({
         scrollable
         footer={footer}
       >
-        {stale && (
-          <div className="mb-4 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
-            <CircleAlert className="mt-0.5 size-4 shrink-0" />
-            <div className="min-w-0 space-y-2">
-              <p>
-                Chat changed this post while you had the editor open. Saving
-                keeps what you have written here and replaces the chat version.
-              </p>
-              {text?.trim() && text.trim() !== items[0]?.text.trim() && (
-                <details className="text-amber-200/80">
-                  <summary className="cursor-pointer text-xs">
-                    What chat wrote
-                  </summary>
-                  <p className="mt-1 text-xs whitespace-pre-wrap">
-                    {text.trim()}
-                  </p>
-                </details>
-              )}
-            </div>
-          </div>
-        )}
-
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="min-w-0 space-y-4">
             {items.map((item, index) => (

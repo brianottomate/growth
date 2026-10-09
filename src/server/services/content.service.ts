@@ -347,7 +347,6 @@ export type SaveSpotThreadItemInput = {
 
 export type SaveSpotThreadInput = {
   rootPlatformPostId: string;
-  expectedUpdatedAt: string;
   items: SaveSpotThreadItemInput[];
   firstComment?: string | null;
 };
@@ -377,7 +376,7 @@ const cleanThreadItem = (item: SaveSpotThreadItemInput) => {
  */
 async function saveSpotThread(
   input: SaveSpotThreadInput,
-): Promise<{ id: string; updatedAt: Date; itemIds: string[] } | null> {
+): Promise<{ id: string; updatedAt: Date; itemIds: string[] }> {
   if (input.items.length === 0) {
     throw new Error("A platform post needs at least one item.");
   }
@@ -491,17 +490,12 @@ async function saveSpotThread(
         sequence: 0,
         updatedAt: now,
       })
-      .where(
-        and(
-          eq(platformPostTable.id, input.rootPlatformPostId),
-          eq(platformPostTable.updatedAt, new Date(input.expectedUpdatedAt)),
-        ),
-      )
+      .where(eq(platformPostTable.id, input.rootPlatformPostId))
       .returning({
         id: platformPostTable.id,
         updatedAt: platformPostTable.updatedAt,
       });
-    if (!savedRoot) return null;
+    if (!savedRoot) throw new Error("Post not found");
 
     const keptChildIds: string[] = [];
     for (const [index, inputItem] of input.items.slice(1).entries()) {

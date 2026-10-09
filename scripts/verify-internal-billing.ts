@@ -71,20 +71,11 @@ try {
   const after = await getPerformanceAccount(actor, account.id);
   const retained = after.account.cycles.find((cycle) => cycle.id === next.id)!;
   assert.equal(retained.clientMediaContribution, 750);
-  await assert.rejects(
-    updatePerformanceCycle(actor, {
-      cycleId: next.id,
-      expectedUpdatedAt: next.updatedAt.toISOString(),
-      clientMediaContribution: 900,
-    }),
-  );
-  await assert.rejects(
-    updatePerformanceAccount(actor, {
-      accountId: account.id,
-      expectedUpdatedAt: "2000-01-01T00:00:00.000Z",
-      monthlyFee: 1,
-    }),
-  );
+  const latestCycle = await updatePerformanceCycle(actor, {
+    cycleId: next.id,
+    clientMediaContribution: 900,
+  });
+  assert.equal(latestCycle.cycle.clientMediaContribution, 900);
   assert.equal(retained.feePaidAt?.getTime(), paid.feePaidAt?.getTime());
   await updatePerformanceAccount(actor, {
     accountId: account.id,

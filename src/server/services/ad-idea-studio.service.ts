@@ -45,10 +45,6 @@ export async function saveAdIdea(
   ) {
     throw new Error("Use the existing editor for this ad format");
   }
-  if (ad.updatedAt.toISOString() !== args.expectedUpdatedAt)
-    throw new Error(
-      "This ad changed elsewhere. Reload before saving your edits.",
-    );
 
   const bookingTargetId = document.copy.bookingTargetId;
   if (bookingTargetId && bookingTargetId !== ad.bookingTargetId) {
@@ -86,12 +82,10 @@ export async function saveAdIdea(
       name: args.name,
       updatedAt: new Date(),
     })
-    .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+    .where(eq(adTable.id, ad.id))
     .returning();
   if (!saved)
-    throw new Error(
-      "This ad changed while saving. Reload before trying again.",
-    );
+    throw new Error("Ad not found or unavailable for this operation.");
 
   return saved;
 }

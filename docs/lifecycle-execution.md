@@ -20,8 +20,7 @@ structured property digests, personalization fallbacks, branding and rendering a
 used for blasts and sequences. Product-update templates are currently blocked at
 sequence review because their separate renderer lacks the marketing footer.
 
-Sequence drafts can be saved with no QStash or Postmark keys. Saving uses an
-expected version to reject stale concurrent edits. Email references are checked
+Sequence drafts can be saved with no QStash or Postmark keys. Draft saves use last-write-wins. Email references are checked
 against the sequence brand and current workspace; strategy programs are not
 execution owners. Active recipients retain their immutable reviewed version.
 

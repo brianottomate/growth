@@ -21,6 +21,14 @@ have been removed.
 > renderer reads (`src/app/api/pregen/preview/[token]`) — that HTTP boundary is
 > the only coupling between them.
 
+## Editing policy
+
+Editable Growth records use last-write-wins. Do not add timestamp, revision,
+content-equality, or other optimistic concurrency checks that reject a save
+because another edit happened. Keep permissions, valid state transitions,
+reviewed delivery snapshots, and send/job idempotency checks. Avoid deduplication
+guards on ordinary edits; require a concrete repeated-side-effect reason for them.
+
 ## Commands
 
 Package manager is **Bun** (not npm/yarn/pnpm).

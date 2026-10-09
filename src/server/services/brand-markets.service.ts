@@ -165,7 +165,6 @@ export async function draftBrandMarkets(input: {
     );
   return saveBrandMarkets({
     brandId: brand.id,
-    expectedUpdatedAt: brand.updatedAt,
     value: { markets, draftedAt: new Date().toISOString(), confirmedAt: null },
   });
 }
@@ -197,24 +196,13 @@ export async function setBrandMarkets(input: {
 async function saveBrandMarkets(input: {
   brandId: string;
   value: BrandMarkets;
-  expectedUpdatedAt?: Date;
 }) {
   const markets = brandMarketsSchema.parse(input.value);
   const saved = await db
     .update(brandTable)
     .set({ markets })
-    .where(
-      and(
-        eq(brandTable.id, input.brandId),
-        input.expectedUpdatedAt
-          ? eq(brandTable.updatedAt, input.expectedUpdatedAt)
-          : undefined,
-      ),
-    )
+    .where(eq(brandTable.id, input.brandId))
     .returning({ id: brandTable.id });
-  if (!saved.length)
-    throw new Error(
-      "The brand changed during generation. Read it again and retry.",
-    );
+  if (!saved.length) throw new Error("Brand not found");
   return { markets };
 }

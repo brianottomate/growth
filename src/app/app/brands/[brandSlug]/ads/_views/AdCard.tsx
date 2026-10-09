@@ -167,7 +167,6 @@ export function AdCard({
 
   const [document, setDocument] = useState(() => ideaDocumentFromAd(ad));
   const [name, setName] = useState(ad.name);
-  const [version, setVersion] = useState(ad.updatedAt);
   const [dirty, setDirty] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editor, setEditor] = useState<
@@ -177,7 +176,6 @@ export function AdCard({
   const [savedState, setSavedState] = useState(() => ({
     document: ideaDocumentFromAd(ad),
     name: ad.name,
-    version: ad.updatedAt,
   }));
   const [shape, setShape] = useState<IdeaShape>(() => {
     const sizes = savedState.document.exportShapes?.length
@@ -243,7 +241,6 @@ export function AdCard({
   const save = useMutation(
     orpc.ads.saveIdea.mutationOptions({
       onSuccess: (saved) => {
-        setVersion(saved.updatedAt.toISOString());
         const nextDocument = ideaDocumentFromAd({
           ...ad,
           content: saved.content as AdCreativeContent,
@@ -251,7 +248,6 @@ export function AdCard({
         setSavedState({
           document: nextDocument,
           name: saved.name,
-          version: saved.updatedAt.toISOString(),
         });
         setDocument(nextDocument);
         setName(saved.name);
@@ -283,7 +279,6 @@ export function AdCard({
     setSavedState({
       document: ideaDocumentFromAd(ad),
       name: ad.name,
-      version: ad.updatedAt,
     });
   }, [ad]);
   const openEditor = (
@@ -301,7 +296,6 @@ export function AdCard({
       },
     });
     setName(savedState.name);
-    setVersion(savedState.version);
     setDirty(false);
     setSelectedId(id);
     setPoolTarget(kind === "image" ? "size" : "slide");
@@ -328,17 +322,14 @@ export function AdCard({
         ? savedState.document.copy.bookingTargetId
         : ad.bookingTargetId),
   );
-  const stale = editor !== null && version !== savedState.version;
   const persist = (
     next: IdeaDocument,
     nextName = savedState.name,
-    expectedVersion = savedState.version,
     closeDetails = false,
   ) =>
     save.mutate(
       {
         adId: ad.id,
-        expectedUpdatedAt: expectedVersion,
         name: nextName,
         document: withIdeaPool(next),
       },
@@ -594,7 +585,6 @@ export function AdCard({
   const closeEditor = () => {
     setDocument(savedState.document);
     setName(savedState.name);
-    setVersion(savedState.version);
     setDirty(false);
     setEditor(null);
     setPicker(null);
@@ -606,8 +596,8 @@ export function AdCard({
         Cancel
       </Button>
       <Button
-        disabled={!dirty || busy || stale || !name.trim()}
-        onClick={() => persist(document, name, version)}
+        disabled={!dirty || busy || !name.trim()}
+        onClick={() => persist(document, name)}
       >
         {save.isPending ? "Applying…" : "Apply changes"}
       </Button>
@@ -627,13 +617,7 @@ export function AdCard({
                 ? `Choose image · ${isStatic ? "Image" : `Slide ${document.cards.findIndex((c) => c.id === selectedId) + 1}`} · ${IDEA_SHAPE_LABELS[shape]}`
                 : "Add slides"}
       </h4>
-      {stale && (
-        <p role="alert" className="text-sm">
-          This idea changed elsewhere. Cancel and reopen to edit the latest
-          version. Your changes have not been applied.
-        </p>
-      )}
-      <fieldset disabled={busy || stale} className="space-y-4">
+      <fieldset disabled={busy} className="space-y-4">
         {editor === "copy" && (
           <>
             <div
@@ -655,7 +639,6 @@ export function AdCard({
                     locked ||
                     busy ||
                     dirty ||
-                    stale ||
                     !document.cards.length ||
                     (scope === "image" &&
                       !document.cards.some((item) => item.mode === "compose"))
@@ -663,7 +646,6 @@ export function AdCard({
                   onClick={() =>
                     newCopy.mutate({
                       adId: ad.id,
-                      expectedUpdatedAt: version,
                       scope,
                     })
                   }
@@ -1092,7 +1074,6 @@ export function AdCard({
                         onClick={() =>
                           save.mutate({
                             adId: ad.id,
-                            expectedUpdatedAt: savedState.version,
                             name: savedState.name,
                             document: savedState.document,
                             reviewImportedCreative: true,
@@ -1436,7 +1417,6 @@ export function AdCard({
                 approval.mutate({
                   adId: ad.id,
                   status: ready ? "drawn" : "ready",
-                  expectedUpdatedAt: savedState.version,
                 })
               }
             >
@@ -1452,7 +1432,6 @@ export function AdCard({
                 approval.mutate({
                   adId: ad.id,
                   status: "approved",
-                  expectedUpdatedAt: savedState.version,
                   exportShapes: [
                     ...(savedState.document.exportShapes ??
                       savedState.document.shapes),
@@ -1468,7 +1447,6 @@ export function AdCard({
               inStudio
               assigned={Boolean(campaignId)}
               adId={ad.id}
-              updatedAt={ad.updatedAt}
               pushed={Boolean(deliveryState)}
             />
           )}

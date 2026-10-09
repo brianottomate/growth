@@ -175,7 +175,6 @@ export function CampaignAdCard({
               <ReturnToStudioButton
                 menu
                 adId={ad.id}
-                updatedAt={ad.updatedAt.toISOString()}
                 studioHref={studioHref}
                 pushed={Boolean(deliveryState)}
               />

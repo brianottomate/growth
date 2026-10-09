@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db, type Database } from "@/server/db";
 import { brandTable, userTable } from "@/server/db/schema";
 import {
@@ -24,7 +24,7 @@ export async function readLaunchRecord(brandId: string, orgId: string) {
   return brand.performanceChecklist?.launch ?? emptyLaunchRecord();
 }
 
-/** A single atomic, scoped write; stale clients must refresh instead of overwriting. */
+/** A scoped checklist save; the last write wins. */
 export async function recordLaunchChecklist(input: {
   brandId: string;
   orgId: string;
@@ -33,7 +33,6 @@ export async function recordLaunchChecklist(input: {
   by: string | null;
   evidence?: string;
   receipt?: string;
-  expectedRevision?: number;
   client?: Database;
 }) {
   const client = input.client ?? db;
@@ -49,12 +48,6 @@ export async function recordLaunchChecklist(input: {
   });
   if (!brand) throw new Error("Brand not found");
   const current = brand.performanceChecklist?.launch ?? emptyLaunchRecord();
-  if (input.receipt && current.receipts.includes(input.receipt)) return current;
-  if (
-    input.expectedRevision !== undefined &&
-    input.expectedRevision !== current.revision
-  )
-    throw new Error("Checklist changed. Refresh and try again.");
   const actor = input.by
     ? await client.query.userTable.findFirst({
         where: eq(userTable.id, input.by),
@@ -78,15 +71,9 @@ export async function recordLaunchChecklist(input: {
     .set({
       performanceChecklist: { ...brand.performanceChecklist, launch: next },
     })
-    .where(
-      and(
-        where,
-        sql`${brandTable.performanceChecklist} is not distinct from ${brand.performanceChecklist == null ? null : JSON.stringify(brand.performanceChecklist)}::jsonb`,
-      ),
-    )
+    .where(where)
     .returning({ id: brandTable.id });
-  if (!saved.length)
-    throw new Error("Checklist changed. Refresh and try again.");
+  if (!saved.length) throw new Error("Brand not found");
   return next;
 }
 
@@ -106,26 +93,13 @@ export async function completeLaunchMilestones(
   if (!brand)
     throw new Error("Brand not found while recording workflow completion");
   if (!brand.organizationId) return;
-  // Concurrent completions may touch different milestones. Re-read on CAS
-  // conflicts; receipt deduplication prevents retrying the same event.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      return await recordLaunchChecklist({
-        brandId,
-        orgId: brand.organizationId,
-        patch: items.map((item) => ({ item, checked: true })),
-        source: "workflow",
-        by,
-        evidence,
-        receipt,
-      });
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.message !== "Checklist changed. Refresh and try again." ||
-        attempt === 4
-      )
-        throw error;
-    }
-  }
+  return recordLaunchChecklist({
+    brandId,
+    orgId: brand.organizationId,
+    patch: items.map((item) => ({ item, checked: true })),
+    source: "workflow",
+    by,
+    evidence,
+    receipt,
+  });
 }

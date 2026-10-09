@@ -186,17 +186,9 @@ export async function freezeApprovedAd(
         ...next,
         updatedAt: new Date(),
       })
-      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+      .where(eq(adTable.id, ad.id))
       .returning({ id: adTable.id });
-    if (!saved) {
-      for (const id of generated) await deleteMedia(id);
-      generated.length = 0;
-      // Two consumers can render concurrently; only one version is saved.
-      if (await approvedAdFrozen(ad.id)) return false;
-      throw new Error(
-        `${ad.name} changed while its images were saved. Try again.`,
-      );
-    }
+    if (!saved) throw new Error("Ad not found");
   } catch (error) {
     for (const id of generated) await deleteMedia(id);
     throw error;
@@ -232,7 +224,6 @@ export async function approveImageAd(input: {
   adId: string;
   orgId: string;
   userId: string;
-  expectedUpdatedAt: string;
   exportShapes?: IdeaShape[];
 }) {
   const ad = await db.query.adTable.findFirst({
@@ -252,10 +243,6 @@ export async function approveImageAd(input: {
     if (ad.campaignId) await freezeApprovedAd(ad.id);
     return { adId: ad.id, status: "approved" as const };
   }
-  if (ad.updatedAt.toISOString() !== input.expectedUpdatedAt)
-    throw new Error(
-      "This ad changed elsewhere. Reload and review the latest version.",
-    );
   if (!("media" in ad.content))
     throw new Error("This ad has no image composition.");
   if (isImportedMetaCatalog(ad.content))
@@ -306,7 +293,7 @@ export async function approveImageAd(input: {
     approval: {
       approvedAt: approvedAt.toISOString(),
       approvedBy: input.userId,
-      sourceVersion: input.expectedUpdatedAt,
+      sourceVersion: ad.updatedAt.toISOString(),
       renders: {},
       brand: {
         name: brand.name,
@@ -333,12 +320,10 @@ export async function approveImageAd(input: {
       approvedBy: input.userId,
       updatedAt: new Date(),
     })
-    .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+    .where(eq(adTable.id, ad.id))
     .returning({ id: adTable.id });
   if (!saved)
-    throw new Error(
-      "This ad changed during approval. Review it and approve again.",
-    );
+    throw new Error("Ad not found or unavailable for this operation.");
   if (ad.campaignId) await freezeApprovedAd(ad.id);
   return { adId: ad.id, status: "approved" as const };
 }
@@ -347,7 +332,6 @@ export async function approveImageAd(input: {
 export async function returnAdToStudio(
   input: {
     adId: string;
-    expectedUpdatedAt: string;
     comment?: string;
     as?: "user" | "agent";
   },
@@ -367,8 +351,6 @@ export async function returnAdToStudio(
       columns: { id: true },
     }));
   if (!ad || !brand) throw new Error("Ad not found");
-  if (ad.updatedAt.toISOString() !== input.expectedUpdatedAt)
-    throw new Error("This ad changed. Refresh before returning it to Studio.");
   if (ad.status !== "approved" && !ad.campaignId)
     throw new Error("This ad is already a Studio draft.");
   const pushed = await db.query.platformAdTable.findMany({
@@ -398,12 +380,10 @@ export async function returnAdToStudio(
         businessKey: null,
         updatedAt: new Date(),
       })
-      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+      .where(eq(adTable.id, ad.id))
       .returning({ id: adTable.id });
     if (!saved.length)
-      throw new Error(
-        "This ad changed. Refresh before returning it to Studio.",
-      );
+      throw new Error("Ad not found or unavailable for this operation.");
     for (const platform of pushed) {
       if (platform.pushedCreative) continue;
       await tx

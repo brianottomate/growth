@@ -197,7 +197,7 @@ workspace checks and one typed FK membership table. See [Initiatives](initiative
 `emailRead` exposes listSequences, getSequence, sequenceEmails, previewSequence and
 sequenceStatus. `emailWrite` exposes saveSequence, prepareSequence, pauseSequence,
 cancelSequenceEnrollment and archiveSequence. These use the same scoped services
-as the Performance Email forms. Edits require the current expectedVersion.
+as the Performance Email forms. Draft edits use last-write-wins.
 
 activateSequence, enrollSequence and recoverSequence require in-app approval and
 are omitted from MCP and invoke-growth. Ingest credentials remain UI-only.

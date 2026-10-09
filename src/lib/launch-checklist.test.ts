@@ -11,32 +11,6 @@ const stamp = {
   at: "2026-10-04T12:00:00Z",
   evidence: "run-1",
 };
-test("workflow retries do not overwrite later manual corrections", () => {
-  const completed = applyLaunchPatch(
-    emptyLaunchRecord(),
-    [{ item: "signed", checked: true }],
-    stamp,
-    "run-1",
-  );
-  const reopened = applyLaunchPatch(
-    completed,
-    [{ item: "signed", checked: false }],
-    { ...stamp, source: "manual", by: "user-a" },
-  );
-  expect(
-    applyLaunchPatch(
-      reopened,
-      [{ item: "signed", checked: true }],
-      stamp,
-      "run-1",
-    ),
-  ).toBe(reopened);
-  expect(reopened.items.signed?.checked).toBe(false);
-  expect(reopened.history.map((event) => event.source)).toEqual([
-    "workflow",
-    "manual",
-  ]);
-});
 test("bulk updates preserve other milestones and record provenance per item", () => {
   const current = applyLaunchPatch(
     emptyLaunchRecord(),

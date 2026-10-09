@@ -104,7 +104,6 @@ export async function saveEmailAudience(
   input: {
     brandId: string;
     id?: string;
-    expectedRevision?: number;
     name: string;
     definition: EmailAudienceDefinition;
   },
@@ -121,8 +120,6 @@ export async function saveEmailAudience(
     const { audience } = await requireAudience(input.id, actor);
     if (audience.brandId !== input.brandId)
       throw new Error("Audience belongs to another brand.");
-    if (input.expectedRevision === undefined)
-      throw new Error("Pass the audience revision before editing.");
     const changed = await db
       .update(emailAudienceTable)
       .set({
@@ -131,15 +128,9 @@ export async function saveEmailAudience(
         revision: sql`${emailAudienceTable.revision}+1`,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(emailAudienceTable.id, input.id),
-          eq(emailAudienceTable.revision, input.expectedRevision),
-        ),
-      )
+      .where(eq(emailAudienceTable.id, input.id))
       .returning({ id: emailAudienceTable.id });
-    if (!changed.length)
-      throw new Error("This audience changed. Reload before saving.");
+    if (!changed.length) throw new Error("Audience not found");
     id = input.id;
   } else {
     const [created] = await db
@@ -220,14 +211,10 @@ export async function previewEmailAudience(
 }
 
 export async function compileEmailAudience(
-  input: { audienceId: string; expectedRevision: number },
+  input: { audienceId: string },
   actor: Actor,
 ) {
   const { audience, brand } = await requireAudience(input.audienceId, actor);
-  if (audience.revision !== input.expectedRevision)
-    throw new Error(
-      "Audience changed. Preview and compile the current revision.",
-    );
   assertEmailAudienceSource(audience.definition, {
     slug: brand.slug,
     websiteId: brand.wanderOsWebsiteId,

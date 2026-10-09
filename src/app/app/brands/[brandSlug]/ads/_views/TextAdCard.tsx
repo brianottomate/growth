@@ -142,7 +142,6 @@ export function TextAdForm({
             ? save.mutate({
                 adId: ad.id,
                 text: copy,
-                expectedUpdatedAt: ad.updatedAt,
               })
             : create.mutate({
                 ...(campaignId ? { campaignId } : { brandId }),

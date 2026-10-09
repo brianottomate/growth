@@ -75,7 +75,6 @@ export const createPerformanceAccountSchema = z.object({
 export const updatePerformanceAccountSchema = z.object({
   ...commercialFields,
   accountId: z.string().min(1),
-  expectedUpdatedAt: z.iso.datetime().optional(),
   name: z.string().trim().min(1).max(160).optional(),
   contactName: z.string().trim().min(1).max(160).nullable().optional(),
   contactEmail: z.string().trim().email().nullable().optional(),
@@ -134,7 +133,6 @@ export const openPerformanceCycleSchema = z.object({
 
 export const updatePerformanceCycleSchema = z.object({
   cycleId: z.string().min(1),
-  expectedUpdatedAt: z.iso.datetime().optional(),
   status: z.enum(["planned", "live", "reporting", "closed"]).optional(),
   billedAmount: performanceAmountSchema
     .max(999999999999.99)
@@ -521,24 +519,13 @@ export async function updatePerformanceAccount(
   const current = await requireAccount(actor, input.accountId);
   validateAmounts({ ...current, ...input });
   await requireOwnedBrand(actor, input.brandId);
-  const { accountId, expectedUpdatedAt, ...changes } = input;
+  const { accountId, ...changes } = input;
   const [account] = await db
     .update(performanceAccountTable)
     .set(changes)
-    .where(
-      and(
-        eq(performanceAccountTable.id, accountId),
-        expectedUpdatedAt
-          ? eq(performanceAccountTable.updatedAt, new Date(expectedUpdatedAt))
-          : undefined,
-      ),
-    )
+    .where(eq(performanceAccountTable.id, accountId))
     .returning();
-  if (!account)
-    throw new PerformanceError(
-      "BAD_REQUEST",
-      "Account terms changed while saving. Refresh and try again.",
-    );
+  if (!account) throw new PerformanceError("BAD_REQUEST", "Account not found");
   await generateBillingCycles({ orgId: actor.orgId, accountId: account.id });
   return { account };
 }
@@ -637,15 +624,7 @@ export async function updatePerformanceCycle(
         ? currentCycle.clientMediaContribution
         : input.clientMediaContribution,
   });
-  const {
-    cycleId,
-    startAt,
-    endAt,
-    feePaid,
-    mediaPaid,
-    expectedUpdatedAt,
-    ...changes
-  } = input;
+  const { cycleId, startAt, endAt, feePaid, mediaPaid, ...changes } = input;
   const [cycle] = await db
     .update(performanceCycleTable)
     .set({
@@ -665,20 +644,10 @@ export async function updatePerformanceCycle(
         : {}),
       ...(endAt !== undefined ? { endAt: endAt ? new Date(endAt) : null } : {}),
     })
-    .where(
-      and(
-        eq(performanceCycleTable.id, cycleId),
-        expectedUpdatedAt
-          ? eq(performanceCycleTable.updatedAt, new Date(expectedUpdatedAt))
-          : undefined,
-      ),
-    )
+    .where(eq(performanceCycleTable.id, cycleId))
     .returning();
   if (!cycle)
-    throw new PerformanceError(
-      "BAD_REQUEST",
-      "Billing month changed while saving. Refresh and try again.",
-    );
+    throw new PerformanceError("BAD_REQUEST", "Billing month not found");
   return { cycle };
 }
 

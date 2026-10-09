@@ -221,7 +221,6 @@ export async function rewriteAdCreative(input: {
     {
       adId: input.adId,
       name: context.ad.name,
-      expectedUpdatedAt: context.ad.updatedAt,
       document: applyCreativeCopy(context.ad.document, output),
     },
     { orgId: input.orgId, userId: input.userId },
@@ -232,7 +231,6 @@ export async function rewriteAdCreative(input: {
 export async function draftAdCreativeCopy(input: {
   adId: string;
   orgId: string;
-  expectedUpdatedAt: string;
   scope: CreativeCopyScope;
 }) {
   const context = await adChatContext({

@@ -15,7 +15,7 @@ import { createId } from "@/server/db/utils";
 
 import { type BrandMarkets } from "@/lib/markets";
 
-import { and, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
 import {
   adTable,
@@ -162,15 +162,10 @@ async function saveDraftChange(
   const saved = await db
     .update(adTable)
     .set(patch)
-    .where(
-      and(
-        eq(adTable.id, ad.id),
-        eq(adTable.updatedAt, ad.updatedAt),
-        ne(adTable.status, "approved"),
-      ),
-    )
+    .where(and(eq(adTable.id, ad.id), ne(adTable.status, "approved")))
     .returning({ id: adTable.id });
-  if (!saved.length) throw new Error("This ad changed. Refresh before saving.");
+  if (!saved.length)
+    throw new Error("Ad not found or unavailable for this operation.");
 }
 
 function creativeContent(ad: { content: unknown }): AdCreativeContent {
@@ -786,12 +781,10 @@ export async function setAdHome(input: {
       ...projected,
       updatedAt: new Date(),
     })
-    .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+    .where(eq(adTable.id, ad.id))
     .returning({ id: adTable.id });
   if (!saved)
-    throw new Error(
-      "This ad changed elsewhere. Reload before changing its home.",
-    );
+    throw new Error("Ad not found or unavailable for this operation.");
   return { adId: ad.id, name, homeName: bound.name };
 }
 
@@ -889,10 +882,9 @@ export async function attachAdSet(input: {
           eq(adTable.brandId, brand.id),
           eq(adTable.status, "approved"),
           isNull(adTable.campaignId),
-          or(
-            ...wanted.map((ad) =>
-              and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)),
-            ),
+          inArray(
+            adTable.id,
+            wanted.map((ad) => ad.id),
           ),
         ),
       )
@@ -957,7 +949,6 @@ export async function setAdStatus(input: {
   orgId: string;
   status: "drawn" | "ready" | "approved";
   userId?: string;
-  expectedUpdatedAt?: string;
   exportShapes?: IdeaShape[];
 }) {
   const ad = await requireOwnedAd(input, true);
@@ -978,22 +969,12 @@ export async function setAdStatus(input: {
           ? { status: "ready", readyAt: new Date(), readyBy: input.userId }
           : { status: "drawn", readyAt: null, readyBy: null },
       )
-      .where(
-        and(
-          eq(adTable.id, ad.id),
-          ne(adTable.status, "approved"),
-          input.expectedUpdatedAt
-            ? eq(adTable.updatedAt, new Date(input.expectedUpdatedAt))
-            : undefined,
-        ),
-      )
+      .where(and(eq(adTable.id, ad.id), ne(adTable.status, "approved")))
       .returning({ id: adTable.id });
     if (!saved.length)
-      throw new Error("This ad changed. Refresh before changing its status.");
+      throw new Error("Ad not found or unavailable for this operation.");
     return { adId: ad.id, status: input.status };
   }
-  if (!input.expectedUpdatedAt)
-    throw new Error("Review the current ad before approving it.");
   if (!input.userId) throw new Error("Approval needs a signed-in person.");
   const userId = input.userId;
   if (
@@ -1004,7 +985,6 @@ export async function setAdStatus(input: {
     await approveImageAd({
       ...input,
       userId,
-      expectedUpdatedAt: input.expectedUpdatedAt,
     });
   } else {
     if (ad.type === "text" && !textAdReady(ad.content as AdTextContent))
@@ -1032,15 +1012,10 @@ export async function setAdStatus(input: {
         approvedAt: new Date(),
         approvedBy: userId,
       })
-      .where(
-        and(
-          eq(adTable.id, ad.id),
-          eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
-        ),
-      )
+      .where(eq(adTable.id, ad.id))
       .returning({ id: adTable.id });
     if (!saved.length)
-      throw new Error("This ad changed. Refresh before approving.");
+      throw new Error("Ad not found or unavailable for this operation.");
   }
   return { adId: ad.id, status: "approved" as const };
 }
@@ -1107,28 +1082,20 @@ export async function setAdCopy(input: {
   /** Per carousel card, in order; a blank field inherits the ad's. */
   cards?: { headline?: string; description?: string }[];
   text?: AdTextContent;
-  expectedUpdatedAt?: string;
 }) {
   const ad = await requireOwnedAd(input);
   if (ad.type === "text") {
-    if (!input.text || !input.expectedUpdatedAt)
-      throw new Error(
-        "Supply the text pool and its current version before saving.",
-      );
+    if (!input.text) throw new Error("Supply the text pool before saving.");
     const content = textAdCopySchema.parse(input.text);
     const saved = await db
       .update(adTable)
       .set({ content })
       .where(
-        and(
-          eq(adTable.id, ad.id),
-          eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
-          inArray(adTable.status, ["drawn", "ready"]),
-        ),
+        and(eq(adTable.id, ad.id), inArray(adTable.status, ["drawn", "ready"])),
       )
       .returning({ id: adTable.id });
     if (!saved.length)
-      throw new Error("This ad changed. Refresh before saving your copy.");
+      throw new Error("Ad not found or unavailable for this operation.");
     return { adId: ad.id };
   }
   if (input.text)
@@ -1424,16 +1391,12 @@ export async function unfreezePlacement(input: {
   return { adId: ad.id, placementKey: input.placementKey };
 }
 
-/** Section saves merge into the latest persisted content and require the reviewed version. */
+/** Section saves merge into the latest persisted content. */
 export async function saveAdSection(
   input: z.infer<typeof adSectionSchema>,
   orgId: string,
 ) {
   const ad = await requireOwnedAd({ adId: input.adId, orgId });
-  if (ad.updatedAt.toISOString() !== input.expectedUpdatedAt)
-    throw new Error(
-      "This ad changed elsewhere. Reload before saving your edits.",
-    );
   let content = ad.content;
   let bookingTargetId = ad.bookingTargetId;
   const section = input.section;
@@ -1515,16 +1478,10 @@ export async function saveAdSection(
       bookingTargetId,
     })
     .where(
-      and(
-        eq(adTable.id, ad.id),
-        inArray(adTable.status, ["drawn", "ready"]),
-        eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
-      ),
+      and(eq(adTable.id, ad.id), inArray(adTable.status, ["drawn", "ready"])),
     )
     .returning({ id: adTable.id });
   if (!saved.length)
-    throw new Error(
-      "This ad changed elsewhere. Reload before saving your edits.",
-    );
+    throw new Error("Ad not found or unavailable for this operation.");
   return { adId: ad.id };
 }

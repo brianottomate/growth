@@ -148,7 +148,6 @@ export default async function PerformanceBrandPage({
         <section className="rounded-xl border px-4">
           <ReadinessChecklist
             brandId={brand.id}
-            revision={brandReadiness.revision}
             checklist={brandReadiness.checklist}
             links={readinessLinks(deskBrand)}
           />

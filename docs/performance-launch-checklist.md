@@ -13,18 +13,12 @@ records a milestone; it does not activate a campaign.
 ## Writes and provenance
 
 `recordLaunchChecklist` is the shared organization-scoped write function.
-A request patches one or several items atomically. Manual and assistant writes
-require the revision they read; stale or racing writes fail and require a fresh
-read. Each item retains its last explicit checked/unchecked decision, source,
+A request patches one or several items atomically using last-write-wins.
+Each item retains its last explicit checked/unchecked decision, source,
 authenticated actor (when available), timestamp, and optional evidence. The last
-100 item events are retained for inspection. Workflow receipts deduplicate the
-same completion so its retry cannot overwrite a later manual reopening.
-A genuinely new successful workflow may check the item again. Removing assets
-does not reopen items implicitly.
-
-The record is stored in the existing brand `performanceChecklist.launch` JSONB
-field. Tracker `values` and `meta` stay independent and are preserved by both
-write paths. No schema migration is needed.
+100 item events are retained for inspection. Workflow receipts record provenance;
+reusing one does not suppress a later write. Removing assets does not reopen items
+implicitly.
 
 ## Workflow completion points
 
@@ -51,19 +45,18 @@ Unrelated syncs, provider polling, reads, and failed workflows do not emit
 completions. If contacts are edited separately, the operator/MCP explicitly
 records the contacts milestone; the writer does not inspect existing fields to
 infer that both are present. Workflow milestone writes run after successful
-business writes, with conflict retries. They are not a transactional outbox:
+business writes. Checklist saves use last-write-wins. They are not a transactional outbox:
 a recording failure is surfaced and can be corrected through the checklist.
 
 ## MCP bulk updates
 
 Read `performanceRead__launchChecklist` with `brandId`, then call
-`performanceWrite__recordLaunchChecklist` with `brandId`, `expectedRevision`, and
+`performanceWrite__recordLaunchChecklist` with `brandId` and
 `patch` (1–13 distinct items). For example:
 
 ```json
 {
   "brandId": "brand_example",
-  "expectedRevision": 4,
   "patch": [
     { "item": "intake", "checked": true },
     { "item": "budget", "checked": true },

@@ -112,11 +112,10 @@ export const sequenceEmails = growthAction({
 });
 export const saveSequence = growthAction({
   description:
-    "Create or replace a sequence draft without sending. For edits first read the sequence and pass expectedVersion; preserve unrelated fields and step IDs. Supply unique step IDs for new steps. Steps may have null platformPostId while planning. A sequence is a separate plan linking existing email content, not a lifecycle strategy program.",
+    "Create or replace a sequence draft without sending. For edits first read the sequence; preserve unrelated fields and step IDs. Supply unique step IDs for new steps. Steps may have null platformPostId while planning. A sequence is a separate plan linking existing email content, not a lifecycle strategy program.",
   inputSchema: z.object({
     brandId: z.string(),
     sequenceId: z.string().optional(),
-    expectedVersion: z.number().int().optional(),
     draft: emailSequenceDraftSchema,
   }),
   outputSchema: z.object({ id: z.string(), version: z.number() }),

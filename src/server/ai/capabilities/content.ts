@@ -694,7 +694,6 @@ export const setPlatformPostThread = growthAction({
     const existing = [root, ...children];
     const saved = await ContentService.saveSpotThread({
       rootPlatformPostId: root.id,
-      expectedUpdatedAt: root.updatedAt.toISOString(),
       items: input.posts.map((post, index) => ({
         id: existing[index]?.id,
         text: post.text,
@@ -702,11 +701,6 @@ export const setPlatformPostThread = growthAction({
         assetLinks: existing[index]?.assetLinks ?? [],
       })),
     });
-    if (!saved) {
-      throw new Error(
-        "This platform draft changed while the thread was being prepared. Read the work item again and retry.",
-      );
-    }
 
     return {
       ok: true as const,

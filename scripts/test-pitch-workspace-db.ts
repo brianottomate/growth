@@ -31,7 +31,6 @@ try {
       membership.userId,
       {
         brandId: brand.id,
-        expectedRevision: 0,
         fields: {
           ...EMPTY_PITCH,
           headline: "Saved copy",
@@ -50,15 +49,6 @@ try {
     assert.equal(saved.revision, 1);
     assert.equal(saved.managementFeeDollars, 0);
     await assert.rejects(
-      savePitchWorkspace(
-        membership.organizationId,
-        membership.userId,
-        { brandId: brand.id, expectedRevision: 0, fields: EMPTY_PITCH },
-        tx,
-      ),
-      /Someone updated/,
-    );
-    await assert.rejects(
       getPitchWorkspace("other-organization", brand.id, tx),
       /Brand not found/,
     );
@@ -71,7 +61,7 @@ try {
     const reset = await savePitchWorkspace(
       membership.organizationId,
       membership.userId,
-      { brandId: brand.id, expectedRevision: 1, fields: EMPTY_PITCH },
+      { brandId: brand.id, fields: EMPTY_PITCH },
       tx,
     );
     assert.equal(reset.revision, 2);
@@ -86,5 +76,5 @@ try {
   if (error !== rollback) throw error;
 }
 console.log(
-  "Pitch persistence, stale-save rejection and organization isolation passed; fixture rolled back.",
+  "Pitch persistence, last-write-wins and organization isolation passed; fixture rolled back.",
 );

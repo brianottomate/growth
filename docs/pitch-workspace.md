@@ -16,9 +16,8 @@ Up to three hosted photos can be chosen, or uploaded through the existing R2
 media pipeline. Browser-local URLs cannot be persisted.
 
 Save immediately updates the live pitch after both repos have deployed. It never
-changes agreed fees, invoices or billing settings. The UPDATE compares the expected
-revision atomically; a stale save returns a conflict and requires an explicit
-reload that discards edits. In explicit manual mode, AI suggestions edit the local form only after Apply;
+changes agreed fees, invoices or billing settings. Saves use an upsert and the last write wins. The revision records
+changes for display and preview refreshes. In explicit manual mode, AI suggestions edit the local form only after Apply;
 Undo restores the previous form. Save remains a separate action.
 
 The app, assistant and MCP share `performanceRead.pitch`,
@@ -45,8 +44,8 @@ bun run ai:contracts
 bun --conditions=react-server scripts/test-pitch-workspace-db.ts
 ```
 
-The last check inserts a fixture inside a transaction, checks saving, stale-save
-rejection and cross-organization rejection, then deliberately rolls everything
+The last check inserts a fixture inside a transaction, checks saving, last-write-wins
+updates and cross-organization rejection, then deliberately rolls everything
 back. Browser QA should use a temporary prospect and archive it afterwards.
 
 For local integration, run Growth on 3102 and wander.com on 3101. Configure the

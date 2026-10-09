@@ -3,7 +3,6 @@ import { textAdCopySchema } from "./ad-authoring";
 
 export const adSectionSchema = z.object({
   adId: z.string().min(1),
-  expectedUpdatedAt: z.string().datetime(),
   section: z.discriminatedUnion("kind", [
     z.object({
       kind: z.literal("text"),

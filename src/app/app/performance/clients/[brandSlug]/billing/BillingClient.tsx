@@ -142,7 +142,6 @@ function Terms({
             const form = new FormData(event.currentTarget);
             save.mutate({
               accountId: account.id,
-              expectedUpdatedAt: new Date(account.updatedAt).toISOString(),
               monthlyFee: amount(form, "monthlyFee"),
               agreedAdSpend: amount(form, "agreedAdSpend"),
               clientMediaContribution: amount(form, "clientMediaContribution"),
@@ -347,7 +346,6 @@ function Cycle({
           const form = new FormData(event.currentTarget);
           save.mutate({
             cycleId: cycle.id,
-            expectedUpdatedAt: new Date(cycle.updatedAt).toISOString(),
             billedAmount: amount(form, "billedAmount"),
             mediaBudget: amount(form, "mediaBudget"),
             clientMediaContribution: amount(form, "clientMediaContribution"),

@@ -24,7 +24,6 @@ import {
 
 export function ReturnToStudioButton({
   adId,
-  updatedAt,
   studioHref,
   pushed = false,
   menu = false,
@@ -32,7 +31,6 @@ export function ReturnToStudioButton({
   assigned = true,
 }: {
   adId: string;
-  updatedAt: string;
   studioHref?: string;
   pushed?: boolean;
   menu?: boolean;
@@ -167,7 +165,6 @@ export function ReturnToStudioButton({
               onClick={() =>
                 mutation.mutate({
                   adId,
-                  expectedUpdatedAt: updatedAt,
                   comment,
                   as: "user",
                 })

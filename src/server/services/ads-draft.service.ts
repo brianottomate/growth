@@ -963,16 +963,11 @@ export async function addDraftAd(input: {
         ...values,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(adTable.id, existing.id),
-          eq(adTable.updatedAt, existing.updatedAt),
-        ),
-      )
+      .where(eq(adTable.id, existing.id))
       .returning();
 
     if (!updated)
-      throw new Error("This ad changed. Refresh before drafting again.");
+      throw new Error("Ad not found or unavailable for this operation.");
     return updated;
   }
 
@@ -1697,9 +1692,9 @@ export async function replaceDraftAdMedia(input: {
     .set({
       content: { ...content, media },
     })
-    .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+    .where(eq(adTable.id, ad.id))
     .returning();
   if (!updated)
-    throw new Error("This ad changed. Refresh before replacing its media.");
+    throw new Error("Ad not found or unavailable for this operation.");
   return { ad: updated, replaced: previous };
 }

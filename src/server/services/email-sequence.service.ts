@@ -103,7 +103,6 @@ export async function saveEmailSequence(input: {
   organizationId: string;
   brandId: string;
   sequenceId?: string;
-  expectedVersion?: number;
   draft: EmailSequenceDraft;
 }) {
   await requireBrand(input.organizationId, input.brandId);
@@ -152,11 +151,6 @@ export async function saveEmailSequence(input: {
         )
         .for("update");
       if (!current) throw new ORPCError("NOT_FOUND");
-      if (current.version !== input.expectedVersion)
-        throw new ORPCError("CONFLICT", {
-          message:
-            "Someone edited this sequence. Reload before saving your changes.",
-        });
       version = current.version + 1;
       await tx
         .update(sequences)

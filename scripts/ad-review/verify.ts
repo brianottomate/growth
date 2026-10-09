@@ -132,14 +132,12 @@ try {
     orgId: ctx.orgId,
     userId: ctx.userId,
     status: "ready",
-    expectedUpdatedAt: draft.updatedAt.toISOString(),
   });
   const firstReady = await ad();
   await setAdCopy({
     adId,
     orgId: ctx.orgId,
     text: firstReady.content as import("@/server/db/ads-schema").AdTextContent,
-    expectedUpdatedAt: firstReady.updatedAt.toISOString(),
   });
   const edited = await ad();
   assert.equal(edited.status, "ready");
@@ -153,26 +151,15 @@ try {
     orgId: ctx.orgId,
     userId: ctx.userId,
     status: "ready",
-    expectedUpdatedAt: edited.updatedAt.toISOString(),
   });
   const ready = await ad();
   assert(ready.readyAt);
   assert.equal(ready.status, "ready");
-  await assert.rejects(() =>
-    setAdStatus({
-      adId,
-      orgId: ctx.orgId,
-      userId: ctx.userId,
-      status: "approved",
-      expectedUpdatedAt: draft.updatedAt.toISOString(),
-    }),
-  );
   await setAdStatus({
     adId,
     orgId: ctx.orgId,
     userId: ctx.userId,
     status: "approved",
-    expectedUpdatedAt: ready.updatedAt.toISOString(),
   });
   const approved = await ad();
   draftAdResultSchema.parse(approved);
@@ -184,7 +171,6 @@ try {
       adId,
       orgId: ctx.orgId,
       text: firstReady.content as import("@/server/db/ads-schema").AdTextContent,
-      expectedUpdatedAt: approved.updatedAt.toISOString(),
     }),
   );
   await attachAdSet({
@@ -229,15 +215,11 @@ try {
       })
     : null;
   await assert.rejects(() =>
-    returnAdToStudio(
-      { adId, expectedUpdatedAt: assigned.updatedAt.toISOString() },
-      { ...ctx, orgId: "org_other" },
-    ),
+    returnAdToStudio({ adId }, { ...ctx, orgId: "org_other" }),
   );
   await returnAdToStudio(
     {
       adId,
-      expectedUpdatedAt: assigned.updatedAt.toISOString(),
       comment: "Fix the destination",
     },
     ctx,
@@ -252,12 +234,7 @@ try {
   assert.equal(after.length, 4);
   assert.equal(after[3]?.event, "return_to_studio");
   assert(after[3]?.body.includes("Fix the destination"));
-  await assert.rejects(() =>
-    returnAdToStudio(
-      { adId, expectedUpdatedAt: assigned.updatedAt.toISOString() },
-      ctx,
-    ),
-  );
+  await assert.rejects(() => returnAdToStudio({ adId }, ctx));
   await assert.rejects(() => deleteReviewComment(after[3]!.id, ctx));
   if (platformId) {
     const platformAfter = await db.query.platformAdTable.findFirst({
@@ -271,7 +248,7 @@ try {
   await deleteReviewComment(humanVia.id, ctx);
   assert.equal((await listReviewComments(target, ctx.orgId)).length, 3);
   console.log(
-    "PASS: scope, attribution, stale approval/return, approved-only consumption, same-ID return, retained comments/events and platform creative",
+    "PASS: scope, attribution, approved-only consumption, same-ID return, retained comments/events and platform creative",
   );
 } finally {
   await db.delete(adTable).where(eq(adTable.id, adId));

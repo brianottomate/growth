@@ -565,18 +565,10 @@ export async function attachBookingTarget(
           : {}),
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(adTable.id, ad.id),
-          eq(adTable.updatedAt, ad.updatedAt),
-          eq(adTable.status, ad.status),
-        ),
-      )
+      .where(and(eq(adTable.id, ad.id), ne(adTable.status, "approved")))
       .returning({ id: adTable.id });
     if (!changed.length)
-      throw new Error(
-        "This ad changed while you were editing. Reload and try again.",
-      );
+      throw new Error("Ad not found or unavailable for this operation.");
   } else if (input.campaignId) {
     const campaign = await db.query.campaignTable.findFirst({
       where: and(

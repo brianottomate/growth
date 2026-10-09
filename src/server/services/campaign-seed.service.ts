@@ -70,7 +70,7 @@ export async function prepareCampaignSeed(
     warehouseActor,
   );
   const snapshot = await compileEmailAudience(
-    { audienceId: saved.id, expectedRevision: saved.revision },
+    { audienceId: saved.id },
     warehouseActor,
   );
   return { snapshotId: snapshot.id };

@@ -19,7 +19,7 @@ function guidanceForPath(pathname: string): string | null {
   if (
     /^\/app\/performance\/(clients|brands)\/[^/]+\/newsletters/.test(pathname)
   )
-    return "This is Performance Email: blasts, executable sequences, audiences and settings. Use emailRead.listSequences/getSequence/sequenceStatus and emailWrite.saveSequence for sequence planning; keep lifecycle strategy programs unchanged. Steps link email content, with relative waitMinutes; use existing email tools for content. Read current version before edits and pass expectedVersion. Preview then prepare a frozen revision before activation; activation, enrollment and queue recovery require the in-app approval card and can send real Postmark emails. Never invent recipient consent. Ingest secrets stay in the delivery settings UI.";
+    return "This is Performance Email: blasts, executable sequences, audiences and settings. Use emailRead.listSequences/getSequence/sequenceStatus and emailWrite.saveSequence for sequence planning; keep lifecycle strategy programs unchanged. Steps link email content, with relative waitMinutes; use existing email tools for content. Read the sequence before edits and preserve unrelated fields. Preview then prepare a frozen revision before activation; activation, enrollment and queue recovery require the in-app approval card and can send real Postmark emails. Never invent recipient consent. Ingest secrets stay in the delivery settings UI.";
   if (pathname === "/app/next")
     return "This is the conversational home. All canonical workspace capabilities remain available; the current location guides the answer but does not limit what the operator can ask Growth to do.";
   if (pathname.startsWith("/app/review"))

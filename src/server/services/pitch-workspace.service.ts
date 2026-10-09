@@ -1,7 +1,7 @@
 import "server-only";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, type Database, type TransactionClient } from "@/server/db";
 import { brandTable, brandPitchTable } from "@/server/db/schema";
@@ -16,7 +16,6 @@ import {
 
 export const savePitchSchema = z.object({
   brandId: z.string().min(1),
-  expectedRevision: z.number().int().min(0),
   fields: pitchFieldsSchema,
 });
 const scope = (orgId: string, brandId: string) =>
@@ -78,33 +77,19 @@ export async function savePitchWorkspace(
   const values = {
     brandId: input.brandId,
     overrides: pitchOverrides(input.fields),
-    revision: input.expectedRevision + 1,
+    revision: 1,
     updatedAt: new Date(),
     updatedBy: userId,
   };
-  // First-save races use the unique brand key; subsequent saves compare revisions in SQL.
-  const [saved] =
-    input.expectedRevision === 0
-      ? await client
-          .insert(brandPitchTable)
-          .values(values)
-          .onConflictDoNothing()
-          .returning()
-      : await client
-          .update(brandPitchTable)
-          .set(values)
-          .where(
-            and(
-              eq(brandPitchTable.brandId, input.brandId),
-              eq(brandPitchTable.revision, input.expectedRevision),
-            ),
-          )
-          .returning();
-  if (!saved)
-    throw new GrowthActionError(
-      "conflict",
-      "Someone updated this pitch. Reload the saved pitch before saving your changes.",
-    );
+  const [saved] = await client
+    .insert(brandPitchTable)
+    .values(values)
+    .onConflictDoUpdate({
+      target: brandPitchTable.brandId,
+      set: { ...values, revision: sql`${brandPitchTable.revision} + 1` },
+    })
+    .returning();
+  if (!saved) throw new GrowthActionError("not_found", "Pitch not found");
   return {
     ...pitchFieldsSchema.parse(saved.overrides),
     revision: saved.revision,

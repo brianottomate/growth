@@ -1639,11 +1639,10 @@ export const attachAdSetAction = growthAction({
 export const setAdStatusAction = growthAction({
   outputSchema: setAdStatusActionOutputSchema,
   description:
-    "Move an ad along draft → ready → approved. ready is a human mark for review that survives edits; drawn takes a ready mark back. approved is the person's final sign-off: its recipe, copy and branding are captured immediately. Images render when attachAdSet sends it to a campaign. To revise an approved ad use returnToStudio; its platform ads remain unchanged. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
+    "Move an ad along draft → ready → approved. ready is a human mark for review that survives edits; drawn takes a ready mark back. approved is the person's final sign-off: its recipe, copy and branding are captured immediately. Images render when attachAdSet sends it to a campaign. To revise an approved ad use returnToStudio; its platform ads remain unchanged. This never publishes to a platform.",
   inputSchema: z.object({
     adId: z.string().min(1),
     status: z.enum(["drawn", "ready", "approved"]),
-    expectedUpdatedAt: z.string().datetime().optional(),
     exportShapes: ideaExportShapesSchema.optional(),
   }),
   execute: (input, ctx) => {
@@ -1653,7 +1652,6 @@ export const setAdStatusAction = growthAction({
       adId: input.adId,
       orgId: ctx.orgId,
       status: input.status,
-      expectedUpdatedAt: input.expectedUpdatedAt,
       exportShapes: input.exportShapes,
       userId: ctx.userId,
     });
@@ -1676,7 +1674,6 @@ export const returnAdToStudioAction = growthAction({
     "Return the same approved or campaign ad to Studio as an unassigned draft. Clears approval and Ready attribution, keeps its source artwork, composition and comments, purges unused generated exports, and records the optional comment with the return event. Existing platform ads and their creative remain unchanged and may still run; this does not pause delivery. Read the current updatedAt before calling. Use as=user only for words the user explicitly asks you to post on their behalf; otherwise as=agent.",
   inputSchema: z.object({
     adId: z.string().min(1),
-    expectedUpdatedAt: z.string().datetime(),
     comment: z.string().trim().max(8000).optional(),
     as: z.enum(["user", "agent"]).default("agent"),
   }),
@@ -1686,11 +1683,10 @@ export const returnAdToStudioAction = growthAction({
 export const setAdCopyAction = growthAction({
   outputSchema: setAdCopyActionOutputSchema,
   description:
-    "Rewrite a drafted ad. For text-first ads supply the full text pool and expectedUpdatedAt from the latest read. For creative ads: its headline, primary text, description, and each carousel card's own Meta headline and description. The images are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
+    "Rewrite a drafted ad. For text-first ads supply the full text pool. For creative ads: its headline, primary text, description, and each carousel card's own Meta headline and description. The images are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
   inputSchema: z.object({
     adId: z.string().min(1),
     text: textAdCopySchema.optional(),
-    expectedUpdatedAt: z.string().datetime().optional(),
     headline: z
       .string()
       .max(60)
@@ -1734,7 +1730,6 @@ export const setAdCopyAction = growthAction({
       description: input.description,
       cards: input.cards,
       text: input.text,
-      expectedUpdatedAt: input.expectedUpdatedAt,
     }),
 });
 

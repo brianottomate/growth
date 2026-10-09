@@ -706,7 +706,6 @@ export const contentRouter = {
     .input(
       z.object({
         rootPlatformPostId: z.string(),
-        expectedUpdatedAt: z.string().datetime(),
         items: z.array(spotThreadItemInput).min(1).max(25),
         firstComment: z.string().max(2_200).nullable().optional(),
       }),
@@ -730,14 +729,7 @@ export const contentRouter = {
       }
 
       try {
-        const saved = await ContentService.saveSpotThread(input);
-        if (!saved) {
-          throw new ORPCError("CONFLICT", {
-            message:
-              "This post changed while you were editing. Close and reopen the editor to review the latest version.",
-          });
-        }
-        return saved;
+        return await ContentService.saveSpotThread(input);
       } catch (error) {
         if (error instanceof ORPCError) throw error;
         throw new ORPCError("BAD_REQUEST", {

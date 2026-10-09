@@ -83,11 +83,10 @@ export const previewEmailAudienceAction = growthAction({
 });
 export const saveEmailAudienceAction = growthAction({
   description:
-    "Save or revise a brand's reusable warehouse email audience rules. Existing audiences require expectedRevision. consentConfirmed may only be true when the operator explicitly confirmed marketing permission. Saving does not authorize sending.",
+    "Save or revise a brand's reusable warehouse email audience rules. consentConfirmed may only be true when the operator explicitly confirmed marketing permission. Saving does not authorize sending.",
   inputSchema: z.object({
     brandId: z.string(),
     id: z.string().optional(),
-    expectedRevision: z.number().int().positive().optional(),
     name: z.string().trim().min(1).max(160),
     definition: emailAudienceDefinitionSchema,
   }),
@@ -99,7 +98,6 @@ export const compileEmailAudienceAction = growthAction({
     "Compile a saved audience revision into a private, immutable BigQuery recipient table expiring after 30 days. Returns an asynchronous job receipt; poll audienceSnapshot for readiness. No guest records are copied into Neon and no email is sent. Live opt-outs and suppressions must still be checked before each delivery batch.",
   inputSchema: z.object({
     audienceId: z.string(),
-    expectedRevision: z.number().int().positive(),
   }),
   outputSchema: snapshot,
   execute: (input, ctx) => compileEmailAudience(input, actor(ctx)),

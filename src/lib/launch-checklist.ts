@@ -69,7 +69,6 @@ export function applyLaunchPatch(
   stamp: Omit<LaunchEvent, "item" | "checked">,
   receipt?: string,
 ): LaunchRecord {
-  if (receipt && current.receipts.includes(receipt)) return current;
   const events: LaunchEvent[] = patch.map(({ at, skipped, ...entry }) => ({
     ...entry,
     ...stamp,

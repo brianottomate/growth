@@ -147,7 +147,7 @@ Performance clients can create ads before choosing a campaign. The All ads, Text
 
 Studio supports home-photo and brand-concept generation, uploaded media, the shared image/composition editor, video/catalog tiles, and complete text headline/description pools. Text drafts can contain partial copy; approval requires 3–15 headlines (30 characters each) and 2–4 descriptions (90 characters each). Approved text ads return to Studio for correction, like every other ad. Text editing and approval require the current `updatedAt` version, preventing a stale browser from approving or overwriting newer copy. Creative-set rebuilds preserve text drafts and approved ads.
 
-The existing `draftAd` and `writeGoogleTextAds` capabilities, and the app's From home group generation, accept exactly one of `brandId` (standalone Studio) or `campaignId`. Brand-scoped generation uses the same services as campaign authoring. `writeGoogleTextAds` optionally accepts a landing URL and search themes. `setAdCopy` accepts a complete `text` pool with `expectedUpdatedAt`. Approved standalone ads can subsequently be attached to a campaign using the existing attachment flow; the current relationship still assigns each ad to one campaign.
+The existing `draftAd` and `writeGoogleTextAds` capabilities, and the app's From home group generation, accept exactly one of `brandId` (standalone Studio) or `campaignId`. Brand-scoped generation uses the same services as campaign authoring. `writeGoogleTextAds` optionally accepts a landing URL and search themes. `setAdCopy` accepts a complete `text` pool. Approved standalone ads can subsequently be attached to a campaign using the existing attachment flow; the current relationship still assigns each ad to one campaign.
 
 ## Campaign geography
 

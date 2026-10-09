@@ -35,13 +35,11 @@ export function ReadinessChecklist({
   links,
   defaultOpen = false,
   brandId,
-  revision,
 }: {
   checklist: Checklist;
   links: ReadinessLinks;
   defaultOpen?: boolean;
   brandId?: string;
-  revision?: number;
 }) {
   const router = useRouter();
   const save = useMutation(
@@ -154,14 +152,11 @@ export function ReadinessChecklist({
                             key={item.id}
                             item={item}
                             href={sharedAction ? null : href}
-                            disabled={
-                              !brandId || revision == null || save.isPending
-                            }
+                            disabled={!brandId || save.isPending}
                             onRecord={(entry) => {
-                              if (brandId && revision != null)
+                              if (brandId)
                                 save.mutate({
                                   brandId,
-                                  expectedRevision: revision,
                                   patch: [
                                     { item: item.id as LaunchItem, ...entry },
                                   ],

@@ -1,7 +1,7 @@
 import "server-only";
 import { syncAccountTermsFromSettings } from "./billing-cycles.service";
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { STORED_PIPELINE_STAGES } from "@/lib/performance-pipeline";
 import {
@@ -145,15 +145,10 @@ export async function setPerformanceSettings(input: {
         eq(brandTable.id, brand.id),
         eq(brandTable.organizationId, input.orgId),
         isNull(brandTable.deletedAt),
-        sql`${brandTable.performanceSettings} is not distinct from ${brand.performanceSettings == null ? null : JSON.stringify(brand.performanceSettings)}::jsonb`,
       ),
     )
     .returning();
-  if (!saved.length)
-    throw new PerformanceSettingsError(
-      422,
-      "Client settings changed while saving. Refresh and try again.",
-    );
+  if (!saved.length) throw new PerformanceSettingsError(404, "Brand not found");
   await syncAccountTermsFromSettings({
     orgId: input.orgId,
     brandId: input.brandId,

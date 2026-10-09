@@ -334,12 +334,6 @@ function SequenceEditor({
     initialVersion !== undefined &&
     version !== undefined &&
     initialVersion > version;
-  const loadLatest = () => {
-    const next = emailSequenceDraftSchema.parse(initial);
-    setDraft(next);
-    setSaved(JSON.stringify(next));
-    setVersion(initialVersion);
-  };
   // Reconcile agent/MCP writes only when there is no unsaved operator work.
   useEffect(() => {
     if (!hasNewerVersion || dirty) return;
@@ -439,26 +433,6 @@ function SequenceEditor({
   const sender = emails.data?.sender;
   return (
     <div className="space-y-6">
-      {hasNewerVersion && dirty && (
-        <div role="alert" className="rounded-lg border p-3 text-sm">
-          This sequence was updated elsewhere. Your unsaved draft is preserved.
-          Load the latest version before continuing.
-          <Button
-            variant="outline"
-            className="ml-3"
-            onClick={() => {
-              if (
-                window.confirm(
-                  "Discard your unsaved edits and load the latest saved sequence?",
-                )
-              )
-                loadLatest();
-            }}
-          >
-            Load latest version
-          </Button>
-        </div>
-      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" asChild>
           <Link href={`${basePath}?tab=sequences`}>← All sequences</Link>
@@ -479,12 +453,7 @@ function SequenceEditor({
             {dirty ? "Unsaved draft" : "Draft saved"}
           </span>
           <Button
-            disabled={
-              save.isPending ||
-              createEmail.isPending ||
-              !dirty ||
-              hasNewerVersion
-            }
+            disabled={save.isPending || createEmail.isPending || !dirty}
             onClick={() => {
               const parsed = emailSequenceDraftSchema.safeParse(draft);
               if (!parsed.success)
@@ -494,7 +463,6 @@ function SequenceEditor({
               save.mutate({
                 brandId,
                 sequenceId,
-                expectedVersion: version,
                 draft: parsed.data,
               });
             }}

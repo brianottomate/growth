@@ -102,13 +102,12 @@ for (const brand of brands) {
         .where(
           and(
             eq(brandTable.id, brand.id),
-            eq(brandTable.updatedAt, brand.updatedAt),
             isNull(brandTable.creativeDirection),
           ),
         )
         .returning({ id: brandTable.id });
       if (!saved.length)
-        throw new Error("Brand changed during backfill; preserved newer edits");
+        throw new Error("Brand has no missing creative direction to backfill");
     }
     for (const proposal of output.personas) {
       const source = personas.find((p) => p.id === proposal.id)!;
@@ -118,7 +117,6 @@ for (const brand of brands) {
         .where(
           and(
             eq(personaTable.id, source.id),
-            eq(personaTable.updatedAt, source.updatedAt),
             isNull(personaTable.profile),
             isNull(personaTable.deletedAt),
           ),
@@ -126,7 +124,7 @@ for (const brand of brands) {
         .returning({ id: personaTable.id });
       if (!saved.length)
         throw new Error(
-          `Persona ${source.id} changed during backfill; preserved newer edits`,
+          `Persona ${source.id} has no missing profile to backfill`,
         );
     }
     console.log(

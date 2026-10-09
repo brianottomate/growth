@@ -85,9 +85,6 @@ export function EmailAudiencesClient({
         query.state.data?.status === "compiling" ? 3000 : false,
     }),
   );
-  const selectedIsCurrent =
-    !selectedId ||
-    audiences.data?.find((a) => a.id === selectedId)?.revision === revision;
   const previewMatches =
     Boolean(preview.data) &&
     preview.variables?.brandId === brandId &&
@@ -286,12 +283,6 @@ export function EmailAudiencesClient({
         I have confirmed marketing permission for this audience. A booking alone
         does not establish it.
       </label>
-      {!selectedIsCurrent && (
-        <p className="text-sm text-muted-foreground">
-          This audience changed. Select it again from Saved audiences to load
-          the latest revision.
-        </p>
-      )}
       <div className="flex flex-wrap gap-2">
         <Button
           loading={preview.isPending}
@@ -310,7 +301,6 @@ export function EmailAudiencesClient({
               {
                 brandId,
                 id: selectedId,
-                expectedRevision: revision,
                 name,
                 definition,
               },
@@ -334,9 +324,7 @@ export function EmailAudiencesClient({
           loading={compile.isPending}
           disabled={
             !selectedId ||
-            !revision ||
             !previewMatches ||
-            !selectedIsCurrent ||
             preview.isPending ||
             save.isPending ||
             savedDefinition !== emailAudienceDefinitionKey(definition) ||
@@ -346,7 +334,7 @@ export function EmailAudiencesClient({
           }
           onClick={() =>
             compile.mutate(
-              { audienceId: selectedId!, expectedRevision: revision! },
+              { audienceId: selectedId! },
               {
                 onSuccess: (s) => {
                   setSnapshotId(s.id);

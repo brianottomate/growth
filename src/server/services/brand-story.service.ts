@@ -98,7 +98,6 @@ export async function draftBrandStory(input: {
       websiteMeta: true,
       story: true,
       creativeDirection: true,
-      updatedAt: true,
     },
   });
   if (!brand) throw new Error("Brand not found");
@@ -185,16 +184,8 @@ export async function draftBrandStory(input: {
           }
         : {}),
     })
-    .where(
-      and(
-        eq(brandTable.id, brand.id),
-        eq(brandTable.updatedAt, brand.updatedAt),
-      ),
-    )
+    .where(eq(brandTable.id, brand.id))
     .returning({ id: brandTable.id });
-  if (!saved.length)
-    throw new Error(
-      "The brand changed while writing. Read it again and retry; your edits were preserved.",
-    );
+  if (!saved.length) throw new Error("Brand not found");
   return { story, creativeDirection: output.creativeDirection };
 }

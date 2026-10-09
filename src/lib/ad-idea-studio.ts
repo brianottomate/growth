@@ -128,7 +128,6 @@ export type IdeaStudio = {
 };
 export const ideaSaveSchema = z.object({
   adId: z.string().min(1),
-  expectedUpdatedAt: z.string().datetime(),
   name: z.string().trim().min(1).max(300),
   reviewImportedCreative: z.boolean().optional(),
   document: ideaDocumentSchema,

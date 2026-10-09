@@ -89,7 +89,6 @@ export function PreparedAdCard({
     null,
   );
   const [draft, setDraft] = useState(ad.content);
-  const [editVersion, setEditVersion] = useState(ad.updatedAt);
   const [targetId, setTargetId] = useState(ad.bookingTargetId ?? null);
   const [picking, setPicking] = useState<"base" | "story" | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -154,7 +153,6 @@ export function PreparedAdCard({
     (t) => t.id === (editor === "destination" ? targetId : ad.bookingTargetId),
   );
   const open = (section: NonNullable<typeof editor>) => {
-    setEditVersion(ad.updatedAt);
     setDraft(structuredClone(ad.content));
     setTargetId(ad.bookingTargetId ?? null);
     setEditor(section);
@@ -209,7 +207,7 @@ export function PreparedAdCard({
                 body: draftVideo?.body ?? "",
                 description: draftVideo?.description ?? "",
               };
-    save.mutate({ adId: ad.id, expectedUpdatedAt: editVersion, section });
+    save.mutate({ adId: ad.id, section });
   };
   const actions = (
     <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
@@ -726,7 +724,6 @@ export function PreparedAdCard({
                 status.mutate({
                   adId: ad.id,
                   status: ready ? "drawn" : "ready",
-                  expectedUpdatedAt: ad.updatedAt,
                 })
               }
             >
@@ -749,7 +746,6 @@ export function PreparedAdCard({
                 status.mutate({
                   adId: ad.id,
                   status: "approved",
-                  expectedUpdatedAt: ad.updatedAt,
                 })
               }
             >
@@ -761,7 +757,6 @@ export function PreparedAdCard({
               inStudio
               assigned={Boolean(campaignId)}
               adId={ad.id}
-              updatedAt={ad.updatedAt}
               pushed={Boolean(deliveryState)}
             />
           )}
