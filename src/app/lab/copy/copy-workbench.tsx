@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { nanoid } from "nanoid";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +15,10 @@ import {
   copyLabInspirationSchema,
   copyLabExperimentSchema,
   COPY_LAB_PLACEMENTS,
+  fixtureHomeSuite,
+  mergeCopyLabSuite,
+  type CopyLabAction,
+  copyLabHistorySchema,
   type CopyLabHomeSuite,
   COPY_LAB_SURFACES,
   type CopyLabBrand,
@@ -30,6 +36,22 @@ import {
 } from "@/lib/catalog-studio";
 import { COMPOSITION_TEMPLATES } from "@/lib/compositions";
 import { HomeSuite, CatalogArtwork, CompositionGuide } from "./home-suite";
+import { RunIdeas } from "./run-ideas";
+import { RunReview } from "./run-review";
+import { PromptInspector } from "./prompt-inspector";
+import { HomePicker } from "@/app/app/performance/clients/[brandSlug]/HomePicker";
+
+type RunRecord = {
+  id: string;
+  selection: string;
+  brandId: string;
+  homeId: string;
+  photoUrl?: string;
+  action: CopyLabAction;
+  variant: Variant;
+  at: string;
+  result: CopyLabRunResult;
+};
 
 type Home = CopyLabHome & { photoCount: number };
 type Preset = { id: string; label: string; text: string };
@@ -88,6 +110,14 @@ function hash(text: string) {
 }
 
 export function CopyWorkbench(props: {
+  promptBases: Record<
+    string,
+    {
+      withStory: { ad: string; photo: string };
+      withoutStory: { ad: string; photo: string };
+    }
+  >;
+
   snapshotAt: string;
   brands: CopyLabBrand[];
   homes: Home[];
@@ -111,6 +141,9 @@ export function CopyWorkbench(props: {
   const [activeSet, setActiveSet] = useState("production");
   const [variants, setVariants] = useState<Variant[]>([PRODUCTION]);
   const [cells, setCells] = useState<Record<string, Cell>>({});
+  const [history, setHistory] = useState<RunRecord[]>([]);
+  const [showSource, setShowSource] = useState(false);
+  const [activeRun, setActiveRun] = useState<string | null>(null);
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [catalogTemplates, setCatalogTemplates] = useState<CatalogTemplateId[]>(
     [DEFAULT_CATALOG_TEMPLATE, "catalog-amenities-place"],
@@ -130,6 +163,10 @@ export function CopyWorkbench(props: {
     setVariants(load("variants", [PRODUCTION]));
     setActiveSet(load("activeSet", "production"));
     setCells(load("cells", {}));
+    const savedHistory = copyLabHistorySchema.safeParse(
+      load("run-history", []),
+    );
+    if (savedHistory.success) setHistory(savedHistory.data);
     setPicks(load("picks", {}));
     const context = load<null | {
       surface: CopyLabSurface;
@@ -154,6 +191,9 @@ export function CopyWorkbench(props: {
   useEffect(() => {
     if (loaded) save("variants", variants);
   }, [variants, loaded]);
+  useEffect(() => {
+    if (loaded) save("run-history", history);
+  }, [history, loaded]);
   useEffect(() => {
     if (loaded) save("picks", picks);
   }, [picks, loaded]);
@@ -227,6 +267,65 @@ export function CopyWorkbench(props: {
     surface === "home-suite" && !blind
       ? [columns.find((v) => v.id === activeSet) ?? columns[0]!]
       : columns;
+  const selectedRecord = history.find(
+    (record) =>
+      record.id === activeRun &&
+      record.brandId === brandId &&
+      record.homeId === selected[0],
+  );
+  const deleteRun = (record: RunRecord) => {
+    const reviewKeys = [
+      record.id,
+      "status-quo",
+      ...(record.result.expandedIdeas ?? []).map((i) => i.id),
+    ].map(
+      (id) => `${STORE}:review:${id === record.id ? id : `${record.id}:${id}`}`,
+    );
+    const reviews: [string, string][] = [];
+    try {
+      for (const key of reviewKeys) {
+        const value = localStorage.getItem(key);
+        if (value !== null) reviews.push([key, value]);
+        localStorage.removeItem(key);
+      }
+    } catch {
+      /* Removing the run still works when storage is unavailable. */
+    }
+    setHistory((current) => current.filter((run) => run.id !== record.id));
+    setActiveRun((current) => (current === record.id ? null : current));
+    toast("Run deleted", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          try {
+            for (const [key, value] of reviews)
+              localStorage.setItem(key, value);
+          } catch {
+            /* The generated snapshot can still be restored. */
+          }
+          setHistory((current) =>
+            current.some((run) => run.id === record.id)
+              ? current
+              : [...current, record].sort((a, b) => a.at.localeCompare(b.at)),
+          );
+        },
+      },
+    });
+  };
+  const cellFor = (variant: Variant): Cell | undefined => {
+    const current = cells[`${selection}|${variant.id}`];
+    if (current?.status === "running") return current;
+    if (selectedRecord && selectedRecord.variant.id === variant.id)
+      return {
+        status: "done",
+        result: selectedRecord.result,
+        at: selectedRecord.at,
+        ran: settingsOf(selectedRecord.variant),
+      };
+    return current;
+  };
+  const inspectorCell =
+    activeRun === "source" ? undefined : cellFor(visibleColumns[0]!);
   const production = Object.entries(cells)
     .flatMap(([key, cell]) =>
       key.startsWith(`${surface}|${brandId}|`) &&
@@ -247,6 +346,7 @@ export function CopyWorkbench(props: {
 
   const chooseBrand = (id: string) => {
     setBrandId(id);
+    setActiveRun(null);
     setHomeIds(props.homes.filter((h) => h.brandId === id).map((h) => h.id));
   };
   const toggleHome = (id: string) =>
@@ -263,7 +363,7 @@ export function CopyWorkbench(props: {
     );
   const duplicate = (variant: Variant) => {
     if (variants.length >= 20) return;
-    const id = crypto.randomUUID();
+    const id = nanoid();
     setActiveSet(id);
     setVariants((list) => [
       ...list,
@@ -275,9 +375,24 @@ export function CopyWorkbench(props: {
     ]);
   };
 
-  async function run(variant: Variant) {
+  async function run(variant: Variant, action: CopyLabAction = "both") {
     const key = `${selection}|${variant.id}`;
     if (cells[key]?.status === "running") return;
+    const prior: Cell | undefined = selectedRecord
+      ? {
+          status: "done",
+          result: selectedRecord.result,
+          at: selectedRecord.at,
+          ran: settingsOf(selectedRecord.variant),
+        }
+      : undefined;
+    const previousOutput =
+      prior?.status === "done"
+        ? (prior.result.output as CopyLabHomeSuite)
+        : selectedHome
+          ? fixtureHomeSuite(selectedHome, photoUrl)
+          : null;
+    setActiveRun(null);
     setCells((c) => ({ ...c, [key]: { status: "running" } }));
     const { id: _id, ...body } = variant;
     try {
@@ -286,6 +401,7 @@ export function CopyWorkbench(props: {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           surface,
+          action: surface === "home-suite" ? action : undefined,
           brandId,
           homeIds: selected,
           variant: body,
@@ -293,13 +409,32 @@ export function CopyWorkbench(props: {
           catalogTemplates,
           photoUrl,
           catalogHomeIds:
-            surface === "home-suite"
-              ? brandHomes.slice(0, 8).map((h) => h.id)
-              : undefined,
+            surface === "home-suite" ? selected.slice(0, 1) : undefined,
         }),
       });
       const json = (await res.json()) as CopyLabRunResult & { error?: string };
       if (!res.ok || json.error) throw new Error(json.error ?? res.statusText);
+      if (surface === "home-suite" && previousOutput && json.output)
+        json.output = mergeCopyLabSuite(
+          previousOutput,
+          json.output as CopyLabHomeSuite,
+          action,
+        );
+      if (action === "ad" && prior?.status === "done")
+        json.photoPlan = prior.result.photoPlan;
+      const record: RunRecord = {
+        id: nanoid(),
+        selection,
+        brandId,
+        homeId: selected[0] ?? "",
+        photoUrl,
+        action,
+        variant: { ...variant },
+        at: new Date().toISOString(),
+        result: json,
+      };
+      setHistory((records) => [...records, record].slice(-30));
+      setActiveRun(null);
       setCells((c) => ({
         ...c,
         [key]: {
@@ -326,6 +461,7 @@ export function CopyWorkbench(props: {
         JSON.stringify(
           {
             variants,
+            history,
             cells: Object.fromEntries(
               Object.entries(cells).filter(
                 ([, cell]) => cell.status === "done",
@@ -377,6 +513,8 @@ export function CopyWorkbench(props: {
         throw new Error("This experiment needs a different fixture snapshot.");
       const done = Object.entries(experiment.cells).slice(-KEEP_CELLS);
       setInspiration(experiment.inspiration ?? []);
+      setHistory(experiment.history ?? []);
+      setActiveRun(null);
       setVariants(experiment.variants);
       setActiveSet(context.activeSet ?? experiment.variants[0]!.id);
       setCells(Object.fromEntries(done));
@@ -404,26 +542,28 @@ export function CopyWorkbench(props: {
   );
 
   return (
-    <div className="space-y-6 p-3 sm:p-6">
+    <div className="@container w-full space-y-6 p-3 sm:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Copy lab</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Tune the prompt, then compare one home’s complete ads across square,
-            portrait, landscape and vertical formats.
+            Compare Instagram feed posts, stories and every carousel card, with
+            the prompt build alongside.
           </p>
           <p className="text-xs text-muted-foreground">
             Fixtures from {props.snapshotAt.slice(0, 10)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button
-            size="sm"
-            disabled={!canRun || generating}
-            onClick={() => visibleColumns.forEach((v) => void run(v))}
-          >
-            {generating ? "Generating…" : "Generate set"}
-          </Button>
+          {surface !== "home-suite" && (
+            <Button
+              size="sm"
+              disabled={!canRun || generating}
+              onClick={() => visibleColumns.forEach((v) => void run(v))}
+            >
+              {generating ? "Generating…" : "Generate set"}
+            </Button>
+          )}
         </div>
       </header>
 
@@ -441,16 +581,61 @@ export function CopyWorkbench(props: {
           options={props.brands.map((b) => ({ value: b.id, label: b.name }))}
         />
         {spec.homes === "one" && (
-          <SimpleSelect
-            size="sm"
-            className="max-w-full min-w-0 sm:max-w-96"
-            aria-label="Home"
-            value={selected[0] ?? ""}
-            onValueChange={(id) => setHomeIds([id])}
-            options={brandHomes.map((h) => ({ value: h.id, label: h.name }))}
-          />
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <HomePicker
+              key={brandId}
+              homes={brandHomes.map((home) => ({
+                id: home.id,
+                name: home.name,
+                imageUrl: home.heroUrl ?? home.photos[0]?.url ?? "",
+                thumbUrl:
+                  home.photos.find((photo) => photo.url === home.heroUrl)
+                    ?.thumbUrl ??
+                  home.photos[0]?.thumbUrl ??
+                  null,
+                bedrooms: home.bedrooms,
+                guests: home.guests,
+                nightlyFrom: home.nightlyFrom,
+              }))}
+              picked={selected}
+              max={1}
+              single
+              label="From homes"
+              title={`Choose one home · ${brand.name}`}
+              onChange={(ids) => {
+                if (ids.length) {
+                  setHomeIds(ids.slice(0, 1));
+                  setActiveRun(null);
+                }
+              }}
+            />
+            {selectedHome && (
+              <div className="flex min-w-0 items-center gap-2">
+                {(selectedHome.heroUrl ?? selectedHome.photos[0]?.url) && (
+                  // oxlint-disable-next-line nextjs/no-img-element
+                  <img
+                    src={selectedHome.heroUrl ?? selectedHome.photos[0]?.url}
+                    alt=""
+                    className="h-10 w-14 shrink-0 rounded object-cover"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p
+                    className="max-w-80 truncate text-sm font-medium"
+                    title={selectedHome.name}
+                  >
+                    {selectedHome.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedHome.bedrooms} bedrooms · sleeps{" "}
+                    {selectedHome.guests}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
-        {surface === "home-suite" && !blind && (
+        {surface !== "home-suite" && !blind && (
           <SimpleSelect
             size="sm"
             aria-label="Copy set"
@@ -460,107 +645,282 @@ export function CopyWorkbench(props: {
           />
         )}
       </div>
-      <div
-        className={
-          surface === "home-suite"
-            ? "space-y-6"
-            : "flex gap-4 overflow-x-auto pb-4"
-        }
-      >
-        {surface === "catalog-card" && selected[0] && (
-          <HumanColumn home={props.homes.find((h) => h.id === selected[0])!} />
-        )}
-        {visibleColumns.map((variant, index) => {
-          const cell = cells[`${selection}|${variant.id}`];
-          const pick = picks[selection];
-          const reveal = !blind || Boolean(pick);
-          return (
-            <div
-              key={variant.id}
-              className={`${surface === "home-suite" ? "w-full" : "w-[380px] shrink-0"} space-y-3 rounded-lg border p-3 ${pick === variant.id ? "border-primary ring-1 ring-primary" : ""}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-medium">
-                  {reveal ? variant.label : `Option ${index + 1}`}
-                </span>
-                <div className="flex gap-1">
-                  <Button
-                    size="xs"
-                    variant={pick === variant.id ? "default" : "outline"}
-                    aria-pressed={pick === variant.id}
-                    onClick={() =>
-                      setPicks((p) => ({ ...p, [selection]: variant.id }))
-                    }
-                  >
-                    Prefer
-                  </Button>
-                  <Button
-                    size="xs"
-                    disabled={!canRun || cell?.status === "running"}
-                    onClick={() => void run(variant)}
-                  >
-                    {cell?.status === "running" ? "Running" : "Run"}
-                  </Button>
-                </div>
+      {surface === "home-suite" && selectedHome ? (
+        <div className="grid min-w-0 grid-cols-1 items-start gap-6 @4xl:grid-cols-[320px_minmax(0,1fr)] @6xl:grid-cols-[360px_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-3 @4xl:sticky @4xl:top-4 @4xl:max-h-[calc(100dvh-2rem)] @4xl:overflow-y-auto">
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs">
+              <p className="font-medium">
+                {selectedRecord
+                  ? `Starting from: ${selectedRecord.variant.label}`
+                  : "Fresh experiment"}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {selectedRecord
+                  ? "Partial writes preserve the other copy from this saved run. Results create a separate run."
+                  : "Each write creates a separate run from fixture photos. Select a saved run as a starting point to reuse its copy."}
+              </p>
+              {selectedRecord && (
+                <Button
+                  className="mt-2"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => setActiveRun(null)}
+                >
+                  Start fresh
+                </Button>
+              )}
+            </div>
+            <PromptInspector
+              brand={brand}
+              home={selectedHome}
+              homes={brandHomes}
+              variant={visibleColumns[0]!}
+              basePrompts={
+                props.promptBases[brandId]![
+                  visibleColumns[0]!.story ? "withStory" : "withoutStory"
+                ]
+              }
+              stale={false}
+              busy={generating}
+              canRun={canRun}
+              onRun={(action) => void run(visibleColumns[0]!, action)}
+              onChange={(patch) => update(visibleColumns[0]!.id, patch)}
+              photos={selectedHome.photos}
+              photoUrl={photoUrl}
+              onPhoto={(url) => {
+                setPhoto(url);
+                setActiveRun(null);
+              }}
+            />
+          </div>
+          <section className="min-w-0 space-y-5" aria-label="Run comparison">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold">Saved runs</h2>
+                <p className="text-xs text-muted-foreground">
+                  Independent results, newest first. Adjust each preview without
+                  changing its prompt snapshot.
+                </p>
               </div>
-              {!blind && (
-                <VariantEditor
-                  variant={variant}
-                  presets={props.presets}
-                  production={production ?? null}
-                  homeProduction={
-                    surface === "home-suite"
-                      ? (homeProduction ?? null)
-                      : undefined
-                  }
-                  onChange={(patch) => update(variant.id, patch)}
-                  onDuplicate={() => duplicate(variant)}
-                  onRemove={
-                    variants.length > 1
-                      ? () => {
-                          setVariants((list) =>
-                            list.filter((v) => v.id !== variant.id),
-                          );
-                          setPicks((p) =>
-                            Object.fromEntries(
-                              Object.entries(p).filter(
-                                ([, id]) => id !== variant.id,
-                              ),
-                            ),
-                          );
-                        }
-                      : undefined
-                  }
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setShowSource((v) => !v)}
+              >
+                {showSource ? "Hide source photos" : "Show source photos"}
+              </Button>
+            </div>
+            {generating && (
+              <p
+                role="status"
+                className="rounded-lg border bg-muted p-4 text-sm"
+              >
+                Writing a new run… Your saved runs stay available below.
+              </p>
+            )}
+            {cells[`${selection}|${visibleColumns[0]!.id}`]?.status ===
+              "error" && (
+              <p role="alert" className="text-sm text-destructive">
+                {
+                  (
+                    cells[`${selection}|${visibleColumns[0]!.id}`] as Extract<
+                      Cell,
+                      { status: "error" }
+                    >
+                  ).error
+                }
+              </p>
+            )}
+            {history
+              .filter(
+                (r) =>
+                  r.selection.startsWith("home-suite|") &&
+                  r.brandId === brandId &&
+                  r.homeId === selectedHome.id,
+              )
+              .slice()
+              .reverse()
+              .map((record, index, records) => (
+                <RunIdeas
+                  homes={brandHomes}
+                  key={record.id}
+                  id={record.id}
+                  title={`Run ${records.length - index} · ${record.variant.label} · ${{ ad: "Ad copy", photo: "Photo copy", both: "Ad + photo copy" }[record.action]}`}
+                  at={record.at}
+                  output={record.result.output as CopyLabHomeSuite}
+                  result={record.result}
+                  variant={record.variant}
+                  home={selectedHome}
+                  brand={brand}
+                  selected={selectedRecord?.id === record.id}
+                  onDelete={() => deleteRun(record)}
+                  onUse={() => {
+                    setActiveRun(record.id);
+                    setPhoto(record.photoUrl ?? null);
+                  }}
+                />
+              ))}
+            {(showSource ||
+              !history.some(
+                (r) =>
+                  r.selection.startsWith("home-suite|") &&
+                  r.brandId === brandId &&
+                  r.homeId === selectedHome.id,
+              )) && (
+              <RunReview
+                key={`source-${selectedHome.id}-${photoUrl}`}
+                id={`source-${selectedHome.id}-${photoUrl}`}
+                title="Source photos"
+                output={fixtureHomeSuite(selectedHome, photoUrl)}
+                home={selectedHome}
+                brand={brand}
+              />
+            )}
+          </section>
+        </div>
+      ) : (
+        <>
+          <div className="grid min-w-0 grid-cols-1 items-start gap-6 @5xl:grid-cols-[minmax(0,1fr)_400px]">
+            <div
+              className={
+                surface === "home-suite"
+                  ? "min-w-0 space-y-6"
+                  : "flex gap-4 overflow-x-auto pb-4"
+              }
+            >
+              {surface === "catalog-card" && selected[0] && (
+                <HumanColumn
+                  home={props.homes.find((h) => h.id === selected[0])!}
                 />
               )}
-              <CellView
-                cell={cell}
-                surface={surface}
-                homes={selected.map((id) =>
-                  props.homes.find((h) => h.id === id)!,
-                )}
-                stale={
-                  cell?.status === "done" && cell.ran !== settingsOf(variant)
-                }
-                reveal={reveal}
-                brand={brand}
-                placement={placement}
-                photoUrl={photoUrl}
-                catalogHomes={brandHomes}
-              />
+              {visibleColumns.map((variant, index) => {
+                const cell =
+                  activeRun === "source" ? undefined : cellFor(variant);
+                const pick = picks[selection];
+                const reveal = !blind || Boolean(pick);
+                return (
+                  <div
+                    key={variant.id}
+                    className={`${surface === "home-suite" ? "w-full" : "w-[380px] shrink-0"} space-y-3 rounded-lg border p-3 ${pick === variant.id ? "border-primary ring-1 ring-primary" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium">
+                        {reveal ? variant.label : `Option ${index + 1}`}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          size="xs"
+                          variant={pick === variant.id ? "default" : "outline"}
+                          aria-pressed={pick === variant.id}
+                          onClick={() =>
+                            setPicks((p) => ({ ...p, [selection]: variant.id }))
+                          }
+                        >
+                          Prefer
+                        </Button>
+                        <Button
+                          size="xs"
+                          disabled={!canRun || cell?.status === "running"}
+                          onClick={() => void run(variant)}
+                        >
+                          {cell?.status === "running" ? "Running" : "Run"}
+                        </Button>
+                      </div>
+                    </div>
+                    {!blind && (
+                      <VariantEditor
+                        variant={variant}
+                        presets={props.presets}
+                        production={production ?? null}
+                        homeProduction={
+                          surface === "home-suite"
+                            ? (homeProduction ?? null)
+                            : undefined
+                        }
+                        onChange={(patch) => update(variant.id, patch)}
+                        onDuplicate={() => duplicate(variant)}
+                        onRemove={
+                          variants.length > 1
+                            ? () => {
+                                setVariants((list) =>
+                                  list.filter((v) => v.id !== variant.id),
+                                );
+                                setPicks((p) =>
+                                  Object.fromEntries(
+                                    Object.entries(p).filter(
+                                      ([, id]) => id !== variant.id,
+                                    ),
+                                  ),
+                                );
+                              }
+                            : undefined
+                        }
+                      />
+                    )}
+                    <CellView
+                      cell={cell}
+                      surface={surface}
+                      homes={selected.map((id) =>
+                        props.homes.find((h) => h.id === id)!,
+                      )}
+                      stale={
+                        cell?.status === "done" &&
+                        cell.ran !== settingsOf(variant)
+                      }
+                      reveal={reveal}
+                      brand={brand}
+                      placement={placement}
+                      photoUrl={photoUrl}
+                      catalogHomes={selectedHome ? [selectedHome] : []}
+                    />
+                  </div>
+                );
+              })}
+              {!blind && (
+                <button
+                  type="button"
+                  onClick={() => duplicate(variants.at(-1) ?? PRODUCTION)}
+                  className="w-40 shrink-0 rounded-lg border border-dashed text-sm text-muted-foreground hover:text-foreground"
+                >
+                  + Copy set
+                </button>
+              )}
             </div>
-          );
-        })}
-        {!blind && (
-          <button
-            type="button"
-            onClick={() => duplicate(variants.at(-1) ?? PRODUCTION)}
-            className="w-40 shrink-0 rounded-lg border border-dashed text-sm text-muted-foreground hover:text-foreground"
-          >
-            + Copy set
-          </button>
-        )}
-      </div>
+            {!blind && (
+              <PromptInspector
+                brand={brand}
+                home={selectedHome}
+                homes={brandHomes}
+                variant={visibleColumns[0]!}
+                basePrompts={
+                  props.promptBases[brandId]![
+                    visibleColumns[0]!.story ? "withStory" : "withoutStory"
+                  ]
+                }
+                result={
+                  inspectorCell?.status === "done"
+                    ? inspectorCell.result
+                    : undefined
+                }
+                stale={
+                  inspectorCell?.status === "done" &&
+                  inspectorCell.ran !== settingsOf(visibleColumns[0]!)
+                }
+                busy={generating}
+                canRun={canRun}
+                onRun={(action) => void run(visibleColumns[0]!, action)}
+                onChange={(patch) => update(visibleColumns[0]!.id, patch)}
+                photos={selectedHome?.photos ?? []}
+                photoUrl={photoUrl}
+                onPhoto={(url) => {
+                  setPhoto(url);
+                  setActiveRun(null);
+                }}
+              />
+            )}
+          </div>
+        </>
+      )}
       {surface === "home-suite" && selectedHome && (
         <details className="space-y-3 rounded-lg border p-4">
           <summary className="cursor-pointer font-semibold">
@@ -1173,26 +1533,60 @@ function CellView(props: {
   const { cell } = props;
   if (!cell)
     return props.surface === "home-suite" ? (
-      <div className="flex flex-wrap gap-6">
-        {["Home static", "Home carousel", "Catalog"].map((label) => (
-          <section
-            key={label}
-            className={`${label === "Catalog" ? "w-full" : "w-[664px]"} max-w-full rounded border p-4`}
-          >
-            <h3 className="font-medium">{label}</h3>
-            <div className="mt-3 flex aspect-square items-center justify-center rounded bg-muted text-sm text-muted-foreground">
-              Generate to preview
-            </div>
-          </section>
-        ))}
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Source photos · choose a prompt direction and write copy to create a
+          local run.
+        </p>
+        <HomeSuite
+          key={`source-${props.homes[0]!.id}-${props.photoUrl}`}
+          output={fixtureHomeSuite(props.homes[0]!, props.photoUrl)}
+          home={props.homes[0]!}
+          brand={props.brand}
+          placement={props.placement}
+          photoUrl={props.photoUrl}
+          catalogHomes={props.homes.slice(0, 1)}
+        />
       </div>
     ) : (
       <p className="text-sm text-muted-foreground">Not run</p>
     );
   if (cell.status === "running")
-    return <p className="text-sm text-muted-foreground">Writing…</p>;
+    return props.surface === "home-suite" ? (
+      <div className="space-y-3">
+        <p role="status" className="text-sm text-muted-foreground">
+          Writing a new local run…
+        </p>
+        <HomeSuite
+          output={fixtureHomeSuite(props.homes[0]!, props.photoUrl)}
+          home={props.homes[0]!}
+          brand={props.brand}
+          placement={props.placement}
+          photoUrl={props.photoUrl}
+          catalogHomes={props.homes.slice(0, 1)}
+        />
+      </div>
+    ) : (
+      <p className="text-sm text-muted-foreground">Writing…</p>
+    );
   if (cell.status === "error")
-    return <p className="text-sm text-destructive">{cell.error}</p>;
+    return (
+      <div className="space-y-3">
+        <p role="alert" className="text-sm text-destructive">
+          {cell.error}
+        </p>
+        {props.surface === "home-suite" && (
+          <HomeSuite
+            output={fixtureHomeSuite(props.homes[0]!, props.photoUrl)}
+            home={props.homes[0]!}
+            brand={props.brand}
+            placement={props.placement}
+            photoUrl={props.photoUrl}
+            catalogHomes={props.homes.slice(0, 1)}
+          />
+        )}
+      </div>
+    );
   const { result } = cell;
   return (
     <div className="space-y-3">
@@ -1235,6 +1629,7 @@ function CellView(props: {
         <p className="text-sm text-destructive">No usable copy</p>
       ) : props.surface === "home-suite" ? (
         <HomeSuite
+          key={`${props.homes[0]?.id}-${cell.at}`}
           output={result.output as CopyLabHomeSuite}
           home={props.homes[0]!}
           brand={props.brand}

@@ -61,6 +61,18 @@ export function trimHomeCards<T>(cards: T[], max: number): T[] {
   return [...cards.slice(0, max - 1), cards.at(-1)!];
 }
 
+/** Fixed geometry used by the production starter workflow and lab comparisons. */
+export function starterCompositionTemplate(hero: boolean, story = false) {
+  return hero
+    ? story
+      ? ("tall-statement" as const)
+      : ("hero-overlay" as const)
+    : ("image-hero" as const);
+}
+export function starterCompositionCta(hero: boolean) {
+  return hero ? "Explore your next escape" : "";
+}
+
 /** Only selected, real photos can become editable ad cards. */
 export function generatedDocument(
   home: StarterHome,
@@ -80,13 +92,9 @@ export function generatedDocument(
     story = false,
   ) => ({
     ...layout,
-    templateId: hero
-      ? story
-        ? ("tall-statement" as const)
-        : ("hero-overlay" as const)
-      : ("image-hero" as const),
+    templateId: starterCompositionTemplate(hero, story),
     eyebrow: "",
-    cta: hero ? "Explore your next escape" : "",
+    cta: starterCompositionCta(hero),
     showLogo,
   });
   const cards = selected.map((card, i) => {

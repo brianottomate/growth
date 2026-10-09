@@ -2,6 +2,7 @@
 
 import { catalogAdHeadline } from "@/lib/catalog-studio";
 import { useState } from "react";
+import { AdCopyFields, type AdCopyValues } from "./ad-copy-fields";
 import { Button } from "@/components/ui/button";
 import { CatalogCollectionPreview } from "@/app/app/performance/clients/[brandSlug]/catalog/CatalogPreview";
 import { AdMock } from "@/components/ad-mock";
@@ -108,6 +109,7 @@ function ComposedAd({
   placement,
   label,
   shape: shapeOverride,
+  cardIndex,
 }: {
   document: IdeaDocument;
   home: CopyLabHome;
@@ -115,6 +117,7 @@ function ComposedAd({
   placement: MetaPlacement;
   label: string;
   shape?: IdeaShape;
+  cardIndex?: number;
 }) {
   const [card, setCard] = useState(0);
   const spec = META_PLACEMENTS.find((p) => p.id === placement)!;
@@ -127,11 +130,14 @@ function ComposedAd({
         : "square");
   const copy = document.copyOverrides[shape] ?? document.copy;
   const media = document.cards.flatMap((slide) => {
-    const url = ideaPreviewUrl(home.brandId, slide, shape);
+    const url =
+      slide.mode === "supplied"
+        ? slide.source.url
+        : ideaPreviewUrl(home.brandId, slide, shape);
     return url
       ? [
           {
-            url: labCompositionUrl(url, home),
+            url: slide.mode === "supplied" ? url : labCompositionUrl(url, home),
             type: "image",
             headline: slide.copy?.headline ?? copy.headline,
             description: slide.copy?.description ?? copy.description,
@@ -139,7 +145,20 @@ function ComposedAd({
         ]
       : [];
   });
-  const active = Math.min(card, Math.max(0, media.length - 1));
+  const active = Math.min(cardIndex ?? card, Math.max(0, media.length - 1));
+  const source = {
+    primaryText: copy.body,
+    headline: media[active]?.headline ?? copy.headline,
+    description: media[active]?.description ?? copy.description ?? "",
+  };
+  const sourceKey = JSON.stringify([active, shape, source]);
+  const [edits, setEdits] = useState<Record<string, AdCopyValues>>({});
+  const fields = edits[sourceKey] ?? source;
+  const previewMedia = media.map((item, index) =>
+    index === active
+      ? { ...item, headline: fields.headline, description: fields.description }
+      : item,
+  );
   const [view, setView] = useState<"placement" | "artwork">("placement");
   return (
     <section className="w-80 max-w-full min-w-0 space-y-3">
@@ -170,14 +189,18 @@ function ComposedAd({
           crop={shape}
           brandName={brand.name}
           brandLogo={null}
-          body={copy.body}
-          headline={copy.headline}
-          description={copy.description ?? null}
+          body={fields.primaryText}
+          headline={fields.headline}
+          description={fields.description || null}
           link={copy.linkUrl || null}
           callToAction={copy.callToAction ?? null}
-          media={media}
-          card={active}
-          onCard={setCard}
+          media={
+            cardIndex === undefined
+              ? previewMedia
+              : previewMedia.slice(active, active + 1)
+          }
+          card={cardIndex === undefined ? active : 0}
+          onCard={cardIndex === undefined ? setCard : undefined}
           {...("frame" in spec ? { frame: spec.frame } : {})}
         />
       ) : (
@@ -185,12 +208,15 @@ function ComposedAd({
           {media[active] && (
             <Artwork src={media[active].url} label={`${label} · ${shape}`} />
           )}
-          <p className="text-sm whitespace-pre-wrap">{copy.body}</p>
-          <p className="text-sm font-semibold">{copy.headline}</p>
-          <p className="text-xs text-muted-foreground">{copy.description}</p>
         </div>
       )}
-      {media.length > 1 && (
+      <AdCopyFields
+        value={fields}
+        onChange={(value) =>
+          setEdits((current) => ({ ...current, [sourceKey]: value }))
+        }
+      />
+      {cardIndex === undefined && media.length > 1 && (
         <div className="flex flex-wrap gap-1" aria-label="Carousel slides">
           {media.map((_, index) => (
             <Button
@@ -255,7 +281,14 @@ export function HomeSuite({
   photoUrl?: string;
   catalogHomes: CopyLabHome[];
 }) {
-  const [visibleShapes, setVisibleShapes] = useState<IdeaShape[]>(["square"]);
+  const [visibleShapes, setVisibleShapes] = useState<IdeaShape[]>([
+    "portrait",
+    "story",
+  ]);
+  const [catalogPrimaryText, setCatalogPrimaryText] = useState("");
+  const [catalogEdits, setCatalogEdits] = useState<
+    Record<string, AdCopyValues>
+  >({});
   const visibleFormats = PREVIEW_FORMATS.filter((format) =>
     visibleShapes.includes(format.shape),
   );
@@ -279,6 +312,11 @@ export function HomeSuite({
   const generatedCount =
     output.catalogHomes?.filter((c) => c.copy).length ??
     (output.catalog ? 1 : 0);
+  const catalogCards = collection.map((item) => ({
+    ...item,
+    headline: catalogEdits[item.key]?.headline ?? item.headline,
+    description: catalogEdits[item.key]?.description ?? item.description,
+  }));
   return (
     <div className="space-y-6">
       <p className="text-xs text-muted-foreground">
@@ -309,7 +347,7 @@ export function HomeSuite({
         </p>
       )}
       <div className="flex min-w-0 flex-wrap items-start gap-8">
-        {(["static", "carousel"] as const).map((kind) => (
+        {(["static"] as const).map((kind) => (
           <section
             key={kind}
             className={`${visibleFormats.length > 1 ? "w-[664px]" : "w-80"} max-w-full space-y-3`}
@@ -366,6 +404,30 @@ export function HomeSuite({
           </details>
         )}
       </div>
+      <section className="min-w-0 space-y-3 border-t pt-6">
+        <h3 className="font-semibold">Home carousel · all cards</h3>
+        <div className="flex items-start gap-6 overflow-x-auto pb-4">
+          {output.carousel ? (
+            output.carousel.cards.map((_, index) => (
+              <div key={index} className="w-80 max-w-full shrink-0">
+                <ComposedAd
+                  document={output.carousel!}
+                  home={home}
+                  brand={brand}
+                  placement="instagram-feed"
+                  shape="portrait"
+                  cardIndex={index}
+                  label={`Card ${index + 1} · Instagram`}
+                />
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Composition needs another pass.
+            </p>
+          )}
+        </div>
+      </section>
       <section className="space-y-3 border-t pt-6">
         <h3 className="font-semibold">
           Catalog · {collection.length} homes together
@@ -375,12 +437,46 @@ export function HomeSuite({
           {collection.length - generatedCount} source cards. Failed or
           ungenerated cards show the fixture’s existing copy.
         </p>
-        <CatalogCollectionPreview
-          key={`${brand.id}-${home.id}`}
-          brandName={brand.name}
-          cards={collection}
-          compact
-        />
+        <div className="[&>div>div]:w-60">
+          <CatalogCollectionPreview
+            key={`${brand.id}-${home.id}`}
+            brandName={brand.name}
+            cards={catalogCards}
+            ad={{ primaryText: catalogPrimaryText }}
+            compact
+          />
+        </div>
+        <div className="flex flex-wrap items-start gap-6">
+          {collection.map((item) => (
+            <section key={item.key} className="w-60 max-w-full space-y-2">
+              <h4 className="text-sm font-medium">
+                {catalogAdHeadline(
+                  catalogHomes.find((h) => h.id === item.key)?.name ??
+                    item.headline,
+                )}
+              </h4>
+              <AdCopyFields
+                value={{
+                  primaryText: catalogPrimaryText,
+                  headline: catalogEdits[item.key]?.headline ?? item.headline,
+                  description:
+                    catalogEdits[item.key]?.description ?? item.description,
+                }}
+                onChange={(value) => {
+                  setCatalogPrimaryText(value.primaryText);
+                  setCatalogEdits((current) => ({
+                    ...current,
+                    [item.key]: value,
+                  }));
+                }}
+              />
+            </section>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Catalog primary text is shared across cards. Edits update these
+          previews for this session.
+        </p>
       </section>
       <details className="rounded-lg border p-3">
         <summary className="cursor-pointer text-sm font-medium">

@@ -1,5 +1,8 @@
 import { COPY_VOICE_RULES } from "@/server/services/blog-workbench/prompt";
-import { copyLabFixtures } from "@/server/services/copy-lab.service";
+import {
+  copyLabFixtures,
+  homeExperimentPrompts,
+} from "@/server/services/copy-lab.service";
 
 import { CopyWorkbench } from "./copy-workbench";
 
@@ -11,6 +14,15 @@ export default function CopyLabPage() {
   const { snapshotAt, brands, homes } = copyLabFixtures;
   return (
     <CopyWorkbench
+      promptBases={Object.fromEntries(
+        brands.map((brand) => [
+          brand.id,
+          {
+            withStory: homeExperimentPrompts(brand),
+            withoutStory: homeExperimentPrompts(brand, false),
+          },
+        ]),
+      )}
       snapshotAt={snapshotAt}
       brands={brands}
       homes={homes.map((home) => ({ ...home, photoCount: home.photos.length }))}

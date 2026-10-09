@@ -80,7 +80,10 @@ export function HomePicker({
           {label}
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[85vh] w-[96vw] max-w-4xl flex-col overflow-hidden p-0">
+      <DialogContent
+        size={single ? "lg" : "default"}
+        className="flex max-h-[85vh] w-[96vw] max-w-4xl flex-col overflow-hidden p-0"
+      >
         <DialogHeader
           divider="default"
           className="shrink-0 px-5 py-3 pr-12 text-left"
@@ -107,7 +110,13 @@ export function HomePicker({
               No home matches “{query}”.
             </p>
           ) : (
-            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            <ul
+              className={
+                single
+                  ? "grid grid-cols-2 gap-3 sm:grid-cols-3"
+                  : "grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6"
+              }
+            >
               {filtered.map((home) => {
                 const on = picked.includes(home.id);
                 const full = !single && !on && picked.length >= max;

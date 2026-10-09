@@ -8,7 +8,7 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
   // LocalCan tunnels expose the dev server for teammates; without this Next
   // blocks their HMR socket and the page never hydrates.
-  allowedDevOrigins: ["*.localcan.dev"],
+  allowedDevOrigins: ["*.localcan.dev", "wander-copy-lab.local"],
   // `bun run build` runs the native type checker before compilation. Keeping
   // Next's duplicate checker alive alongside the build exhausts Vercel memory.
   typescript: { ignoreBuildErrors: true },
