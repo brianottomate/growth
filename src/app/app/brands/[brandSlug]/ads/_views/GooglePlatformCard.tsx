@@ -26,6 +26,7 @@ import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { WriteSearchAdsButton } from "./WriteSearchAdsButton";
 import { AskAssistantButton } from "./AskAssistantButton";
 import { money } from "./format";
+import { SearchCopyPreview } from "./SearchCopyPreview";
 
 type Audience = {
   configuration?: DeliveryGroupConfiguration | null;
@@ -227,15 +228,25 @@ export function GooglePlatformCard({
             <details key={group.id} className="rounded-lg border p-3">
               <summary className="cursor-pointer text-sm font-medium">
                 {group.name} · {searchTerms(group.keywords).length} keywords ·{" "}
-                {approved.length} approved ads
+                {approved.length} approved ad{approved.length === 1 ? "" : "s"}
                 {previews.length
                   ? ` · ${previews.length} draft preview${previews.length === 1 ? "" : "s"}`
                   : ""}
               </summary>
               <div className="mt-3 space-y-2 text-xs">
-                <p className="whitespace-pre-line">
-                  {group.keywords?.join("\n")}
-                </p>
+                <div className="flex flex-wrap gap-2">
+                  {searchTerms(group.keywords).map((term) => (
+                    <span
+                      key={`${term.match}:${term.text}`}
+                      className="inline-flex max-w-full items-center gap-2 rounded-md border bg-background px-2.5 py-1.5"
+                    >
+                      <span className="text-sm break-words">{term.text}</span>
+                      <span className="shrink-0 text-[10px] font-medium text-muted-foreground capitalize">
+                        {term.match}
+                      </span>
+                    </span>
+                  ))}
+                </div>
 
                 <DeliveryGroupEditor group={group} />
                 {group.excludedKeywords?.length ? (
@@ -268,17 +279,8 @@ export function GooglePlatformCard({
                   · {copy.headlines.length} headlines /{" "}
                   {copy.descriptions.length} descriptions
                 </summary>
-                <div className="mt-3 grid grid-cols-1 gap-4 @xl:grid-cols-2">
-                  <CopyPool
-                    label="Headlines"
-                    lines={copy.headlines}
-                    limit={30}
-                  />
-                  <CopyPool
-                    label="Descriptions"
-                    lines={copy.descriptions}
-                    limit={90}
-                  />
+                <div className="mt-3">
+                  <SearchCopyPreview copy={copy} />
                 </div>
               </details>
             );
@@ -316,9 +318,10 @@ export function GooglePlatformCard({
         </p>
       )}
       <p className="border-t pt-4 text-xs text-muted-foreground">
-        {groupCount} ad groups × {approved.length} approved ads ={" "}
-        {groupCount * approved.length} Google ads. Choose the connected ad
-        account when pushing. Launch is a separate action.
+        {groupCount} ad groups × {approved.length} approved ad
+        {approved.length === 1 ? "" : "s"} = {groupCount * approved.length}{" "}
+        Google ads. Choose the connected ad account when pushing. Launch is a
+        separate action.
       </p>
     </section>
   );
@@ -329,31 +332,6 @@ function Fact({ label, value }: { label: string; value: string }) {
     <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="mt-1 text-sm font-semibold break-words">{value}</dd>
-    </div>
-  );
-}
-function CopyPool({
-  label,
-  lines,
-  limit,
-}: {
-  label: string;
-  lines: string[];
-  limit: number;
-}) {
-  return (
-    <div className="space-y-2">
-      <h5 className="text-xs font-medium">{label}</h5>
-      {lines.map((line, i) => (
-        <p key={i} className="flex justify-between gap-3 text-xs">
-          <span>{line}</span>
-          <span
-            className={`shrink-0 ${line.length > limit ? "text-destructive" : "text-muted-foreground"}`}
-          >
-            {line.length}/{limit}
-          </span>
-        </p>
-      ))}
     </div>
   );
 }

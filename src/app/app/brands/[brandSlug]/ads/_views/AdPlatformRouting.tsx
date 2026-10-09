@@ -18,11 +18,13 @@ export function AdPlatformRouting({
   platforms,
   planned,
   locked,
+  type,
 }: {
   adId: string;
   platforms: ChannelPlatform[] | null;
   planned: ChannelPlatform[];
   locked: boolean;
+  type: "text" | "creative";
 }) {
   const router = useRouter();
   const save = useMutation(
@@ -31,10 +33,14 @@ export function AdPlatformRouting({
       onError: (error) => toast.error(error.message),
     }),
   );
-  if (planned.length < 2) return null;
+  const compatible = planned.filter((platform) => {
+    const features = adPlatformSpec(platform)?.features;
+    return type === "text" ? features?.textAds : features?.creativeAds;
+  });
+  if (!compatible.length) return null;
 
   const toggle = (platform: ChannelPlatform) => {
-    const on = planned.filter((p) => adRoutesTo(platforms, p));
+    const on = compatible.filter((p) => adRoutesTo(platforms, p));
     const next = on.includes(platform)
       ? on.filter((p) => p !== platform)
       : [...on, platform];
@@ -49,14 +55,14 @@ export function AdPlatformRouting({
   };
 
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-1">
-      {planned.map((platform) => {
+    <div className="flex flex-wrap items-center gap-1">
+      {compatible.map((platform) => {
         const on = adRoutesTo(platforms, platform);
         return (
           <button
             key={platform}
             type="button"
-            disabled={locked || save.isPending}
+            disabled={locked || save.isPending || compatible.length === 1}
             aria-pressed={on}
             onClick={() => toggle(platform)}
             className={cn(

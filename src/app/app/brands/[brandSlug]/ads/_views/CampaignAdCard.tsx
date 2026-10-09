@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ReturnToStudioButton } from "@/components/review/ReturnToStudioButton";
 
 import { useEffect, useMemo, useState } from "react";
@@ -9,10 +8,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Images,
+  MoreHorizontal,
   Play,
-  Type,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { AdPreviewSlide } from "./AdPreviewSlide";
 import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
@@ -23,6 +28,7 @@ import type { AdContent, ChannelPlatform } from "@/server/db/schema";
 
 import { AdIdeaPreview } from "./AdIdeaPreview";
 import { AdPlatformRouting } from "./AdPlatformRouting";
+import { SearchCopyPreview } from "./SearchCopyPreview";
 
 /** Campaigns inspect delivery creatives; Studio owns their authoring and review. */
 export function CampaignAdCard({
@@ -90,7 +96,8 @@ export function CampaignAdCard({
       preload.src = images[index]!.url;
     }
   }, [currentSlide, format, images]);
-  const Icon = format === "video" ? Play : format === "text" ? Type : Images;
+  const Icon = format === "video" ? Play : Images;
+  const textCopy = "headlines" in ad.content ? ad.content : null;
   const copy =
     creative?.body ||
     ("descriptions" in ad.content ? ad.content.descriptions[0] : "");
@@ -106,7 +113,7 @@ export function CampaignAdCard({
       className="overflow-hidden rounded-xl border bg-background"
     >
       <div className="flex flex-wrap items-start gap-4 p-4">
-        {thumbnail && format !== "video" ? (
+        {textCopy ? null : thumbnail && format !== "video" ? (
           <AdPreviewSlide
             url={thumbnail}
             index={currentSlide}
@@ -164,13 +171,30 @@ export function CampaignAdCard({
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <h3 className="text-sm font-semibold">{ad.name}</h3>
               <Badge variant="secondary">
-                {AD_FORMATS.find((item) => item.id === format)?.label}
+                {textCopy
+                  ? "Responsive Search Ad"
+                  : AD_FORMATS.find((item) => item.id === format)?.label}
               </Badge>
             </div>
             {studioPreview ? (
-              <Link className="shrink-0 text-xs underline" href={studioHref}>
-                Edit in Studio
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Ad actions"
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <a href={`${studioHref}#ad-${ad.id}`}>
+                      Open draft in Studio
+                    </a>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <ReturnToStudioButton
                 menu
@@ -192,10 +216,10 @@ export function CampaignAdCard({
                 : "Pushed to platform"}
             </p>
           )}
-          {copy && (
+          {!textCopy && copy && (
             <p className="line-clamp-2 text-xs text-muted-foreground">{copy}</p>
           )}
-          {destination && (
+          {!textCopy && destination && (
             <a
               href={destination}
               title={destination}
@@ -206,28 +230,47 @@ export function CampaignAdCard({
               {destinationLabel(destination)} ↗
             </a>
           )}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button
-              size="sm"
-              variant={open ? "secondary" : "ghost"}
-              aria-expanded={open}
-              aria-controls={`preview-${ad.id}`}
-              onClick={() => setOpen((value) => !value)}
+          {textCopy && <SearchCopyPreview copy={textCopy} showAssets={false} />}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant={open ? "secondary" : "ghost"}
+            aria-expanded={open}
+            aria-controls={`preview-${ad.id}`}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {textCopy
+              ? open
+                ? "Hide assets"
+                : `View assets · ${textCopy.headlines.length} headlines, ${textCopy.descriptions.length} descriptions`
+              : open
+                ? "Hide preview"
+                : "Preview"}
+            <ChevronDown
+              className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </Button>
+          {format === "carousel" && slideCount > 1 && (
+            <span
+              aria-live="polite"
+              className="text-xs text-muted-foreground tabular-nums"
             >
-              {open ? "Hide preview" : "Preview"}
-              <ChevronDown
-                className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
-              />
-            </Button>
-            {format === "carousel" && slideCount > 1 && (
-              <span
-                aria-live="polite"
-                className="text-xs text-muted-foreground tabular-nums"
-              >
-                {currentSlide + 1} / {slideCount}
-              </span>
-            )}
-          </div>
+              {currentSlide + 1} / {slideCount}
+            </span>
+          )}
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Platforms</span>
+          <AdPlatformRouting
+            adId={ad.id}
+            type={creative ? "creative" : "text"}
+            platforms={ad.platforms ?? null}
+            planned={plannedPlatforms}
+            locked={Boolean(deliveryState)}
+          />
         </div>
       </div>
       {open && (
@@ -248,12 +291,6 @@ export function CampaignAdCard({
               ))}
             </div>
           )}
-          <AdPlatformRouting
-            adId={ad.id}
-            platforms={ad.platforms ?? null}
-            planned={plannedPlatforms}
-            locked={Boolean(deliveryState)}
-          />
           {creative && format !== "video" ? (
             <AdIdeaPreview
               showMetaPreview={false}
@@ -297,22 +334,7 @@ export function CampaignAdCard({
               )}
             </div>
           ) : "headlines" in ad.content ? (
-            <div className="space-y-4 text-sm">
-              <div>
-                <h4 className="mb-2 font-medium">Headlines</h4>
-                {ad.content.headlines.map((line, index) => (
-                  <p key={index}>{line}</p>
-                ))}
-              </div>
-              <div>
-                <h4 className="mb-2 font-medium">Descriptions</h4>
-                {ad.content.descriptions.map((line, index) => (
-                  <p key={index} className="text-muted-foreground">
-                    {line}
-                  </p>
-                ))}
-              </div>
-            </div>
+            <SearchCopyPreview copy={ad.content} showExample={false} />
           ) : null}
         </div>
       )}

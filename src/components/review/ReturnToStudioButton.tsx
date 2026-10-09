@@ -1,11 +1,10 @@
 "use client";
-import { useId, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orpc } from "@/orpc/client";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { MoreHorizontal, Undo2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -43,15 +42,14 @@ export function ReturnToStudioButton({
     : "Returned to Studio as a draft.";
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState("");
-  const [followToStudio, setFollowToStudio] = useState(false);
-  const followId = useId();
+  const followToStudio = useRef(false);
+  const canOpenStudio = Boolean(studioHref && !inStudio);
   const router = useRouter();
   const mutation = useMutation(
     orpc.ads.returnToStudio.mutationOptions({
       onSuccess: (result) => {
         setOpen(false);
         setComment("");
-        setFollowToStudio(false);
         toast.success(
           result.platformAdsUnchanged
             ? `${completed} Existing platform ads are unchanged.`
@@ -61,7 +59,7 @@ export function ReturnToStudioButton({
           toast.warning(
             `${completed} Some exported files could not be removed.`,
           );
-        if (studioHref && followToStudio) {
+        if (studioHref && followToStudio.current) {
           // Load the newly reopened draft rather than a prefetched Studio page.
           window.location.assign(`${studioHref}#ad-${adId}`);
         } else {
@@ -71,6 +69,14 @@ export function ReturnToStudioButton({
       onError: (error) => toast.error(error.message),
     }),
   );
+  const submit = (openStudio: boolean) => {
+    followToStudio.current = openStudio;
+    mutation.mutate({
+      adId,
+      comment,
+      as: "user",
+    });
+  };
   return (
     <>
       {menu ? (
@@ -98,7 +104,6 @@ export function ReturnToStudioButton({
           if (mutation.isPending) return;
           if (!nextOpen) {
             setComment("");
-            setFollowToStudio(false);
             mutation.reset();
           }
           setOpen(nextOpen);
@@ -129,23 +134,6 @@ export function ReturnToStudioButton({
               placeholder="What needs to change?"
             />
           </label>
-          {studioHref && !inStudio && (
-            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-              <label htmlFor={followId} className="space-y-1 text-sm">
-                <span className="block font-medium">Follow to Studio</span>
-                <span className="block text-muted-foreground">
-                  Open the draft after returning it. Leave off to stay in this
-                  campaign.
-                </span>
-              </label>
-              <Switch
-                id={followId}
-                checked={followToStudio}
-                onCheckedChange={setFollowToStudio}
-                disabled={mutation.isPending}
-              />
-            </div>
-          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -153,24 +141,26 @@ export function ReturnToStudioButton({
               onClick={() => {
                 setOpen(false);
                 setComment("");
-                setFollowToStudio(false);
                 mutation.reset();
               }}
             >
               Cancel
             </Button>
+            {canOpenStudio && (
+              <Button
+                variant="outline"
+                disabled={mutation.isPending}
+                onClick={() => submit(false)}
+              >
+                Return and stay here
+              </Button>
+            )}
             <Button
               disabled={mutation.isPending}
               loading={mutation.isPending}
-              onClick={() =>
-                mutation.mutate({
-                  adId,
-                  comment,
-                  as: "user",
-                })
-              }
+              onClick={() => submit(canOpenStudio)}
             >
-              {label}
+              {canOpenStudio ? "Return and open Studio" : label}
             </Button>
           </DialogFooter>
           {mutation.error && (

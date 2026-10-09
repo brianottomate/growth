@@ -125,15 +125,12 @@ export function Audiences({
         />
       ) : (
         <div className="space-y-4">
-          <section className="space-y-4 rounded-xl border bg-card p-5">
-            <div>
-              <h3 className="font-semibold">Shared audiences</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Who we want to reach and why. Platform plans below show how each
-                audience is used.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-4">
+          <section className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Who we want to reach and why. Platform plans below show how each
+              audience is used.
+            </p>
+            <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
               {audiences.map((row) => (
                 <div key={row.id} className="space-y-3 rounded-xl border p-4">
                   <div className="flex items-start justify-between gap-3">

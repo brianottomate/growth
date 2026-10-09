@@ -35,20 +35,22 @@ export function PlatformDraftPreviews({
               key={ad.id}
               className="group min-w-0 rounded-lg border p-3"
             >
-              <summary className="cursor-pointer text-sm font-medium">
+              <summary className="flex cursor-pointer items-center gap-3 text-sm font-medium">
                 {content.media[0]?.url && (
                   <img
                     src={content.media[0].url}
                     alt=""
-                    className="mb-3 aspect-square w-full rounded-md object-cover group-open:hidden"
+                    className="size-16 shrink-0 rounded-md object-cover"
                   />
                 )}
-                {ad.name}
-                <span className="block text-xs font-normal text-muted-foreground">
-                  Studio draft · {content.format ?? "static"}
+                <span>
+                  {ad.name}
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    Studio draft · {content.format ?? "static"}
+                  </span>
                 </span>
               </summary>
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 max-w-xl space-y-3">
                 <AdIdeaPreview
                   studio={
                     content.ideaStudio ?? {
