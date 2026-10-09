@@ -18,10 +18,18 @@ export const PIPELINE_COLUMNS = [
     color: "border-t-sky-500",
   },
   {
+    // Keep the existing stage identity when renaming it; no approval is inferred.
     id: "launch_prep",
-    name: "Launch prep",
-    description: "Create, review, and prepare the initial work for launch",
+    name: "Creative",
+    description:
+      "Create and approve the initial creative; hand off to Delivery",
     color: "border-t-sky-500",
+  },
+  {
+    id: "delivery",
+    name: "Delivery",
+    description: "Configure campaigns and launch the approved creative",
+    color: "border-t-emerald-500",
   },
   {
     id: "first_month",

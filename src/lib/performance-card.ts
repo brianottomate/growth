@@ -2,6 +2,16 @@ import type { PerformanceSettings } from "@/server/db/brand-schema";
 import { pipelineStage, type PipelineStage } from "./performance-pipeline";
 import type { PerformanceCardState } from "./performance-card-state";
 import type { ReadinessChecklist, ReadinessFix } from "./performance-readiness";
+import { currentPeriod } from "./performance-billing";
+
+export type PipelineBillingCycle = {
+  period: string;
+  billedAmount: number | null;
+  mediaBudget: number | null;
+  clientMediaContribution: number | null;
+  feePaidAt: Date | null;
+  mediaPaidAt: Date | null;
+};
 
 export type PerformancePipelineCard = {
   id: string;
@@ -10,9 +20,15 @@ export type PerformancePipelineCard = {
   website: string | null;
   href: string;
   stage: PipelineStage;
+  pipelineOrder: string | null;
   state: PerformanceCardState;
   management: number | null;
   spend: number | null;
+  billing: {
+    period: string;
+    current: PipelineBillingCycle | null;
+    upcoming: PipelineBillingCycle | null;
+  };
   campaignCount: number;
   adCount: number;
   intakeUrl?: string | null;
@@ -43,9 +59,12 @@ export function performanceCardFromBrand(brand: {
   intakeUrl?: string | null;
   settings?: PerformanceSettings | null;
   campaigns: { adCount: number }[];
+  billingCycles?: PipelineBillingCycle[];
   lead?: StaffMember | null;
   csLead?: StaffMember | null;
 }): PerformancePipelineCard {
+  const period = currentPeriod();
+  const cycles = brand.billingCycles ?? [];
   return {
     id: brand.id,
     name: brand.name,
@@ -57,6 +76,7 @@ export function performanceCardFromBrand(brand: {
       pipelineStage: brand.settings?.pipelineStage,
     }),
     state: brand.settings?.cardState ?? {},
+    pipelineOrder: brand.settings?.pipelineOrder ?? null,
     intakeUrl: brand.intakeUrl,
     effectiveDate: brand.settings?.effectiveDate,
     endDate: brand.settings?.endDate,
@@ -66,6 +86,14 @@ export function performanceCardFromBrand(brand: {
     noteEditedBy: brand.settings?.noteEditedBy,
     management: brand.settings?.monthlyFee ?? null,
     spend: brand.settings?.agreedAdSpend ?? null,
+    billing: {
+      period,
+      current: cycles.find((cycle) => cycle.period === period) ?? null,
+      upcoming:
+        cycles
+          .filter((cycle) => cycle.period > period)
+          .sort((a, b) => a.period.localeCompare(b.period))[0] ?? null,
+    },
     lead: brand.lead ?? null,
     csLead: brand.csLead ?? null,
     campaignCount: brand.campaigns.length,

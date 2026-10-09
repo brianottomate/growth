@@ -6,6 +6,7 @@ import {
 import { z } from "zod";
 import { generateBillingCycles } from "@/server/services/billing-cycles.service";
 import { PIPELINE_COLUMNS } from "@/lib/performance-pipeline";
+import { movePipelineCard } from "@/server/services/pipeline-order.service";
 import { setPerformanceSettings } from "@/server/services/performance-settings.service";
 import { setBrandStages } from "@/server/services/brand-relationship.service";
 import {
@@ -50,6 +51,21 @@ import {
 } from "@/server/ai/capabilities/launch-checklist";
 
 export const performanceRouter = {
+  movePipelineCard: workspaceProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        stage: z.enum(PIPELINE_COLUMNS.map((column) => column.id)),
+        beforeId: z.string().min(1).nullable(),
+      }),
+    )
+    .handler(({ context: ctx, input }) =>
+      movePipelineCard({
+        ...input,
+        orgId: ctx.workspace.orgId,
+        userId: ctx.workspace.userId,
+      }),
+    ),
   launchChecklist: actionProcedure(launchChecklistAction),
   recordLaunchChecklist: actionProcedure(recordLaunchChecklistAction),
   setLaunchChecklist: workspaceProcedure

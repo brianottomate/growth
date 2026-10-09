@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { isSettled, lineLabel, periodLabel } from "@/lib/performance-billing";
+import { performanceCardFromBrand } from "@/lib/performance-card";
+import { CardBilling } from "./CardBilling";
 import { cn } from "@/components/ui/lib/utils";
 import type { DeskBrand } from "@/server/services/performance-desk.service";
 import {
@@ -102,7 +103,15 @@ export function ClientCard({
             {brand.website ? " · " : ""}
             {meta}
           </p>
-          {brand.billing ? <BillingLine billing={brand.billing} /> : null}
+          <CardBilling
+            card={performanceCardFromBrand(brand)}
+            className="mt-2"
+          />
+          {brand.billing && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              ${brand.billing.spend.toLocaleString("en-US")} spent this month
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           {brand.pitchUrl ? (
@@ -349,32 +358,5 @@ function IntakeFacts({
         </p>
       ) : null}
     </div>
-  );
-}
-
-/** This month's two invoices and the spend against them, one quiet line. */
-function BillingLine({
-  billing,
-}: {
-  billing: NonNullable<DeskBrand["billing"]>;
-}) {
-  const settled = isSettled(billing);
-  return (
-    <p
-      className={cn(
-        "mt-1 flex flex-wrap items-center gap-x-3 text-xs",
-        settled && "text-muted-foreground",
-      )}
-      style={settled ? undefined : { color: "var(--color-warning)" }}
-    >
-      <span className="text-muted-foreground">
-        {periodLabel(billing.period)}
-      </span>
-      <span>Fee {lineLabel(billing.fee)}</span>
-      <span>Ads {lineLabel(billing.media)}</span>
-      <span className="text-muted-foreground">
-        ${billing.spend.toLocaleString("en-US")} spent
-      </span>
-    </p>
   );
 }

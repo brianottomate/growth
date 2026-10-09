@@ -18,12 +18,6 @@ export function statusChips(state: PerformanceCardState): StatusChip[] {
   const chips: (Omit<StatusChip, "value"> & {
     value: string | null | undefined;
   })[] = [
-    {
-      label: "Mgmt payment",
-      value: state.managementPayment,
-      lens: "Commercial",
-    },
-    { label: "Ad payment", value: state.spendPayment, lens: "Commercial" },
     { label: "Catalog", value: state.catalog, lens: "Creative" },
     { label: "Ads", value: state.ads, lens: "Creative" },
     { label: "Email", value: state.newsletter, lens: "Creative" },

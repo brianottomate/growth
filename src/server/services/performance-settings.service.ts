@@ -1,7 +1,7 @@
 import "server-only";
 import { syncAccountTermsFromSettings } from "./billing-cycles.service";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { STORED_PIPELINE_STAGES } from "@/lib/performance-pipeline";
 import {
@@ -137,9 +137,35 @@ export async function setPerformanceSettings(input: {
         }
       : { id: null, name: input.by, image: null };
   }
+  // Patch submitted facts atomically, preserving concurrent board moves and
+  // edits to unrelated settings instead of replacing the read snapshot.
+  const patch = Object.fromEntries(
+    changed
+      .filter((key) => key !== "cardState")
+      .map((key) => [key, next[key as keyof PerformanceSettings]]),
+  );
+  if (changed.includes("pipelineStage")) patch.pipelineOrder = null;
+  Object.assign(patch, {
+    updatedAt: next.updatedAt,
+    updatedBy: next.updatedBy,
+    updatedFrom: next.updatedFrom,
+  });
+  if (changed.includes("note"))
+    Object.assign(patch, {
+      noteEditedAt: next.noteEditedAt,
+      noteEditedBy: next.noteEditedBy,
+    });
+  let expression = sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`;
+  if (changed.includes("cardState")) {
+    const state =
+      input.patch.cardState == null
+        ? sql`'null'::jsonb`
+        : sql`coalesce(nullif(${brandTable.performanceSettings}->'cardState', 'null'::jsonb), '{}'::jsonb) || ${JSON.stringify(performanceCardStateSchema.parse(input.patch.cardState))}::jsonb`;
+    expression = sql`jsonb_set(${expression}, '{cardState}', ${state}, true)`;
+  }
   const saved = await client
     .update(brandTable)
-    .set({ performanceSettings: next })
+    .set({ performanceSettings: expression })
     .where(
       and(
         eq(brandTable.id, brand.id),
@@ -174,7 +200,7 @@ export async function setPerformanceSettings(input: {
       );
     }
   }
-  return { settings: next, changed };
+  return { settings: saved[0]!.performanceSettings!, changed };
 }
 
 export function validIntakeUrl(value: unknown): string | undefined {

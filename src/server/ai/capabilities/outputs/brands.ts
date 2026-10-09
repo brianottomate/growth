@@ -102,6 +102,7 @@ const performanceSettingsShape = {
   reportEmails: z.string().nullable().optional(),
   siteLive: z.string().nullable().optional(),
   pipelineStage: z.enum(STORED_PIPELINE_STAGES).nullish(),
+  pipelineOrder: z.string().nullish(),
   socialMediaPosts: z.string().nullable().optional(),
   terms: z.string().nullable().optional(),
   ugcPermission: z.string().nullable().optional(),

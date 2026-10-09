@@ -252,6 +252,8 @@ export type PerformanceSettings = {
   } | null;
   /** Independent, explicitly recorded dashboard facts. Stored in the existing settings JSONB. */
   cardState?: PerformanceCardState | null;
+  /** Shared manual rank within pipelineStage; string fractional indexing. */
+  pipelineOrder?: string | null;
   /** Operator-selected client journey; unrelated to campaign/platform state. */
   pipelineStage?:
     | import("@/lib/performance-pipeline").StoredPipelineStage

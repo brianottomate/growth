@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, Fragment } from "react";
 import { ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -21,13 +21,12 @@ import { orpc } from "@/orpc/client";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
 import {
-  stageBoardCollision,
-  stageBoardInstructions,
   stageBoardAnnouncements,
   restoreStageBoardFocus,
-  useStageBoardSensors,
 } from "@/components/ui/stage-board-dnd";
 import { Button } from "@/components/ui/button";
+import { comparePipelineOrder } from "@/lib/pipeline-order";
+import { pipelineInstructions, usePipelineDragDrop } from "./pipeline-dnd";
 import { useContentWidth } from "@/components/content-width";
 import { Input } from "@/components/ui/input";
 import {
@@ -108,43 +107,34 @@ export function PipelineBoard({
   details?: Record<string, ReactNode>;
 }) {
   const router = useRouter();
-  const sensors = useStageBoardSensors();
+  const { sensors, collisionDetection, reset } = usePipelineDragDrop();
   const [activeCard, setActiveCard] = useState<PipelineCard | null>(null);
-  const [stageOverrides, setStageOverrides] = useState<
-    Record<string, PipelineStage>
-  >({});
+  const [optimisticCards, setOptimisticCards] = useState<PipelineCard[] | null>(
+    null,
+  );
   const saving = useRef(false);
   const keyboardMove = useRef<string | null>(null);
-  const savedMoves = useRef(new Set<string>());
-  // Keep a successful move visible until the server refresh acknowledges it.
+  const succeeded = useRef(false);
   useEffect(() => {
-    const saved = new Set(savedMoves.current);
-    savedMoves.current.clear();
-    setStageOverrides((current) => {
-      const confirmed = cards.filter(
-        (card) =>
-          current[card.id] !== undefined &&
-          (current[card.id] === card.stage || saved.has(card.id)),
-      );
-      if (!confirmed.length) return current;
-      const next = { ...current };
-      for (const card of confirmed) {
-        delete next[card.id];
-      }
-      return next;
-    });
+    if (succeeded.current) {
+      succeeded.current = false;
+      setOptimisticCards(null);
+    }
   }, [cards]);
   const move = useMutation(
-    orpc.performance.setPipelineStage.mutationOptions({
-      onSuccess: (_result, input) => {
-        savedMoves.current.add(input.brandId);
+    orpc.performance.movePipelineCard.mutationOptions({
+      onSuccess: (result, input) => {
+        setOptimisticCards((current) =>
+          (current ?? cards).map((card) => ({
+            ...card,
+            stage: card.id === input.brandId ? result.stage : card.stage,
+            pipelineOrder: result.positions[card.id] ?? card.pipelineOrder,
+          })),
+        );
+        succeeded.current = true;
       },
       onError: (error, input) => {
-        setStageOverrides((current) => {
-          const next = { ...current };
-          delete next[input.brandId];
-          return next;
-        });
+        setOptimisticCards(null);
         toast.error(error.message);
         if (keyboardMove.current === input.brandId) {
           const card = cards.find((card) => card.id === input.brandId);
@@ -160,20 +150,31 @@ export function PipelineBoard({
   );
   function onDragEnd({ active, over, activatorEvent }: DragEndEvent) {
     setActiveCard(null);
-    const stage = PIPELINE_COLUMNS.find((column) => column.id === over?.id)?.id;
-    const card = cards.find((card) => card.id === active.id);
-    if (
-      !stage ||
-      !card ||
-      saving.current ||
-      (stageOverrides[card.id] ?? card.stage) === stage
-    )
-      return;
+    if (!over || saving.current) return;
+    const stage = PIPELINE_COLUMNS.find(
+      (column) => column.id === (over.data.current?.stage ?? over.id),
+    )?.id;
+    const card = (optimisticCards ?? cards).find(
+      (card) => card.id === active.id,
+    );
+    if (!stage || !card) return;
+    const beforeId = (over.data.current?.beforeId ?? null) as string | null;
+    if (beforeId === card.id) return;
+    const ordered = [...(optimisticCards ?? cards)].sort(comparePipelineOrder);
+    const remaining = ordered.filter((row) => row.id !== card.id);
+    const index = beforeId
+      ? remaining.findIndex((row) => row.id === beforeId)
+      : remaining.reduce(
+          (last, row, index) => (row.stage === stage ? index + 1 : last),
+          0,
+        );
+    remaining.splice(Math.max(0, index), 0, { ...card, stage });
+    setOptimisticCards(remaining);
+    void setParams({ sort: "manual" });
     keyboardMove.current = activatorEvent.type === "keydown" ? card.id : null;
     if (keyboardMove.current) restoreStageBoardFocus(card.id, stage);
     saving.current = true;
-    setStageOverrides((current) => ({ ...current, [card.id]: stage }));
-    move.mutate({ brandId: card.id, stage });
+    move.mutate({ brandId: card.id, stage, beforeId });
   }
   // Every control lives in the URL so a view can be bookmarked or shared.
   const [params, setParams] = useQueryStates(
@@ -189,6 +190,10 @@ export function PipelineBoard({
         "paused",
       ]),
       who: parseAsStringLiteral(WHO).withDefault("clients"),
+      sort: parseAsStringLiteral([
+        "alphabetical",
+        "manual",
+      ] as const).withDefault("alphabetical"),
       people: parseAsStringLiteral(["all", "mine"] as const).withDefault("all"),
     },
     { history: "replace", shallow: true, clearOnDefault: true },
@@ -220,8 +225,7 @@ export function PipelineBoard({
     ...orpc.performance.staffRoster.queryOptions(),
     staleTime: 5 * 60_000,
   }).data?.currentUserId;
-  const matching = cards
-    .map((card) => ({ ...card, stage: stageOverrides[card.id] ?? card.stage }))
+  const matching = (optimisticCards ?? cards)
     .filter(
       (card) =>
         `${card.name} ${card.website ?? ""}`
@@ -230,7 +234,13 @@ export function PipelineBoard({
         (params.people === "all" ||
           (!!me && (card.lead?.id === me || card.csLead?.id === me))),
     )
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) =>
+      params.sort === "alphabetical"
+        ? a.name.localeCompare(b.name)
+        : optimisticCards
+          ? 0
+          : comparePipelineOrder(a, b),
+    );
   // The board shows every column; the list narrows to clients or prospects.
   const visible =
     layout === "list" && params.who !== "all"
@@ -286,6 +296,17 @@ export function PipelineBoard({
           </div>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          {layout === "board" && (
+            <SegmentedToggle
+              label="Sort"
+              value={params.sort}
+              onChange={(sort) => void setParams({ sort })}
+              options={[
+                { id: "alphabetical", label: "A–Z" },
+                { id: "manual", label: "Manual" },
+              ]}
+            />
+          )}
           <Input
             className="h-8 w-56 max-w-full"
             aria-label="Search accounts"
@@ -353,14 +374,17 @@ export function PipelineBoard({
         <DndContext
           id="performance-pipeline"
           sensors={sensors}
-          collisionDetection={stageBoardCollision}
+          collisionDetection={collisionDetection}
           accessibility={{
-            screenReaderInstructions: stageBoardInstructions,
+            screenReaderInstructions: pipelineInstructions,
             announcements: stageBoardAnnouncements,
           }}
-          onDragStart={({ active }) =>
-            setActiveCard(visible.find((card) => card.id === active.id) ?? null)
-          }
+          onDragStart={({ active }) => {
+            reset();
+            setActiveCard(
+              visible.find((card) => card.id === active.id) ?? null,
+            );
+          }}
           onDragCancel={() => setActiveCard(null)}
           onDragEnd={onDragEnd}
         >
@@ -432,16 +456,27 @@ export function PipelineBoard({
                           </Button>
                         </div>
                       </div>
-                      <div className="min-h-0 scrollbar-thin space-y-2 overflow-y-auto">
+                      <div className="min-h-0 scrollbar-thin overflow-y-auto">
                         {rows.map((card) => (
-                          <DraggableClientCard
-                            key={card.id}
-                            card={card}
-                            view={view}
-                            detailSignal={detailSignal}
-                            disabled={move.isPending}
-                          />
+                          <Fragment key={card.id}>
+                            <PipelineSlot
+                              stage={column.id}
+                              beforeId={card.id}
+                              label={`Before ${card.name} in ${column.name}`}
+                            />
+                            <DraggableClientCard
+                              card={card}
+                              view={view}
+                              detailSignal={detailSignal}
+                              disabled={move.isPending}
+                            />
+                          </Fragment>
                         ))}
+                        <PipelineSlot
+                          stage={column.id}
+                          beforeId={null}
+                          label={`At the end of ${column.name}`}
+                        />
                         {rows.length === 0 && (
                           <p className="rounded-lg border border-dashed p-5 text-center text-xs text-muted-foreground">
                             No clients in this stage.
@@ -462,7 +497,7 @@ export function PipelineBoard({
               >
                 <p className="text-sm font-semibold">{activeCard.name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Move to another stage
+                  Drop to save this position
                 </p>
               </div>
             ) : null}
@@ -486,6 +521,8 @@ function StageDropTarget({
     id: stage,
     data: {
       label: PIPELINE_COLUMNS.find((column) => column.id === stage)?.name,
+      kind: "column",
+      stage,
     },
   });
   return (
@@ -531,13 +568,35 @@ function DraggableClientCard({
             {...listeners}
             aria-disabled={disabled}
             data-stage-card-handle={card.id}
-            aria-label={`Move ${card.name} between stages`}
+            aria-label={`Move ${card.name} on board`}
             className="grid size-6 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-disabled:opacity-50 pointer-coarse:size-11"
           >
             <GripVertical className="size-4" />
           </button>
         }
       />
+    </div>
+  );
+}
+
+function PipelineSlot({
+  stage,
+  beforeId,
+  label,
+}: {
+  stage: PipelineStage;
+  beforeId: string | null;
+  label: string;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `slot:${stage}:${beforeId ?? "end"}`,
+    data: { kind: "slot", stage, beforeId, label },
+  });
+  return (
+    <div ref={setNodeRef} aria-label={label} className="relative h-2 shrink-0">
+      {isOver && (
+        <div className="absolute inset-x-0 top-1/2 z-10 h-0.5 rounded bg-primary" />
+      )}
     </div>
   );
 }

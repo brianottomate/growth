@@ -91,6 +91,8 @@ export type DeskBrand = {
     billedAmount: number | null;
     mediaBudget: number | null;
     clientMediaContribution: number | null;
+    feePaidAt: Date | null;
+    mediaPaidAt: Date | null;
   }[];
   campaigns: DeskCampaign[];
   /** Up to five featured homes, so a row is recognizable by its listings. */

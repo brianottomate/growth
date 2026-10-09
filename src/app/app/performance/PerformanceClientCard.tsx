@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PerformanceNote } from "./PerformanceNote";
+import { CardBilling } from "./CardBilling";
 import { CardStaff } from "./CardStaff";
 import { ReadinessProgress } from "./ReadinessProgress";
 import { statusChips, statusTone } from "./AccountStatus";
@@ -248,27 +249,10 @@ export function PerformanceClientCard({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {show("Commercial") && (
-          <div
-            className={`${context === "client" ? "col-start-1" : "col-start-2"} col-span-2 row-start-2 flex flex-wrap gap-x-3 gap-y-1`}
-            title={
-              state.billingPeriod
-                ? `Billing month · ${state.billingPeriod}`
-                : "Billing month not recorded"
-            }
-          >
-            <Payment
-              label="Management"
-              amount={card.management}
-              status={state.managementPayment}
-            />
-            <Payment
-              label="Ad budget"
-              amount={card.spend}
-              status={state.spendPayment}
-            />
-          </div>
-        )}
+        <CardBilling
+          card={card}
+          className={`${context === "client" ? "col-start-1" : "col-start-2"} col-span-2 row-start-2`}
+        />
       </header>
       {context === "board" && !compact && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -290,13 +274,6 @@ export function PerformanceClientCard({
           id="payments"
           className="mt-3 flex scroll-mt-4 flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-xs"
         >
-          <Status label="Management payment" value={state.managementPayment} />
-          <Status label="Ad spend payment" value={state.spendPayment} />
-          {state.billingPeriod ? (
-            <span className="text-muted-foreground">
-              Billing month · {state.billingPeriod}
-            </span>
-          ) : null}
           {card.effectiveDate ? (
             <span className="text-muted-foreground">
               Effective · {trackerDate(card.effectiveDate)}
@@ -382,16 +359,6 @@ export function PerformanceClientCard({
                 states={INTAKE_STATES}
                 detailed={detail === "Detailed"}
               />
-              {state.billingPeriod && (
-                <p className="text-[10px] text-muted-foreground">
-                  Billing month · {state.billingPeriod}
-                </p>
-              )}
-              <Status
-                label="Management payment"
-                value={state.managementPayment}
-              />
-              <Status label="Spend payment" value={state.spendPayment} />
             </CardSection>
           )}
           {show("Creative") && (
@@ -550,11 +517,6 @@ function DenseCard({
           >
             {card.name}
           </Link>
-          <p className="truncate text-[11px] text-muted-foreground tabular-nums">
-            {card.management == null && card.spend == null
-              ? (card.website?.replace(/^https?:\/\//, "") ?? "—")
-              : `${card.management == null ? "—" : money(card.management)} · ${card.spend == null ? "—" : money(card.spend)}`}
-          </p>
         </div>
         {checklist ? (
           <div className="w-14 shrink-0 space-y-1 text-right">
@@ -605,6 +567,7 @@ function DenseCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <CardBilling card={card} className="mt-2" />
       {chips.length > 0 ? (
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
           {chips.map((chip) => (
@@ -673,38 +636,6 @@ function ReadyDot({
             : undefined,
       }}
     />
-  );
-}
-function Payment({
-  label,
-  amount,
-  status,
-}: {
-  label: string;
-  amount: number | null;
-  status?: string | null;
-}) {
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 text-[10px]"
-      title={`${label} · ${recordedStatus(status)}`}
-      aria-label={`${label}: ${amount == null ? "Not recorded" : money(amount)}, ${recordedStatus(status)}`}
-    >
-      <span className="text-muted-foreground">{label}</span>
-      <span
-        className="font-medium tabular-nums"
-        style={{
-          color:
-            status === "Paid"
-              ? "var(--performance-positive)"
-              : status === "Open"
-                ? "var(--performance-payment-open)"
-                : undefined,
-        }}
-      >
-        {amount == null ? "—" : money(amount)}
-      </span>
-    </span>
   );
 }
 function statusStyle(value?: string | null): CSSProperties | undefined {
