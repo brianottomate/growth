@@ -367,6 +367,7 @@ export async function catalogState(
     orderBy: desc(catalogExportTable.createdAt),
   });
   return {
+    reviewPath: `/app/performance/clients/${encodeURIComponent(brand.slug ?? brand.id)}/catalog`,
     homes,
     enrichmentError: inventory.enrichmentError,
     syncedAt: inventory.syncedAt,

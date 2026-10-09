@@ -21,6 +21,9 @@ import { useAssistantDictation } from "./useAssistantDictation";
 import { ChatQueue } from "./ChatQueue";
 import { CopySuggestionsCard } from "./CopySuggestionsCard";
 import { ChatNextOptions } from "./ChatNextOptions";
+import { GrowthResultSummary } from "./GrowthResultSummary";
+import { growthSummaryTools } from "@/lib/growth-result-summary";
+import { SocialPostSummary } from "./SocialPostSummary";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -1602,6 +1605,16 @@ export function renderToolPart(
   if (audit.success) return <AppliedEvidenceCard key={key} {...audit.data} />;
   const outputAction = envelope.action || action;
   const presentationKey = `${toolName}.${outputAction}`;
+  const summaryKind = growthSummaryTools[presentationKey];
+  if (summaryKind)
+    return (
+      <GrowthResultSummary
+        key={key}
+        kind={summaryKind}
+        result={part.output}
+        onPrompt={onPrompt}
+      />
+    );
 
   if (
     toolName === "productAtlasRead" ||
@@ -1727,6 +1740,8 @@ export function renderToolPart(
           busy={isRunning}
         />
       );
+    case "renderSocialPosts.render":
+      return <SocialPostSummary key={key} result={part.output} />;
     case "presentNextOptions.present":
       return null;
     case "contentRead.suggestMedia":

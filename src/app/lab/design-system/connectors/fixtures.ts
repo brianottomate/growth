@@ -19,7 +19,7 @@ const post: SocialResult["data"]["posts"][number] = {
   scheduledAt: "2026-10-09T14:00:00Z",
   publishedAt: null,
   externalUrl: null,
-  href: "/app/content/fixture-coastal",
+  href: "/app/feed-v5?post=fixture-coastal",
   brand: { name: "Wander · Demo", logo: null },
   channel: { displayName: "Wander · Demo", handle: "wander_demo" },
   media: [
@@ -33,7 +33,12 @@ const post: SocialResult["data"]["posts"][number] = {
 const social = (posts: SocialResult["data"]["posts"]): SocialResult => ({
   ok: true,
   action: "render",
-  data: { posts },
+  data: {
+    posts: posts.map((post) => ({
+      ...post,
+      href: `/app/feed-v5?post=${encodeURIComponent(post.id)}`,
+    })),
+  },
 });
 export const socialFixtures: ConnectorFixture[] = [
   {

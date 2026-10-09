@@ -36,7 +36,7 @@ export const CONNECTOR_WIDGETS = [
     id: "workitem",
     title: "Work-item inspector",
     description:
-      "Editorial brief, channel drafts, attached media, and readiness in one view.",
+      "A brief summary and readiness count, with a link to the content workspace.",
     tool: "contentRead__getWorkItem",
     uri: WORK_ITEM_URI,
     html: WORK_ITEM_HTML,
@@ -46,7 +46,7 @@ export const CONNECTOR_WIDGETS = [
     id: "campaign",
     title: "Campaign overview",
     description:
-      "Creative, audiences, platform delivery, and the next campaign handoff.",
+      "Creative and audience counts, with a link to the full campaign.",
     tool: "adsRead__openCampaign",
     uri: CAMPAIGN_URI,
     html: CAMPAIGN_HTML,
@@ -56,7 +56,7 @@ export const CONNECTOR_WIDGETS = [
     id: "creative",
     title: "Creative review",
     description:
-      "Review copy, slides, source imagery, and composition sketches across placements.",
+      "A creative excerpt and thumbnail, with a link to review in Growth.",
     tool: "adsRead__ideaContext",
     aliases: ["adsWrite__saveIdea", "adsWrite__draftAd"],
     uri: CREATIVE_URI,
@@ -67,7 +67,7 @@ export const CONNECTOR_WIDGETS = [
     id: "catalog",
     title: "Catalog batch review",
     description:
-      "Review the current catalog batch, approval states, and export history.",
+      "Batch counts and approval status, with a link to the catalog.",
     tool: "adsRead__catalogState",
     uri: CATALOG_URI,
     html: CATALOG_HTML,
@@ -76,7 +76,8 @@ export const CONNECTOR_WIDGETS = [
   {
     id: "brands",
     title: "Brand picker + map",
-    description: "Search returned brands and inspect their workspace coverage.",
+    description:
+      "A short brand list with workspace links and a conversational choice.",
     tool: "brandRead__getMap",
     aliases: ["brandRead__list"],
     uri: BRANDS_URI,
@@ -87,7 +88,7 @@ export const CONNECTOR_WIDGETS = [
     id: "photos",
     title: "Listing photo picker",
     description:
-      "Browse home imagery and gather a local selection to discuss in chat.",
+      "A few home thumbnails, with a link to browse imagery in Growth.",
     tool: "mediaLibraryRead__listingPhotos",
     uri: PHOTOS_URI,
     html: PHOTOS_HTML,
@@ -97,7 +98,7 @@ export const CONNECTOR_WIDGETS = [
     id: "social",
     title: "Social post previews",
     description:
-      "Platform-native layouts for reviewing creative, captions, and publishing state.",
+      "Compact post summaries with links to review the full creative in Growth.",
     tool: "renderSocialPosts",
     uri: SOCIAL_POST_PREVIEW_URI,
     html: SOCIAL_POST_PREVIEW_HTML,
@@ -115,7 +116,7 @@ export const CONNECTOR_WIDGETS = [
   {
     id: "calendar",
     title: "Content calendar",
-    description: "A dated agenda with publishing states and review filters.",
+    description: "Planning-window counts, with a link to the full calendar.",
     tool: "contentRead__upcoming",
     uri: CONTENT_CALENDAR_URI,
     html: CONTENT_CALENDAR_HTML,
@@ -124,7 +125,8 @@ export const CONNECTOR_WIDGETS = [
   {
     id: "pipeline",
     title: "Content pipeline",
-    description: "Status distribution across work items and standalone posts.",
+    description:
+      "Pipeline totals and review counts, with a link to the content board.",
     tool: "contentRead__pipeline",
     uri: CONTENT_PIPELINE_URI,
     html: CONTENT_PIPELINE_HTML,
@@ -134,7 +136,7 @@ export const CONNECTOR_WIDGETS = [
     id: "production",
     title: "Production queue",
     description:
-      "Completion progress, readiness, and the next step for each item.",
+      "Readiness counts and a short work list, with links into production.",
     tool: "contentRead__productionQueue",
     uri: PRODUCTION_QUEUE_URI,
     html: PRODUCTION_QUEUE_HTML,
@@ -144,7 +146,7 @@ export const CONNECTOR_WIDGETS = [
     id: "performance",
     title: "Ad performance",
     description:
-      "A ranked creative shortlist with delivery metrics and local sorting.",
+      "A short creative ranking, with a link to full performance metrics.",
     tool: "adsRead__top",
     uri: AD_PERFORMANCE_URI,
     html: AD_PERFORMANCE_HTML,

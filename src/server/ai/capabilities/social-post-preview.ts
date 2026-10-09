@@ -6,36 +6,8 @@ import { toSocialPostPreviewItem } from "@/lib/social-post-preview";
 import { assertPostVisibleToOrganization } from "@/server/services/video-analysis.service";
 import { growthTool } from "./types";
 
-const previewMediaSchema = z.object({
-  type: z.enum(["image", "video", "carousel"]),
-  url: z.string(),
-  thumbnail: z.string().nullable(),
-});
-
-const previewPostSchema = z.object({
-  id: z.string(),
-  platform: z.string(),
-  format: z.string().nullable(),
-  status: z.string(),
-  text: z.string(),
-  firstComment: z.string().nullable(),
-  scheduledAt: z.string().nullable(),
-  publishedAt: z.string().nullable(),
-  externalUrl: z.string().nullable(),
-  href: z.string(),
-  brand: z.object({ name: z.string(), logo: z.string().nullable() }),
-  channel: z.object({
-    displayName: z.string().nullable(),
-    handle: z.string().nullable(),
-  }),
-  media: z.array(previewMediaSchema),
-});
-
-export const socialPostPreviewOutputSchema = z.object({
-  ok: z.literal(true),
-  action: z.literal("render"),
-  data: z.object({ posts: z.array(previewPostSchema).min(1).max(6) }),
-});
+import { socialPostPreviewOutputSchema } from "@/lib/social-post-preview";
+export { socialPostPreviewOutputSchema } from "@/lib/social-post-preview";
 
 export const renderSocialPosts = growthTool({
   resultSchema: socialPostPreviewOutputSchema,

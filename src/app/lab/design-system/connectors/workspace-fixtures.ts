@@ -245,6 +245,7 @@ const homeNames = [
   "Lakefront gathering",
 ];
 const catalog = {
+  reviewPath: "/app/performance/clients/demo-wander/catalog",
   homes: homeNames.map((name, i) => ({
     id: "demo-home-" + i,
     name,

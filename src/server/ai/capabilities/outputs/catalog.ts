@@ -50,6 +50,7 @@ const catalogHomeSchema = z.strictObject({
 });
 
 export const catalogStateActionOutputSchema = z.strictObject({
+  reviewPath: z.string().optional(),
   homes: z.array(catalogHomeSchema),
   enrichmentError: z.string().optional(),
   syncedAt: z.string(),

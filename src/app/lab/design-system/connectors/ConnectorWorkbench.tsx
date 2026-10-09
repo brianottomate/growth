@@ -19,6 +19,9 @@ import { Button } from "@/components/ui/button";
 import { SimpleSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { connectorFixtures, socialFixtures } from "./fixtures";
+import { GrowthResultSummary } from "@/app/app/overview/GrowthResultSummary";
+import { SocialPostSummary } from "@/app/app/overview/SocialPostSummary";
+import { InternalNextOptionsPreview } from "./InternalNextOptionsPreview";
 
 export type ConnectorWidget = {
   id: string;
@@ -92,7 +95,7 @@ function WidgetPreview({
   const frame = useRef<HTMLIFrameElement>(null);
   const ready = useRef(false);
   const current = useRef({ payload, reject, loading, host });
-  const [height, setHeight] = useState(240);
+  const [height, setHeight] = useState(100);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [messages, setMessages] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
@@ -146,7 +149,7 @@ function WidgetPreview({
       ) {
         const reported = message.params?.height;
         if (typeof reported === "number" && Number.isFinite(reported))
-          setHeight(Math.min(6000, Math.max(180, reported)));
+          setHeight(Math.min(6000, Math.max(80, reported)));
         if (message.method === "workbench:size") return;
       }
       record("Widget → host", message);
@@ -205,6 +208,14 @@ function WidgetPreview({
           setMessages((entries) => [...entries, text]);
           send({ jsonrpc: "2.0", id: message.id, result: {} });
         }
+      } else if (
+        message.method === "ui/open-link" &&
+        message.id !== undefined
+      ) {
+        const url = message.params?.url;
+        if (typeof url === "string")
+          setMessages((entries) => [...entries, `Open in Growth: ${url}`]);
+        send({ jsonrpc: "2.0", id: message.id, result: {} });
       } else if (message.id !== undefined && message.method) {
         send({
           jsonrpc: "2.0",
@@ -234,8 +245,8 @@ function WidgetPreview({
         <div className="flex items-center justify-between border-b border-current/10 px-4 py-3 text-xs">
           <span>
             {host === "openai"
-              ? "ChatGPT · OpenAI globals"
-              : "ChatGPT / Claude · MCP Apps"}
+              ? "External · ChatGPT · OpenAI globals"
+              : "External · ChatGPT / Claude · MCP Apps"}
           </span>
           <span role="status">
             {connected
@@ -257,7 +268,7 @@ function WidgetPreview({
         )}
       </div>
       <section className="rounded-xl border p-4">
-        <h2 className="font-medium">Captured follow-ups</h2>
+        <h2 className="font-medium">Captured handoffs</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           Messages stay in this preview session.
         </p>
@@ -274,7 +285,7 @@ function WidgetPreview({
           </ol>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
-            Use a widget action to inspect its conversation handoff.
+            Use a widget action to inspect its message or navigation handoff.
           </p>
         )}
       </section>
@@ -307,6 +318,75 @@ function WidgetPreview({
   );
 }
 
+function InternalSummaryPreview({
+  kind,
+  payload,
+  theme,
+  loading,
+  reject,
+  width,
+}: {
+  kind: string;
+  payload: unknown;
+  theme: string;
+  loading: boolean;
+  reject: boolean;
+  width: number;
+}) {
+  const [messages, setMessages] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  return (
+    <div
+      data-theme={theme}
+      className="mx-auto w-full min-w-0 space-y-6 bg-background text-foreground"
+      style={{ maxWidth: width }}
+    >
+      <section className="overflow-hidden rounded-2xl border">
+        <div className="flex items-center justify-between border-b px-4 py-3 text-xs">
+          <span>Internal · Growth chat</span>
+          <span role="status">
+            {loading ? "Waiting for tool result" : "Ready"}
+          </span>
+        </div>
+        <div className="p-4">
+          {loading ? (
+            <p className="text-xs text-muted-foreground">
+              Waiting for tool result…
+            </p>
+          ) : (
+            <GrowthResultSummary
+              kind={kind}
+              result={payload}
+              onPrompt={(prompt) => {
+                if (reject) setError("Simulated send failure. Try again.");
+                else {
+                  setError("");
+                  setMessages((entries) => [...entries, prompt]);
+                }
+              }}
+            />
+          )}
+          {error && (
+            <p role="alert" className="mt-2 text-xs text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+      </section>
+      {messages.length > 0 && (
+        <section className="rounded-xl border p-4">
+          <h2 className="font-medium">Captured follow-ups</h2>
+          {messages.map((message, index) => (
+            <p key={index} className="mt-2 rounded-lg bg-muted p-3 text-xs">
+              {message}
+            </p>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
 export function ConnectorWorkbench({
   widgets,
 }: {
@@ -324,6 +404,7 @@ export function ConnectorWorkbench({
   const [theme, setTheme] = useState("light");
   const [width, setWidth] = useState("720");
   const [host, setHost] = useState("mcp");
+  const [surface, setSurface] = useState("both");
   const [reject, setReject] = useState(false);
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState(0);
@@ -381,9 +462,8 @@ export function ConnectorWorkbench({
           </Button>
         </div>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          {widgets.length} interactive views, rendered from the same HTML served
-          to ChatGPT and Claude. Explore sample data, refine layouts, and
-          inspect every handoff.
+          {widgets.length} tool results. Compare compact summaries in Growth
+          chat and external chat, then inspect the handoff into the website.
         </p>
       </header>
       <section
@@ -556,17 +636,100 @@ export function ConnectorWorkbench({
           </details>
         </aside>
         <div className="min-w-0 space-y-6">
-          <div className="mx-auto max-w-full" style={{ width: Number(width) }}>
-            <WidgetPreview
-              key={`${widget.id}-${theme}-${host}-${session}`}
-              widget={widget}
-              payload={payload}
-              theme={theme}
-              host={host}
-              reject={reject}
-              loading={loading}
-              revision={revision}
-            />
+          {
+            <div
+              aria-label="Preview surface"
+              className="inline-flex gap-1 rounded-full bg-muted p-1"
+            >
+              {["internal", "external", "both"].map((value) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={surface === value ? "secondary" : "ghost"}
+                  className="rounded-full capitalize"
+                  aria-pressed={surface === value}
+                  onClick={() => setSurface(value)}
+                >
+                  {value}
+                </Button>
+              ))}
+            </div>
+          }
+          <div className="@container">
+            <div
+              className={
+                surface === "both"
+                  ? "grid grid-cols-1 items-start gap-4 @3xl:grid-cols-2"
+                  : "grid grid-cols-1"
+              }
+            >
+              {widget.id === "options" && surface !== "external" && (
+                <div
+                  className="mx-auto w-full min-w-0"
+                  style={{ maxWidth: Number(width) }}
+                >
+                  <InternalNextOptionsPreview
+                    key={`internal-${session}-${revision}`}
+                    payload={payload}
+                    theme={theme}
+                    loading={loading}
+                    reject={reject}
+                  />
+                </div>
+              )}
+              {widget.id === "social" && surface !== "external" && (
+                <div
+                  data-theme={theme}
+                  className="mx-auto w-full min-w-0 overflow-hidden rounded-2xl border bg-background text-foreground"
+                  style={{ maxWidth: Number(width) }}
+                >
+                  <div className="flex items-center justify-between border-b px-4 py-3 text-xs">
+                    <span>Internal · Growth chat</span>
+                    <span role="status">
+                      {loading ? "Waiting for tool result" : "Ready"}
+                    </span>
+                  </div>
+                  <div className="p-4">
+                    {loading ? (
+                      <p className="text-xs text-muted-foreground">
+                        Waiting for tool result…
+                      </p>
+                    ) : (
+                      <SocialPostSummary result={payload} />
+                    )}
+                  </div>
+                </div>
+              )}
+              {!["options", "social"].includes(widget.id) &&
+                surface !== "external" && (
+                  <InternalSummaryPreview
+                    key={`${widget.id}-${session}-${revision}`}
+                    kind={widget.id}
+                    payload={payload}
+                    theme={theme}
+                    loading={loading}
+                    reject={reject}
+                    width={Number(width)}
+                  />
+                )}
+              {surface !== "internal" && (
+                <div
+                  className="mx-auto w-full min-w-0"
+                  style={{ maxWidth: Number(width) }}
+                >
+                  <WidgetPreview
+                    key={`${widget.id}-${theme}-${host}-${session}`}
+                    widget={widget}
+                    payload={payload}
+                    theme={theme}
+                    host={host}
+                    reject={reject}
+                    loading={loading}
+                    revision={revision}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <section className="space-y-3 rounded-2xl border p-5">
             <div className="flex items-center justify-between gap-3">
