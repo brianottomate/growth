@@ -1671,7 +1671,7 @@ export const returnAdToStudioAction = growthAction({
     }),
   }),
   description:
-    "Return the same approved or campaign ad to Studio as an unassigned draft. Clears approval and Ready attribution, keeps its source artwork, composition and comments, purges unused generated exports, and records the optional comment with the return event. Existing platform ads and their creative remain unchanged and may still run; this does not pause delivery. Read the current updatedAt before calling. Use as=user only for words the user explicitly asks you to post on their behalf; otherwise as=agent.",
+    "Return the same approved or campaign ad to Studio as an unassigned draft. Clears approval and Ready attribution, keeps its source artwork, composition and comments, purges unused generated exports, and records the optional comment with the return event. Existing platform ads and their creative remain unchanged and may still run; this does not pause delivery. Use as=user only for words the user explicitly asks you to post on their behalf; otherwise as=agent.",
   inputSchema: z.object({
     adId: z.string().min(1),
     comment: z.string().trim().max(8000).optional(),

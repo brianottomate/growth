@@ -629,11 +629,9 @@ export const growthActionPolicies = {
   playbookRead: { list: read(), read: read() },
   strategyRead: { getTargets: read(), proposeTargets: read("model-read") },
   strategyWrite: {
-    createCadence: write(),
-    updateCadence: write({ idempotent: true }),
+    setChannelCadence: write({ idempotent: true }),
     setSeriesCadence: write({ idempotent: true }),
-    createBrandMix: write(),
-    updateBrandMix: write({ idempotent: true }),
+    setBrandMix: write({ idempotent: true }),
   },
   planningRead: {
     previewSlots: read("model-read", ALL),

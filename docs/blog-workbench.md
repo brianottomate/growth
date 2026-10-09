@@ -84,12 +84,10 @@ authoring surface. It remains unpublished through a future `publishedAt` date,
 and renders with the real Velite component registry inside the gated
 `/lab/blog-workbench/preview/<slug>` route. The workbench links to that preview.
 
-The mirror records its generated content hash under `fixtures/blog/drafts/`.
-An unchanged draft can refresh from the next run. Once a teammate edits the MDX,
-automatic refresh refuses to replace it. Keep editing that document, or manually
-reconcile it with the new immutable run. A changed publication date also blocks
-refresh. A successful generation remains saved even if its mirror update is
-blocked. There is no automatic CMS or website publication.
+Refreshing the mirror replaces its article content with the requested run and
+preserves the existing publication date. Draft edits use last-write-wins. Each
+generation remains available in its immutable run directory. There is no
+automatic CMS or website publication.
 
 The `Editorial building blocks` draft demonstrates Growth-native components:
 

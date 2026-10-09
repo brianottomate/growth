@@ -296,7 +296,7 @@ async function main() {
   );
   assert(
     policyForGrowthTool("strategyWrite", {
-      action: "updateCadence",
+      action: "setChannelCadence",
     }).idempotent,
     "Strategy updates lost action-level idempotency",
   );

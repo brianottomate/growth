@@ -1895,9 +1895,9 @@ function ApprovalCard({
                         ? "Create this audience target?"
                         : toolName === "audienceWrite.updateTarget"
                           ? "Save these audience changes?"
-                          : toolName === "strategyWrite.updateCadence"
+                          : toolName === "strategyWrite.setChannelCadence"
                             ? "Save these cadence changes?"
-                            : toolName === "strategyWrite.updateBrandMix"
+                            : toolName === "strategyWrite.setBrandMix"
                               ? "Save these content mix changes?"
                               : toolName ===
                                   "contentMediaWrite.attachLibraryMedia"
@@ -1938,9 +1938,9 @@ function ApprovalCard({
                         ? "Create target"
                         : toolName === "audienceWrite.updateTarget"
                           ? "Save changes"
-                          : toolName === "strategyWrite.updateCadence"
+                          : toolName === "strategyWrite.setChannelCadence"
                             ? "Save cadence"
-                            : toolName === "strategyWrite.updateBrandMix"
+                            : toolName === "strategyWrite.setBrandMix"
                               ? "Save content mix"
                               : toolName ===
                                   "contentMediaWrite.attachLibraryMedia"

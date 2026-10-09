@@ -22,10 +22,8 @@ import {
   getMediaAnalysisOutputSchema,
   proposeStrategyTargetsOutputSchema,
   getStrategyTargetsOutputSchema,
-  createChannelCadenceOutputSchema,
-  updateChannelCadenceOutputSchema,
-  createBrandMixOutputSchema,
-  updateBrandMixOutputSchema,
+  setChannelCadenceOutputSchema,
+  setBrandMixOutputSchema,
   setSeriesCadenceOutputSchema,
   registerBrandChannelOutputSchema,
 } from "./outputs/operations";
@@ -834,7 +832,6 @@ export const getStrategyTargets = growthAction({
 async function saveChannelCadence(
   input: z.infer<typeof channelCadenceInput>,
   ctx: Parameters<typeof requireOwnedBrand>[1],
-  mode: "create" | "update",
 ) {
   const { brandId, platform, targets } = input;
   const brand = await requireOwnedBrand(brandId, ctx);
@@ -850,32 +847,6 @@ async function saveChannelCadence(
   if (!channel)
     throw new Error(`${brand.name} does not have a ${platform} channel.`);
 
-  const existing = await db.query.cadenceTargetTable.findMany({
-    where: and(
-      eq(cadenceTargetTable.channelId, channel.id),
-      eq(cadenceTargetTable.isActive, true),
-      isNull(cadenceTargetTable.deletedAt),
-      isNull(cadenceTargetTable.template),
-    ),
-    columns: { id: true },
-  });
-  if (mode === "create" && existing.length > 0) {
-    throw new Error(
-      `${brand.name}'s ${platform} cadence already exists. Read the current targets and use updateChannelCadence to change it.`,
-    );
-  }
-  if (mode === "update" && existing.length === 0) {
-    // `conflict`, matching the "already exists" guard above, which only grades
-    // that way because its message happens to contain the word "already". The
-    // state disagrees with the action the model chose, and the message names the
-    // action that fits, so "read the current state and decide" is the right
-    // steer. Left untyped this graded `tool_failed` and told it to stop.
-    throw new GrowthActionError(
-      "conflict",
-      `${brand.name}'s ${platform} channel has no cadence yet. Use createChannelCadence to establish it.`,
-    );
-  }
-
   const saved = await replaceChannelCadence({
     brandId,
     channelId: channel.id,
@@ -885,7 +856,6 @@ async function saveChannelCadence(
   return {
     ok: true as const,
     action: "saved" as const,
-    change: mode === "create" ? ("created" as const) : ("updated" as const),
     brand: brand.name,
     platform,
     handle: channel.handle,
@@ -896,26 +866,17 @@ async function saveChannelCadence(
   };
 }
 
-export const createChannelCadence = growthAction({
-  outputSchema: createChannelCadenceOutputSchema,
+export const setChannelCadence = growthAction({
+  outputSchema: setChannelCadenceOutputSchema,
   description:
-    "Create the first recurring cadence baseline for one owned publishing channel after the operator explicitly agrees to a proposed baseline. Supports every publishing platform documented in the input schema. This is a reversible configuration creation, so the operator's conversational instruction is sufficient and no second approval card is needed. Use only platform-valid archetypes.",
+    "Save a complete recurring cadence for one owned publishing channel. Creates or replaces its targets; omitted formats are removed. Use only platform-valid archetypes and the target set agreed with the operator.",
   inputSchema: channelCadenceInput,
-  execute: async (input, ctx) => saveChannelCadence(input, ctx, "create"),
-});
-
-export const updateChannelCadence = growthAction({
-  outputSchema: updateChannelCadenceOutputSchema,
-  description:
-    "Replace an existing owned publishing-channel cadence with a complete reviewed target set. Supports every publishing platform documented in the input schema. Use only after reading the current cadence and explaining the before/after change; omitted formats are removed.",
-  inputSchema: channelCadenceInput,
-  execute: async (input, ctx) => saveChannelCadence(input, ctx, "update"),
+  execute: saveChannelCadence,
 });
 
 async function saveBrandMix(
   input: z.infer<typeof brandMixInput>,
   ctx: Parameters<typeof requireOwnedBrand>[1],
-  mode: "create" | "update",
 ) {
   const brand = await requireOwnedBrand(input.brandId, ctx);
   const allowedPillars = new Set(
@@ -929,33 +890,10 @@ async function saveBrandMix(
     }
   }
 
-  const existing = await db.query.mixTargetTable.findMany({
-    where: and(
-      eq(mixTargetTable.brandId, input.brandId),
-      eq(mixTargetTable.isActive, true),
-      isNull(mixTargetTable.channelId),
-    ),
-    columns: { id: true },
-  });
-  if (mode === "create" && existing.length > 0) {
-    throw new Error(
-      `${brand.name}'s content mix already exists. Use updateBrandMix to change it.`,
-    );
-  }
-  if (mode === "update" && existing.length === 0) {
-    // Same asymmetry as the cadence pair: the "already exists" branch above is
-    // graded by accident, this one was not graded at all.
-    throw new GrowthActionError(
-      "conflict",
-      `${brand.name} has no content mix yet. Use createBrandMix to establish it.`,
-    );
-  }
-
   const targets = await replaceBrandMixTargets(input);
   return {
     ok: true as const,
     action: "saved" as const,
-    change: mode === "create" ? ("created" as const) : ("updated" as const),
     brand: brand.name,
     targets,
     channelsUrl: "/app/channels",
@@ -963,20 +901,12 @@ async function saveBrandMix(
   };
 }
 
-export const createBrandMix = growthAction({
-  outputSchema: createBrandMixOutputSchema,
+export const setBrandMix = growthAction({
+  outputSchema: setBrandMixOutputSchema,
   description:
-    "Create the first brand-default pillar mix after proposing a complete 100% allocation and receiving explicit conversational agreement. This reversible configuration creation does not need a second approval card.",
+    "Save a complete brand-default pillar mix totaling 100%. Creates or replaces the allocation; omitted pillars are removed. Use the allocation agreed with the operator.",
   inputSchema: brandMixInput,
-  execute: async (input, ctx) => saveBrandMix(input, ctx, "create"),
-});
-
-export const updateBrandMix = growthAction({
-  outputSchema: updateBrandMixOutputSchema,
-  description:
-    "Replace an existing brand-default pillar mix with a complete 100% allocation. Explain the before/after change first; omitted pillars are removed.",
-  inputSchema: brandMixInput,
-  execute: async (input, ctx) => saveBrandMix(input, ctx, "update"),
+  execute: saveBrandMix,
 });
 
 const seriesCadenceInput = z.object({
@@ -1143,11 +1073,9 @@ export const OPERATION_TOOLS = {
   openTimelinePost,
   analyzeTimelineVideo,
   proposeStrategyTargets,
-  createChannelCadence,
-  updateChannelCadence,
+  setChannelCadence,
   setSeriesCadence,
-  createBrandMix,
-  updateBrandMix,
+  setBrandMix,
 } as const;
 
 const listingPhotoShape = z.object({

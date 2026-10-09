@@ -217,8 +217,8 @@ import { nextForBrand } from "./next";
 import {
   analyzeMediaAsset,
   analyzeTimelineVideo,
-  createBrandMix,
-  createChannelCadence,
+  setBrandMix,
+  setChannelCadence,
   discoverBrandChannels,
   getMediaAnalysis,
   getStrategyTargets,
@@ -236,8 +236,6 @@ import {
   syncBrandBlog,
   syncBrandWebsite,
   syncOwnedBrandContent,
-  updateBrandMix,
-  updateChannelCadence,
   listListingPhotos,
   importListingPhotos,
 } from "./operations";
@@ -775,11 +773,9 @@ export const strategyWrite = growthDomainTool({
   description:
     "Create or update channel cadence, series cadence, and brand-mix targets.",
   actions: {
-    createCadence: createChannelCadence,
-    updateCadence: updateChannelCadence,
+    setChannelCadence,
     setSeriesCadence,
-    createBrandMix,
-    updateBrandMix,
+    setBrandMix,
   },
 });
 

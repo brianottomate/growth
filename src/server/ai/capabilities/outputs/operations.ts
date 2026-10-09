@@ -120,11 +120,10 @@ const videoItemSchema = z.strictObject({
   updatedAt: z.iso.datetime(),
 });
 
-const createChannelCadenceSchema = z.strictObject({
+const setChannelCadenceSchema = z.strictObject({
   action: z.literal("saved"),
   brand: z.string(),
   calendarUrl: z.string(),
-  change: z.enum(["created", "updated"]),
   channelsUrl: z.string(),
   handle: z.string().nullable(),
   next: z.string(),
@@ -150,10 +149,9 @@ const createChannelCadenceSchema = z.strictObject({
   ),
 });
 
-const createBrandMixSchema = z.strictObject({
+const setBrandMixSchema = z.strictObject({
   action: z.literal("saved"),
   brand: z.string(),
-  change: z.enum(["created", "updated"]),
   channelsUrl: z.string(),
   next: z.string(),
   ok: z.literal(true),
@@ -443,13 +441,9 @@ export const getStrategyTargetsOutputSchema = z.strictObject({
   ),
 });
 
-export const createChannelCadenceOutputSchema = createChannelCadenceSchema;
+export const setChannelCadenceOutputSchema = setChannelCadenceSchema;
 
-export const updateChannelCadenceOutputSchema = createChannelCadenceSchema;
-
-export const createBrandMixOutputSchema = createBrandMixSchema;
-
-export const updateBrandMixOutputSchema = createBrandMixSchema;
+export const setBrandMixOutputSchema = setBrandMixSchema;
 
 export const setSeriesCadenceOutputSchema = z.strictObject({
   ok: z.literal(true),
