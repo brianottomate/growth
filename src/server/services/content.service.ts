@@ -227,7 +227,7 @@ export type CreateIdeaInput = {
   // platform's primary format. The cross-post manifest, materialized eagerly.
   platforms?: ChannelPlatform[];
   // Concrete spots when the content type matters beyond the surface default
-  // (for example newsletter.blast vs the recurring newsletter issue).
+  // A newsletter edition is organized by its content series, not a separate format.
   spots?: { platform: ChannelPlatform; format?: string | null }[];
 };
 

@@ -87,7 +87,8 @@ type PostRow = {
   platform: string;
   format: string | null;
   archetype: string | null;
-  contentPost: { pillar: string | null } | null;
+  source: string;
+  contentPost: { pillar: string | null; seriesId: string | null } | null;
 };
 
 export async function getBrandStrategy(
@@ -120,8 +121,14 @@ export async function getBrandStrategy(
         inArray(platformPostTable.brandId, allBrandIds),
         gte(platformPostTable.publishedAt, cutoff),
       ),
-      columns: { brandId: true, platform: true, format: true, archetype: true },
-      with: { contentPost: { columns: { pillar: true } } },
+      columns: {
+        brandId: true,
+        platform: true,
+        format: true,
+        archetype: true,
+        source: true,
+      },
+      with: { contentPost: { columns: { pillar: true, seriesId: true } } },
     }),
     db.query.cadenceTargetTable.findMany({
       where: and(
@@ -143,10 +150,16 @@ export async function getBrandStrategy(
   const ourPosts = (posts as PostRow[]).filter((p) => p.brandId === brandId);
   const peerPosts = (posts as PostRow[]).filter((p) => p.brandId !== brandId);
   const ourCadencePosts = ourPosts.filter((p) =>
-    formatCountsTowardCadence(p.format),
+    formatCountsTowardCadence(
+      p.format,
+      p.source === "owned" ? (p.contentPost?.seriesId ?? null) : undefined,
+    ),
   );
   const peerCadencePosts = peerPosts.filter((p) =>
-    formatCountsTowardCadence(p.format),
+    formatCountsTowardCadence(
+      p.format,
+      p.source === "owned" ? (p.contentPost?.seriesId ?? null) : undefined,
+    ),
   );
 
   // ---- Pillar mix (observed % vs target %, + peer benchmark) -------------

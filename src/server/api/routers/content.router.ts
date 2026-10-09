@@ -289,7 +289,11 @@ export const contentRouter = {
         const platforms = [
           ...new Set(
             c.platformPosts.map((p) =>
-              p.format === "newsletter.blast" ? "blast" : p.platform,
+              ["newsletter.broadcast", "newsletter.blast"].includes(
+                p.format ?? "",
+              )
+                ? "blast"
+                : p.platform,
             ),
           ),
         ];

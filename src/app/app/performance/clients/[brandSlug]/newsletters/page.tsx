@@ -7,6 +7,7 @@ import { EmailAudiencesClient } from "@/app/app/newsletters/audiences/EmailAudie
 import { BrandEmailStyle } from "@/app/app/newsletters/BrandEmailStyle";
 import { NewsletterCapture } from "@/app/app/newsletters/NewsletterCapture";
 import { NewslettersView } from "@/app/app/newsletters/NewslettersView";
+import { NewsletterSeriesView } from "@/app/app/newsletters/NewsletterSeriesView";
 
 import { loadPerformanceBrand } from "../_data";
 import { db } from "@/server/db";
@@ -28,12 +29,11 @@ export default async function PerformanceBrandNewslettersPage({
     view?: string;
     tab?: string;
     sequence?: string;
+    series?: string;
   }>;
 }) {
-  const [{ brandSlug }, { kind, view, tab, sequence }] = await Promise.all([
-    params,
-    searchParams,
-  ]);
+  const [{ brandSlug }, { kind, view, tab, sequence, series }] =
+    await Promise.all([params, searchParams]);
   const { session, org, brand } = await loadPerformanceBrand(brandSlug);
   if (!session) redirect("/signin");
   if (!org)
@@ -51,7 +51,12 @@ export default async function PerformanceBrandNewslettersPage({
   });
   const setup = sender?.emailSender?.marketingDomain;
   const basePath = `/app/performance/clients/${slug}/newsletters`;
-  const activeTab = ["sequences", "audiences", "settings"].includes(tab ?? "")
+  const activeTab = [
+    "newsletters",
+    "sequences",
+    "audiences",
+    "settings",
+  ].includes(tab ?? "")
     ? tab
     : "blasts";
   const audiences = (
@@ -94,7 +99,8 @@ export default async function PerformanceBrandNewslettersPage({
       >
         {(
           [
-            ["blasts", "Blasts"],
+            ["blasts", "Broadcasts"],
+            ["newsletters", "Newsletters"],
             ["sequences", "Sequences"],
             ["audiences", "Audiences"],
             ["settings", "Settings"],
@@ -110,7 +116,13 @@ export default async function PerformanceBrandNewslettersPage({
           </Link>
         ))}
       </nav>
-      {activeTab === "sequences" ? (
+      {activeTab === "newsletters" ? (
+        <NewsletterSeriesView
+          brand={brand}
+          basePath={basePath}
+          seriesId={series}
+        />
+      ) : activeTab === "sequences" ? (
         <EmailSequences
           brandId={brand.id}
           basePath={basePath}

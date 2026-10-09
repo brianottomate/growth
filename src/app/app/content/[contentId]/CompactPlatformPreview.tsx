@@ -203,7 +203,11 @@ export function CompactPlatformPreview({
     >
       <div className="mb-2 flex items-center gap-1.5">
         <ChannelLogo
-          platform={format === "newsletter.blast" ? "blast" : platform}
+          platform={
+            ["newsletter.broadcast", "newsletter.blast"].includes(format ?? "")
+              ? "blast"
+              : platform
+          }
           className="size-3.5"
         />
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium">

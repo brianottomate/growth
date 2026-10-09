@@ -20,7 +20,7 @@ import {
 } from "@/lib/newsletter-review-source";
 import { ContentAnalysisPanel } from "@/components/content-analysis-panel";
 import { readContentAnalysis } from "@/lib/content-analysis";
-import { EMAIL_DOCUMENT_FORMATS } from "@/lib/email-document";
+import { EMAIL_READ_FORMATS } from "@/lib/email-document";
 import { ensureEmailDocument } from "@/server/services/email-document.service";
 import { NewsletterIssueWorkspace } from "./NewsletterIssueWorkspace";
 
@@ -45,7 +45,7 @@ export default async function NewsletterIssuePage({
 
   const issue = await db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, id),
-    with: { brand: true },
+    with: { brand: true, contentPost: { with: { series: true } } },
   });
   if (!issue?.brand) notFound();
   let hasAccess = issue.brand.organizationId === org.id;
@@ -70,10 +70,13 @@ export default async function NewsletterIssuePage({
   const isOwnedEmail =
     issue.source === "owned" &&
     issue.platform === "newsletter" &&
-    EMAIL_DOCUMENT_FORMATS.includes(
-      issue.format as (typeof EMAIL_DOCUMENT_FORMATS)[number],
+    EMAIL_READ_FORMATS.includes(
+      issue.format as (typeof EMAIL_READ_FORMATS)[number],
     );
   if (isOwnedEmail) {
+    const emailBasePath = issue.brand.performanceSettings
+      ? `/app/performance/clients/${issue.brand.slug ?? issue.brand.id}/newsletters`
+      : `/app/brands/${issue.brand.slug ?? issue.brand.id}/newsletters`;
     await ensureEmailDocument({
       platformPostId: issue.id,
       organizationId: org.id,
@@ -82,13 +85,21 @@ export default async function NewsletterIssuePage({
     return (
       <div>
         <div className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link
-            href={`/app/brands/${issue.brand.slug ?? issue.brand.id}/newsletters`}
-            className="hover:text-foreground"
-          >
+          <Link href={emailBasePath} className="hover:text-foreground">
             {issue.brand.name}
           </Link>
           <span>/</span>
+          {issue.contentPost?.series && issue.brand.performanceSettings && (
+            <>
+              <Link
+                href={`${emailBasePath}?tab=newsletters&series=${encodeURIComponent(issue.contentPost.series.id)}`}
+                className="hover:text-foreground"
+              >
+                {issue.contentPost.series.name}
+              </Link>
+              <span>/</span>
+            </>
+          )}
           <span className="font-medium text-foreground">
             {issue.text || "Email workspace"}
           </span>

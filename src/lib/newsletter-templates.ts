@@ -62,6 +62,12 @@ export function newsletterTemplate(id: NewsletterTemplateId) {
 }
 
 export const draftFromTemplateInputSchema = z.object({
+  seriesId: z
+    .string()
+    .optional()
+    .describe(
+      "Recurring newsletter series for a new edition; must belong to this brand.",
+    ),
   platformPostId: z
     .string()
     .optional()

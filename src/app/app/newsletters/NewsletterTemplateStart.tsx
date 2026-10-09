@@ -46,11 +46,13 @@ export function NewsletterTemplateStart({
   primary = false,
   initialTemplate = "season-ahead",
   onDrafted,
+  seriesId,
 }: {
   brandId: string;
   primary?: boolean;
   initialTemplate?: NewsletterTemplateId;
   onDrafted?: (platformPostId: string) => void;
+  seriesId?: string;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -362,6 +364,7 @@ export function NewsletterTemplateStart({
               onClick={() =>
                 draft.mutate({
                   brandId,
+                  seriesId,
                   template,
                   brief: brief.trim() || undefined,
                   homeIds: homeId ? [homeId] : undefined,

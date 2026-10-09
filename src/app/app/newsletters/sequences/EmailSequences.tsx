@@ -11,9 +11,11 @@ import {
   MessageSquare,
   Plus,
   Trash2,
+  Workflow,
 } from "lucide-react";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc } from "@/orpc/client";
+import { WorkspaceCard } from "@/app/app/performance/WorkspaceCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -164,25 +166,24 @@ export function EmailSequences({
       />
     );
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold">Email sequences</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Plan emails around a moment in your customer’s journey. Welcome is
-            the first journey we’ll connect to Amplitude.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <WorkspaceCard
+      title="Sequences"
+      icon={Workflow}
+      count={query.data?.length}
+      actions={
+        <>
           <SequenceChatStart brandId={brandId} />
-          <Button asChild>
+          <Button variant="outline" asChild>
             <Link href={`${basePath}?tab=sequences&sequence=new`}>
-              <Plus className="size-4" />
-              New sequence
+              <Plus className="size-4" /> New sequence
             </Link>
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
+      <p className="text-sm text-muted-foreground">
+        Plan emails around a moment in your customer’s journey.
+      </p>
       {query.isPending && (
         <p className="text-sm text-muted-foreground">Loading sequences…</p>
       )}
@@ -248,7 +249,7 @@ export function EmailSequences({
             </Link>
           ))}
       </div>
-    </div>
+    </WorkspaceCard>
   );
 }
 function SequenceLoader({

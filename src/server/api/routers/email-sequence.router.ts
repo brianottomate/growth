@@ -86,7 +86,7 @@ export const emailSequenceRouter = {
         ...input,
         organizationId: context.workspace.orgId,
         userId: context.session.user.id,
-        format: "newsletter.blast",
+        format: "newsletter.broadcast",
       }),
     ),
   executionOverview: workspaceProcedure

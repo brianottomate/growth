@@ -569,7 +569,8 @@ async function draftNewsletterFromTemplateUnlocked(
         userId: input.userId,
         brandId: brand.id,
         title: output.subject || template.label,
-        format: "newsletter.blast",
+        seriesId: input.seriesId,
+        format: "newsletter.broadcast",
         hook: input.angle?.trim() || undefined,
         purpose: input.offer?.trim() || undefined,
         plannedAt: input.plannedAt,
@@ -693,7 +694,7 @@ export async function draftNewsletterFromTemplate(
     : await createEmailSlot({
         ...input,
         title: input.angle || newsletterTemplate(input.template).label,
-        format: "newsletter.blast",
+        format: "newsletter.broadcast",
         purpose: input.brief,
       });
   const { document, spot } = await ensureEmailDocument({

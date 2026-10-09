@@ -137,8 +137,9 @@ export default async function ContentDetailPage({
   const onlyEmail =
     ownedSpots.length === 1 &&
     ownedSpots[0]!.platform === "newsletter" &&
-    (ownedSpots[0]!.format === "newsletter.broadcast" ||
-      ownedSpots[0]!.format === "newsletter.blast");
+    ["newsletter.broadcast", "newsletter.blast"].includes(
+      ownedSpots[0]!.format ?? "",
+    );
   const onlyBlog =
     ownedSpots.length === 1 && ownedSpots[0]!.platform === "blog";
   if (

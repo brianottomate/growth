@@ -114,8 +114,10 @@ export async function suggestTargets(
       inArray(platformPostTable.brandId, [brandId, ...peerBrandIds]),
       gte(platformPostTable.publishedAt, cutoff),
     ),
+    with: { contentPost: { columns: { seriesId: true } } },
     columns: {
       brandId: true,
+      source: true,
       platform: true,
       format: true,
       archetype: true,
@@ -124,10 +126,20 @@ export async function suggestTargets(
     },
   });
   const own = posts.filter(
-    (p) => p.brandId === brandId && formatCountsTowardCadence(p.format),
+    (p) =>
+      p.brandId === brandId &&
+      formatCountsTowardCadence(
+        p.format,
+        p.source === "owned" ? (p.contentPost?.seriesId ?? null) : undefined,
+      ),
   );
   const peers = posts.filter(
-    (p) => p.brandId !== brandId && formatCountsTowardCadence(p.format),
+    (p) =>
+      p.brandId !== brandId &&
+      formatCountsTowardCadence(
+        p.format,
+        p.source === "owned" ? (p.contentPost?.seriesId ?? null) : undefined,
+      ),
   );
 
   // ---- own performance per platform × archetype ----

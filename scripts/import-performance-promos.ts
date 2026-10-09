@@ -248,7 +248,7 @@ for (const file of files) {
     userId: operator.id,
     brandId: brand.id,
     title: email.subject,
-    format: "newsletter.blast",
+    format: "newsletter.broadcast",
     hook: email.concept,
     purpose: `${email.offer} (code ${email.code})`,
     plannedAt: plannedAt.toISOString(),

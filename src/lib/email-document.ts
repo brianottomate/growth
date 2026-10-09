@@ -2,7 +2,9 @@ import { z } from "zod";
 
 import { listingsDigestSchema } from "./listings-digest";
 
-export const EMAIL_DOCUMENT_FORMATS = [
+export const EMAIL_DOCUMENT_FORMATS = ["newsletter.broadcast"] as const;
+// Read compatibility while existing rows are migrated; new content uses broadcast.
+export const EMAIL_READ_FORMATS = [
   "newsletter.broadcast",
   "newsletter.blast",
 ] as const;

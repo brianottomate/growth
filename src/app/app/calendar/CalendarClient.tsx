@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { monthWeeks } from "@/lib/calendar-dates";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -109,17 +110,6 @@ const keyOf = (d: Date) =>
 const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
 const addDays = (d: Date, n: number) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-
-/** Weeks (Mon-start) covering a month, trailing empty week trimmed. */
-function monthWeeks(year: number, month: number): Date[][] {
-  const first = new Date(year, month, 1);
-  const start = addDays(first, -mondayIndex(first));
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const weeks = Math.ceil((mondayIndex(first) + daysInMonth) / 7);
-  return Array.from({ length: weeks }, (_, w) =>
-    Array.from({ length: 7 }, (_, d) => addDays(start, w * 7 + d)),
-  );
-}
 
 /** Columns of 7 (Mon-start) covering the whole year — the heatmap grid. */
 function yearColumns(year: number): Date[][] {
@@ -894,8 +884,11 @@ function ContentChip({ g }: { g: DayGroup }) {
   const status = g.entries[0]?.status ?? "draft";
   const brand = brandBadge(g.entries[0]?.brandName);
   const platform = g.entries[0]?.platform ?? "";
-  const iconPlatform =
-    g.entries[0]?.format === "newsletter.blast" ? "blast" : platform;
+  const iconPlatform = ["newsletter.broadcast", "newsletter.blast"].includes(
+    g.entries[0]?.format ?? "",
+  )
+    ? "blast"
+    : platform;
   const media = g.entries.find((e) => e.mediaUrl)?.mediaUrl ?? null;
   const label = g.title ?? g.entries[0]?.text ?? platformLabel(platform);
   const storyCount = g.entries.filter(isStoryEntry).length;
@@ -904,7 +897,9 @@ function ContentChip({ g }: { g: DayGroup }) {
   const platforms = [
     ...new Set(
       g.entries.map((e) =>
-        e.format === "newsletter.blast" ? "blast" : e.platform,
+        ["newsletter.broadcast", "newsletter.blast"].includes(e.format ?? "")
+          ? "blast"
+          : e.platform,
       ),
     ),
   ];
@@ -1463,7 +1458,13 @@ function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
         {g.entries.map((e) => (
           <div key={e.id} className="flex items-center gap-2 text-xs">
             <ChannelLogo
-              platform={e.format === "newsletter.blast" ? "blast" : e.platform}
+              platform={
+                ["newsletter.broadcast", "newsletter.blast"].includes(
+                  e.format ?? "",
+                )
+                  ? "blast"
+                  : e.platform
+              }
               className="size-4 shrink-0"
             />
             <span

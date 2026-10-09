@@ -95,7 +95,7 @@ export const getEmailDraftOutputSchema = z.strictObject({
     }),
   ),
   spot: z.strictObject({
-    format: z.enum(["newsletter.broadcast", "newsletter.blast"]),
+    format: z.literal("newsletter.broadcast"),
     id: z.string(),
     media: z.array(
       z.strictObject({

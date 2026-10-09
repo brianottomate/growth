@@ -31,7 +31,7 @@ export async function createFlexTestSequence(input: {
     const slot = await createEmailSlot({
       ...input,
       title: `Flex test email ${index + 1}`,
-      format: "newsletter.blast",
+      format: "newsletter.broadcast",
     });
     await saveEmailDocument({
       ...input,

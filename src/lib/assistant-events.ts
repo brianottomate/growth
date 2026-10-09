@@ -36,6 +36,7 @@ export type ShapeContentStructureIntent = {
 
 export type PlanEmailIntent = {
   type: "plan_email";
+  mode?: "setup_newsletter";
   brandId?: string;
   brandName?: string;
   visibleText: string;

@@ -174,14 +174,14 @@ function Editor({ workspace }: { workspace: Workspace }) {
   );
   const formatLabel = workspace.sequences?.length
     ? "Sequence email"
-    : workspace.spot.format === "newsletter.blast"
-      ? "One-off blast"
-      : "Newsletter issue";
+    : !workspace.content?.series
+      ? "One-off broadcast"
+      : "Newsletter edition";
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="grid grid-cols-1 items-start gap-3 @xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="rounded-full bg-muted px-2 py-1 font-medium">
               {formatLabel}
@@ -207,11 +207,11 @@ function Editor({ workspace }: { workspace: Workspace }) {
               {sequence.name} sequence
             </Link>
           ))}
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight break-words">
             {workspace.content?.title || draft.subject || "Untitled email"}
           </h1>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2 @xl:max-w-[60cqw] @xl:justify-end">
           <EmailReviewActions
             platformPostId={workspace.spot.id}
             status={workspace.spot.status}

@@ -60,6 +60,7 @@ import {
 } from "@/server/services/newsletter-homes.service";
 import { newsletterTemplateOptions } from "@/server/services/newsletter-template.service";
 import {
+  createEmailSlot as createEmailSlotAction,
   draftEmailFromTemplate as draftEmailFromTemplateAction,
   generateEmailDraft as generateEmailDraftAction,
   getEmailDraft as getEmailDraftAction,
@@ -100,6 +101,7 @@ async function deliveryOrganizationIdForUser(
 }
 
 export const newsletterRouter = {
+  createSlot: actionProcedure(createEmailSlotAction),
   reviewCreative: workspaceProcedure
     .input(
       z.object({

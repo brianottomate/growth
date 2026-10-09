@@ -1544,7 +1544,13 @@ function ScheduleRow({
           iconClassName="size-4"
         />
         <ChannelLogo
-          platform={row.format === "newsletter.blast" ? "blast" : row.platform}
+          platform={
+            ["newsletter.broadcast", "newsletter.blast"].includes(
+              row.format ?? "",
+            )
+              ? "blast"
+              : row.platform
+          }
           className="size-5 shrink-0"
         />
         <button

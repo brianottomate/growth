@@ -61,7 +61,7 @@ export const PLATFORM_META: Record<string, { name: string; code: string }> = {
   pinterest_ads: { name: "Pinterest Ads", code: "PA" },
   newsletter: { name: "Newsletter", code: "NL" },
   // Presentation-only alias for a newsletter-platform spot whose concrete
-  // format is newsletter.blast. It is not a channel_platform enum value.
+  // format is newsletter.broadcast. It is not a channel_platform enum value.
   blast: { name: "Email blast", code: "BL" },
   blog: { name: "Blog", code: "BL" },
   other: { name: "Other", code: "··" },

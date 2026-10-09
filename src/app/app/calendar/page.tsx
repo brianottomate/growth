@@ -126,7 +126,10 @@ export default async function CalendarPage({
     .filter(
       (post) =>
         sp.kind !== "blast" ||
-        (post.format === "newsletter.blast" && !sequenceIds.has(post.id)),
+        (["newsletter.broadcast", "newsletter.blast"].includes(
+          post.format ?? "",
+        ) &&
+          !sequenceIds.has(post.id)),
     )
     .map((p) => {
       const at =

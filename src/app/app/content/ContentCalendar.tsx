@@ -257,7 +257,13 @@ function CalChip({
       title={spot.title ?? undefined}
     >
       <ChannelLogo
-        platform={spot.format === "newsletter.blast" ? "blast" : spot.platform}
+        platform={
+          ["newsletter.broadcast", "newsletter.blast"].includes(
+            spot.format ?? "",
+          )
+            ? "blast"
+            : spot.platform
+        }
         className="size-3.5 shrink-0"
       />
       {spot.mediaUrl && (

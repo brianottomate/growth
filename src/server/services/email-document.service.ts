@@ -9,7 +9,7 @@ import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
-  EMAIL_DOCUMENT_FORMATS,
+  EMAIL_READ_FORMATS,
   emailDocumentDraftSchema,
   formatEmailImplementationHandoff,
   productUpdateEmailDraftSchema,
@@ -73,8 +73,12 @@ const generatedDraftSchema = z.object({
   ctaUrl: z.string().url().max(2_000).nullable(),
 });
 
-function isEmailFormat(value: string | null): value is EmailDocumentFormat {
-  return EMAIL_DOCUMENT_FORMATS.includes(value as EmailDocumentFormat);
+function isEmailFormat(
+  value: string | null,
+): value is (typeof EMAIL_READ_FORMATS)[number] {
+  return EMAIL_READ_FORMATS.includes(
+    value as (typeof EMAIL_READ_FORMATS)[number],
+  );
 }
 
 function snapshotOf(document: EmailDocumentDraft): EmailDocumentSnapshot {
@@ -283,7 +287,7 @@ export async function getEmailWorkspace(input: {
     sequences,
     spot: {
       id: spot.id,
-      format: spot.format as EmailDocumentFormat,
+      format: "newsletter.broadcast" as const,
       status: spot.status,
       scheduledAt: spot.scheduledAt,
       publishedAt: spot.publishedAt,
@@ -486,7 +490,7 @@ export async function createEmailSlot(input: {
         targetSpots: [
           {
             platform: "newsletter",
-            format: input.format,
+            format: "newsletter.broadcast" as const,
             archetype: "article",
             scheduledAt: plannedAt?.toISOString(),
           },
@@ -501,7 +505,7 @@ export async function createEmailSlot(input: {
         contentPostId: content.id,
         channelId: newsletterChannel?.id,
         platform: "newsletter",
-        format: input.format,
+        format: "newsletter.broadcast" as const,
         archetype: "article",
         source: "owned",
         status: "slot",
@@ -560,7 +564,7 @@ export async function createProductUpdateDraft(input: {
     userId: input.userId,
     brandId: input.brandId,
     title: input.title,
-    format: input.format,
+    format: "newsletter.broadcast" as const,
     plannedAt: input.plannedAt,
     purpose:
       input.purpose ??
@@ -655,7 +659,7 @@ export async function runEmailGenerationJob(jobId: string) {
       temperature: 0.7,
       system: [
         `You are the editorial email writer for ${spot.brand.name}.`,
-        spot.format === "newsletter.blast"
+        !spot.contentPost?.seriesId
           ? "This is a one-off email blast. It must feel timely and complete without pretending to be a recurring newsletter issue."
           : "This is an issue in a recurring editorial newsletter. It should feel like one installment in an ongoing reader relationship.",
         brandVoice ? `Brand voice:\n${brandVoice}` : null,

@@ -64,6 +64,7 @@ export function messageSendSummary(
 
 export type MessageSendSnapshot = {
   schema: "wander-growth.message-send.v1";
+  // Frozen historical sends retain their original format label.
   format: "newsletter.broadcast" | "newsletter.blast";
   contentHash: string;
   email: {

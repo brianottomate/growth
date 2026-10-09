@@ -354,15 +354,7 @@ export const PLATFORM_FORMATS: PlatformFormat[] = [
     id: "newsletter.broadcast",
     platform: "newsletter",
     archetype: "article",
-    label: "Newsletter Issue",
-    media: { kinds: ["image"] },
-  },
-  {
-    id: "newsletter.blast",
-    platform: "newsletter",
-    archetype: "article",
-    label: "Email Blast",
-    countsTowardCadence: false,
+    label: "Email Broadcast",
     media: { kinds: ["image"] },
   },
   {
@@ -379,7 +371,9 @@ export const PLATFORM_FORMATS: PlatformFormat[] = [
 const FORMAT_BY_ID = new Map(PLATFORM_FORMATS.map((f) => [f.id, f]));
 
 export function getPlatformFormat(id: string): PlatformFormat | undefined {
-  return FORMAT_BY_ID.get(id);
+  return FORMAT_BY_ID.get(
+    id === "newsletter.blast" ? "newsletter.broadcast" : id,
+  );
 }
 
 export function platformFormatsFor(
@@ -389,15 +383,19 @@ export function platformFormatsFor(
 }
 
 export function archetypeForFormat(id: string): FormatArchetype | undefined {
-  return FORMAT_BY_ID.get(id)?.archetype;
+  return getPlatformFormat(id)?.archetype;
 }
 
-/** Whether a concrete format belongs to the surface's recurring publishing
- * rhythm. Unknown/legacy formats count by default; only explicit one-offs opt
- * out, so historical newsletter rows are never silently discarded. */
+/** Owned email cadence belongs to a recurring content series, not its format.
+ * External broadcasts keep counting without an internal series relationship. */
 export function formatCountsTowardCadence(
   id: string | null | undefined,
+  ownedEmailSeriesId?: string | null,
 ): boolean {
+  if (id === "newsletter.broadcast" || id === "newsletter.blast") {
+    if (ownedEmailSeriesId !== undefined) return Boolean(ownedEmailSeriesId);
+    return id !== "newsletter.blast";
+  }
   return id ? FORMAT_BY_ID.get(id)?.countsTowardCadence !== false : true;
 }
 

@@ -19,6 +19,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { NewsletterChatStart } from "./NewsletterChatStart";
 import { NewsletterTemplateStart } from "./NewsletterTemplateStart";
 
+import { EmailCalendar } from "./EmailCalendar";
 import { EmailReviewActions } from "./EmailReviewActions";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -37,33 +38,48 @@ type Email = {
   status: string;
   updatedAt: string;
 };
-type ReviewFilter = "All" | "Slots" | "Drafts" | "Ready" | "Approved";
-const reviewFilter = (email: Email): ReviewFilter =>
-  email.status === "slot"
-    ? "Slots"
-    : email.status === "pending_review"
-      ? "Ready"
-      : email.status === "approved"
-        ? "Approved"
-        : "Drafts";
+const EMAIL_STAGES = [
+  "Drafts",
+  "Ready",
+  "Approved",
+  "Scheduled",
+  "Sent",
+] as const;
+type EmailStage = (typeof EMAIL_STAGES)[number];
+type StageFilter = "All" | EmailStage;
+
+function emailStage(email: Email): EmailStage {
+  if (email.publishedAt || email.status === "published") return "Sent";
+  // A calendar date alone is an editorial plan, not a scheduled delivery.
+  if (email.status === "scheduled") return "Scheduled";
+  if (email.status === "pending_review") return "Ready";
+  if (email.status === "approved") return "Approved";
+  return "Drafts";
+}
+
+const emailDate = (email: Email) =>
+  emailStage(email) === "Sent" ? email.publishedAt : email.scheduledAt;
 
 function MonthGroup({
   title,
   count,
   storageKey,
   children,
+  defaultCollapsed = false,
 }: {
   title: string;
   count: number;
   storageKey: string;
   children: ReactNode;
+  defaultCollapsed?: boolean;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   useEffect(() => {
     try {
-      setCollapsed(localStorage.getItem(storageKey) === "collapsed");
+      const saved = localStorage.getItem(storageKey);
+      setCollapsed(saved === null ? defaultCollapsed : saved === "collapsed");
     } catch {}
-  }, [storageKey]);
+  }, [storageKey, defaultCollapsed]);
   return (
     <details
       open={!collapsed}
@@ -94,145 +110,159 @@ export function EmailDraftsCard({
   brandName,
   extraActions,
   blastsOnly = false,
+  title,
+  actions,
+  intro,
+  titleAccessory,
 }: {
   emails: Email[];
   brandId?: string;
   brandName?: string;
   extraActions?: ReactNode;
   blastsOnly?: boolean;
+  title?: string;
+  actions?: ReactNode;
+  intro?: ReactNode;
+  titleAccessory?: ReactNode;
 }) {
-  const [period, setPeriod] = useState("upcoming");
-  const [filter, setFilter] = useState<ReviewFilter>("All");
+  const [view, setView] = useState<"list" | "calendar">("list");
+  const [filter, setFilter] = useState<StageFilter>("All");
   const candidates = emails.filter(
     (email) =>
       !["archived", "rejected"].includes(email.status) &&
       (!blastsOnly || !email.sequences.length),
   );
-  const upcoming = candidates.filter(
-    (email) => !email.publishedAt && email.status !== "published",
-  );
-  const past = candidates.filter(
-    (email) => !!email.publishedAt || email.status === "published",
-  );
-  const pool = period === "past" ? past : upcoming;
-  const visible = pool.filter(
-    (email) =>
-      period === "past" || filter === "All" || reviewFilter(email) === filter,
+  const visible = candidates.filter(
+    (email) => filter === "All" || emailStage(email) === filter,
   );
   const groups = new Map<string, { title: string; emails: Email[] }>();
   for (const email of [...visible].sort((a, b) => {
-    const da = period === "past" ? a.publishedAt : a.scheduledAt;
-    const db = period === "past" ? b.publishedAt : b.scheduledAt;
+    const da = emailDate(a);
+    const db = emailDate(b);
     if (!da) return db ? 1 : 0;
     if (!db) return -1;
     return (
       (new Date(da).getTime() - new Date(db).getTime()) *
-      (period === "past" ? -1 : 1)
+      (filter === "Sent" ? -1 : 1)
     );
   })) {
-    const at = period === "past" ? email.publishedAt : email.scheduledAt;
+    const at = emailDate(email);
     const date = at ? new Date(at) : null;
     const key = date ? `${date.getFullYear()}-${date.getMonth()}` : "undated";
     const title = date
       ? date.toLocaleDateString(undefined, { month: "long", year: "numeric" })
-      : period === "past"
+      : filter === "Sent"
         ? "Send date unavailable"
-        : "Unscheduled drafts";
+        : "Unscheduled";
     const group = groups.get(key) ?? { title, emails: [] };
     group.emails.push(email);
     groups.set(key, group);
   }
   return (
     <WorkspaceCard
-      title={blastsOnly ? "Blasts" : "Emails"}
+      title={title ?? (blastsOnly ? "Broadcasts" : "Emails")}
       icon={Mail}
       count={candidates.length}
+      titleAccessory={titleAccessory}
       actions={
-        <>
-          {brandId && <NewsletterTemplateStart brandId={brandId} />}
-          <NewsletterChatStart brandId={brandId} brandName={brandName} />
-          {extraActions}
-        </>
+        actions ?? (
+          <>
+            {brandId && <NewsletterTemplateStart brandId={brandId} />}
+            <NewsletterChatStart brandId={brandId} brandName={brandName} />
+            {extraActions}
+          </>
+        )
       }
     >
+      {intro}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs value={period} onValueChange={setPeriod}>
-          <TabsList aria-label="Email history">
-            <TabsTrigger value="upcoming">
-              Upcoming {upcoming.length}
-            </TabsTrigger>
-            <TabsTrigger value="past">Past {past.length}</TabsTrigger>
+        <Tabs
+          value={filter}
+          onValueChange={(value) => setFilter(value as StageFilter)}
+          className="min-w-0 basis-full @xl:flex-1 @xl:basis-0"
+        >
+          <TabsList
+            aria-label="Email stage"
+            className="h-auto max-w-full justify-start overflow-x-auto"
+          >
+            {(["All", ...EMAIL_STAGES] as const).map((stage) => (
+              <TabsTrigger key={stage} value={stage} className="shrink-0">
+                {stage}{" "}
+                {stage === "All"
+                  ? candidates.length
+                  : candidates.filter((email) => emailStage(email) === stage)
+                      .length}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </Tabs>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">List</Badge>
-          <Button variant="outline" size="sm" asChild>
-            <Link
-              href={`/app/calendar?platform=newsletter&source=owned${blastsOnly ? "&kind=blast" : ""}${brandId ? `&brand=${encodeURIComponent(brandId)}` : ""}`}
-            >
-              Calendar
-            </Link>
-          </Button>
-        </div>
-      </div>
-      {period === "upcoming" && (
-        <div
-          className="flex flex-wrap gap-1"
-          role="group"
-          aria-label="Creative review status"
+        <Tabs
+          value={view}
+          onValueChange={(value) => setView(value as "list" | "calendar")}
         >
-          {(["All", "Slots", "Drafts", "Ready", "Approved"] as const).map(
-            (status) => (
-              <Button
-                key={status}
-                size="sm"
-                variant={filter === status ? "secondary" : "ghost"}
-                aria-pressed={filter === status}
-                onClick={() => setFilter(status)}
-              >
-                {status}{" "}
-                {status === "All"
-                  ? pool.length
-                  : pool.filter((email) => reviewFilter(email) === status)
-                      .length}
-              </Button>
-            ),
-          )}
-        </div>
+          <TabsList aria-label="Email view">
+            <TabsTrigger value="list">List</TabsTrigger>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      {view === "calendar" && (
+        <EmailCalendar
+          entries={visible.flatMap((email) => {
+            const at = emailDate(email);
+            return at
+              ? [
+                  {
+                    id: email.id,
+                    title: email.subject ?? email.title,
+                    stage: emailStage(email),
+                    at,
+                  },
+                ]
+              : [];
+          })}
+          renderEmail={(id) => {
+            const email = visible.find((email) => email.id === id);
+            return email ? <EmailCard key={id} email={email} /> : null;
+          }}
+        />
       )}
       {visible.length ? (
         <div className="space-y-5">
-          {[...groups].map(([key, group]) => (
-            <MonthGroup
-              key={`${period}-${key}`}
-              title={group.title}
-              count={group.emails.length}
-              storageKey={`email-folders:${brandId ?? "all"}:${period}:${key}`}
-            >
-              {group.emails.map((email) => (
-                <EmailCard key={email.id} email={email} />
-              ))}
-            </MonthGroup>
-          ))}
+          {[...groups]
+            .filter(([key]) => view === "list" || key === "undated")
+            .map(([key, group]) => (
+              <MonthGroup
+                key={`${filter}-${key}`}
+                defaultCollapsed={key === "undated"}
+                title={group.title}
+                count={group.emails.length}
+                storageKey={`email-folders:${brandId ?? "all"}:${key === "undated" ? key : `${filter}:${key}`}`}
+              >
+                {group.emails.map((email) => (
+                  <EmailCard key={email.id} email={email} />
+                ))}
+              </MonthGroup>
+            ))}
         </div>
-      ) : (
+      ) : view === "list" ? (
         <EmptyState
           compact
           icon={Mail}
           title={
-            period === "past"
+            filter === "Sent"
               ? "No sent emails yet"
               : filter === "All"
-                ? "No upcoming emails"
+                ? "No emails yet"
                 : `No ${filter.toLowerCase()} emails`
           }
           description={
-            period === "past"
+            filter === "Sent"
               ? "Sent blasts will appear here, grouped by send month."
               : "Start from a template, or shape an idea in chat."
           }
         />
-      )}
+      ) : null}
     </WorkspaceCard>
   );
 }
@@ -252,7 +282,7 @@ function EmailCard({ email }: { email: Email }) {
                 : email.status === "published"
                   ? "Sent"
                   : email.status === "slot"
-                    ? "Empty slot"
+                    ? "Draft"
                     : email.status}
             </Badge>
             {email.scheduledAt &&

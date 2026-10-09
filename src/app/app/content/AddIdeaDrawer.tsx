@@ -91,9 +91,9 @@ const SPOT_TARGETS = [
   { id: "pinterest", platform: "pinterest", label: "Pinterest" },
   { id: "linkedin", platform: "linkedin", label: "LinkedIn" },
   {
-    id: "newsletter.blast",
+    id: "newsletter.broadcast",
     platform: "newsletter",
-    format: "newsletter.blast",
+    format: "newsletter.broadcast",
     label: "Email blast",
   },
 ] as const;
@@ -400,7 +400,9 @@ export function AddIdeaDrawer({
                       <ChannelLogo
                         platform={
                           "format" in target &&
-                          target.format === "newsletter.blast"
+                          ["newsletter.broadcast", "newsletter.blast"].includes(
+                            target.format ?? "",
+                          )
                             ? "blast"
                             : target.platform
                         }

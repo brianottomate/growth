@@ -56,6 +56,11 @@ export async function NewslettersView({
   audiencesCard,
   settingsCard,
   showCapture = true,
+  seriesId,
+  editionActions,
+  editionIntro,
+  editionTitle,
+  editionSwitcher,
 }: {
   /** Every brand in the organization, for the overview's brand picker. */
   brands: ViewBrand[];
@@ -68,6 +73,11 @@ export async function NewslettersView({
   audiencesCard?: ReactNode;
   settingsCard?: ReactNode;
   showCapture?: boolean;
+  seriesId?: string;
+  editionActions?: ReactNode;
+  editionIntro?: ReactNode;
+  editionTitle?: string;
+  editionSwitcher?: ReactNode;
 }) {
   const selectedBrand = brand;
   const emailIdentity = brand
@@ -265,61 +275,69 @@ export async function NewslettersView({
         </h1>
       )}
       <EmailDraftsCard
+        title={editionTitle ?? (seriesId ? "Editions" : undefined)}
+        intro={editionIntro}
+        titleAccessory={editionSwitcher}
+        actions={editionActions}
         blastsOnly={basePath.startsWith("/app/performance/clients/")}
         brandId={selectedBrand?.id}
         brandName={selectedBrand?.name}
-        emails={ownedEmails.map((email) => {
-          const document = documentByEmail.get(email.id);
-          const template = NEWSLETTER_TEMPLATES.find(
-            (item) =>
-              document?.recipeId === item.id ||
-              document?.digest?.rationale === `${item.label} template`,
-          );
-          const image =
-            document?.bodyMarkdown.match(
-              /<img\b[^>]*\bsrc=["']([^"']+)["']/i,
-            )?.[1] ??
-            document?.bodyMarkdown.match(
-              /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/,
-            )?.[1] ??
-            document?.digest?.sections
-              .flatMap((section) => section.properties)
-              .find((home) => home.imageUrl)?.imageUrl;
-          return {
-            id: email.id,
-            title: email.contentPost?.title || email.text || "Untitled email",
-            subject: document?.subject || null,
-            preheader: document?.preheader || null,
-            thumbnail: image && /^https?:\/\//i.test(image) ? image : null,
-            template:
-              template?.label ??
-              (document?.templateKey === "listings-digest"
-                ? "Property digest"
-                : document?.templateKey ===
-                    "os.marketing.operator.product-update"
-                  ? "Product update"
-                  : document
-                    ? "Custom email"
-                    : "No template yet"),
-            homeCount:
-              document?.digest?.sections.reduce(
-                (total, section) => total + section.properties.length,
-                0,
-              ) ?? 0,
-            ctaLabel: document?.ctaLabel || null,
-            sequences: sequencesByEmail.get(email.id) ?? [],
-            status: email.status,
-            updatedAt: email.updatedAt.toISOString(),
-            publishedAt: email.publishedAt?.toISOString() ?? null,
-            bucket:
-              email.status === "slot"
-                ? "Slots"
-                : email.scheduledAt
-                  ? "Planned"
-                  : "Drafts",
-            scheduledAt: email.scheduledAt?.toISOString() ?? null,
-          };
-        })}
+        emails={ownedEmails
+          .filter(
+            (email) => !seriesId || email.contentPost?.seriesId === seriesId,
+          )
+          .map((email) => {
+            const document = documentByEmail.get(email.id);
+            const template = NEWSLETTER_TEMPLATES.find(
+              (item) =>
+                document?.recipeId === item.id ||
+                document?.digest?.rationale === `${item.label} template`,
+            );
+            const image =
+              document?.bodyMarkdown.match(
+                /<img\b[^>]*\bsrc=["']([^"']+)["']/i,
+              )?.[1] ??
+              document?.bodyMarkdown.match(
+                /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/,
+              )?.[1] ??
+              document?.digest?.sections
+                .flatMap((section) => section.properties)
+                .find((home) => home.imageUrl)?.imageUrl;
+            return {
+              id: email.id,
+              title: email.contentPost?.title || email.text || "Untitled email",
+              subject: document?.subject || null,
+              preheader: document?.preheader || null,
+              thumbnail: image && /^https?:\/\//i.test(image) ? image : null,
+              template:
+                template?.label ??
+                (document?.templateKey === "listings-digest"
+                  ? "Property digest"
+                  : document?.templateKey ===
+                      "os.marketing.operator.product-update"
+                    ? "Product update"
+                    : document
+                      ? "Custom email"
+                      : "No template yet"),
+              homeCount:
+                document?.digest?.sections.reduce(
+                  (total, section) => total + section.properties.length,
+                  0,
+                ) ?? 0,
+              ctaLabel: document?.ctaLabel || null,
+              sequences: sequencesByEmail.get(email.id) ?? [],
+              status: email.status,
+              updatedAt: email.updatedAt.toISOString(),
+              publishedAt: email.publishedAt?.toISOString() ?? null,
+              bucket:
+                email.status === "slot"
+                  ? "Slots"
+                  : email.scheduledAt
+                    ? "Planned"
+                    : "Drafts",
+              scheduledAt: email.scheduledAt?.toISOString() ?? null,
+            };
+          })}
         extraActions={
           <>
             {!selectedBrand && (
@@ -329,19 +347,21 @@ export async function NewslettersView({
                 )}
               />
             )}
-            {!settingsCard && selectedBrand && (
-              <BrandEmailStyle
-                brandId={selectedBrand.id}
-                brandName={selectedBrand.name}
-                theme={emailIdentity?.emailSender?.theme}
-                copyGuide={emailIdentity?.emailSender?.copyGuide}
-              />
-            )}
+            {!settingsCard &&
+              !basePath.startsWith("/app/performance/") &&
+              selectedBrand && (
+                <BrandEmailStyle
+                  brandId={selectedBrand.id}
+                  brandName={selectedBrand.name}
+                  theme={emailIdentity?.emailSender?.theme}
+                  copyGuide={emailIdentity?.emailSender?.copyGuide}
+                />
+              )}
           </>
         }
       />
       {audiencesCard}
-      {tagged.length > 0 && (
+      {!seriesId && tagged.length > 0 && (
         <WorkspaceCard
           title="Captured sent emails"
           icon={MailCheck}

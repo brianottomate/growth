@@ -2,7 +2,7 @@ import "server-only";
 import { ORPCError } from "@orpc/server";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { EmailSequenceDraft } from "@/lib/validators/email-sequence";
-import { EMAIL_DOCUMENT_FORMATS } from "@/lib/email-document";
+import { EMAIL_READ_FORMATS } from "@/lib/email-document";
 import { db, withTransaction } from "@/server/db";
 import {
   brandTable,
@@ -84,7 +84,7 @@ export async function listSequenceEmails(
       eq(platformPostTable.brandId, brandId),
       eq(platformPostTable.source, "owned"),
       eq(platformPostTable.platform, "newsletter"),
-      inArray(platformPostTable.format, [...EMAIL_DOCUMENT_FORMATS]),
+      inArray(platformPostTable.format, [...EMAIL_READ_FORMATS]),
       eq(platformPostTable.cleanupStatus, "keep"),
     ),
     columns: { id: true, text: true, status: true },
@@ -124,7 +124,7 @@ export async function saveEmailSequence(input: {
           eq(platformPostTable.brandId, input.brandId),
           eq(platformPostTable.source, "owned"),
           eq(platformPostTable.platform, "newsletter"),
-          inArray(platformPostTable.format, [...EMAIL_DOCUMENT_FORMATS]),
+          inArray(platformPostTable.format, [...EMAIL_READ_FORMATS]),
           eq(platformPostTable.cleanupStatus, "keep"),
         ),
       );

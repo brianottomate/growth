@@ -53,16 +53,16 @@ export function WorkspaceCardHeader({
   titleAccessory?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold">
+    <div className="grid grid-cols-1 items-start gap-3 @xl:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        <h2 className="flex max-w-full min-w-0 items-center gap-2 text-base font-semibold">
           <Icon
             aria-hidden="true"
             className="size-4 shrink-0 text-muted-foreground"
           />
-          {title}
+          <span className="min-w-0 break-words">{title}</span>
           {count !== undefined && (
-            <span className="font-normal text-muted-foreground tabular-nums">
+            <span className="shrink-0 font-normal text-muted-foreground tabular-nums">
               {count}
             </span>
           )}
@@ -70,7 +70,9 @@ export function WorkspaceCardHeader({
         {titleAccessory}
       </div>
       {actions && (
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 @xl:max-w-[60cqw] @xl:justify-end">
+          {actions}
+        </div>
       )}
     </div>
   );

@@ -183,6 +183,13 @@
       "when": 1791581666067,
       "tag": "0024_compact_persona_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791584433969,
+      "tag": "0025_unify-email-broadcast",
+      "breakpoints": true
     }
   ]
 }

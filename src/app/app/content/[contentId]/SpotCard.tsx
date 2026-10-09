@@ -164,8 +164,7 @@ export function SpotCard({
   const providerPublishing = providerPublishingPlatform !== null;
   const isEmail =
     spot.platform === "newsletter" &&
-    (spot.format === "newsletter.broadcast" ||
-      spot.format === "newsletter.blast");
+    ["newsletter.broadcast", "newsletter.blast"].includes(spot.format ?? "");
   const refresh = { onSettled: () => router.refresh() };
   const update = useMutation(
     orpc.content.updateWorkItem.mutationOptions(refresh),
@@ -228,7 +227,11 @@ export function SpotCard({
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
           <ChannelLogo
             platform={
-              spot.format === "newsletter.blast" ? "blast" : spot.platform
+              ["newsletter.broadcast", "newsletter.blast"].includes(
+                spot.format ?? "",
+              )
+                ? "blast"
+                : spot.platform
             }
             className="size-6"
           />
@@ -237,7 +240,9 @@ export function SpotCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold">
-              {spot.format === "newsletter.blast"
+              {["newsletter.broadcast", "newsletter.blast"].includes(
+                spot.format ?? "",
+              )
                 ? "Email"
                 : platformLabel(spot.platform)}
             </span>
