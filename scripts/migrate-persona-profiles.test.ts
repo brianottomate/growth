@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
-import { readPersonaProfile } from "@/lib/persona-profile";
+import { personaProfileSchema } from "@/lib/persona-profile";
 
 test("persona cutover preserves ordered phrases and audience links, drops evidence, and replays without overwriting edits", async () => {
   const pg = new PGlite();
@@ -37,9 +37,20 @@ test("persona cutover preserves ordered phrases and audience links, drops eviden
     expect(rows).toEqual([
       { id: "edited", profile: edited },
       { id: "empty", profile: null },
-      { id: "old", profile: readPersonaProfile(legacy) },
+      {
+        id: "old",
+        profile: {
+          icon: "users",
+          motivation: legacy.motivation,
+          pills: [
+            ...legacy.needs,
+            ...legacy.decisionCriteria,
+            ...legacy.objections,
+          ],
+        },
+      },
     ]);
-    expect(rows[2]!.profile).toEqual({
+    expect(personaProfileSchema.parse(rows[2]!.profile)).toEqual({
       icon: "users",
       motivation: legacy.motivation,
       pills: [

@@ -19,7 +19,10 @@ export default async function PerformanceOverviewPage() {
         title="Dashboard"
         description="Fees and media across signed clients, paying against signed, carried forward from recorded dates."
       />
-      <FinanceOverview accounts={financeAccounts(desk.brands)} />
+      <FinanceOverview
+        accounts={financeAccounts(desk.brands)}
+        showNotes={false}
+      />
     </div>
   );
 }

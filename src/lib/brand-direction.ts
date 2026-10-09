@@ -71,19 +71,16 @@ export const ARCHETYPES = {
 } as const;
 export type Archetype = keyof typeof ARCHETYPES;
 const dial = z.number().int().min(0).max(4);
-export const voiceSchema = z.object({
+export const voiceSchema = z.strictObject({
   casualFormal: dial,
   understatedExpressive: dial,
-  // Existing two-axis preferences remain valid; warmth comes from the archetype.
-  matterOfFactWarm: dial.optional(),
+  matterOfFactWarm: dial,
 });
-export const creativeDirectionSchema = z.object({
+export const creativeDirectionSchema = z.strictObject({
   positioning: z.string().trim().min(1).max(300),
   archetype: z
     .enum(Object.keys(ARCHETYPES) as [Archetype, ...Archetype[]])
     .nullable(),
-  // Retained for saved briefs; new archetype descriptions belong to the dictionary.
-  archetypeReason: z.string().max(300).optional(),
   // Null means use archetype defaults. Existing stored values are explicit overrides.
   voice: voiceSchema.nullable(),
   leadWith: z.array(z.string().trim().min(1).max(100)).max(6),
@@ -92,7 +89,7 @@ export const creativeDirectionSchema = z.object({
 export type CreativeDirection = z.infer<typeof creativeDirectionSchema>;
 
 export const generatedCreativeDirectionSchema = creativeDirectionSchema
-  .omit({ voice: true, archetypeReason: true })
+  .omit({ voice: true })
   .extend({
     archetype: z.enum(Object.keys(ARCHETYPES) as [Archetype, ...Archetype[]]),
     positioning: z.string().trim().min(1).max(100),

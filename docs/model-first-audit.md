@@ -308,13 +308,7 @@ role instructions and default voice. Saved `voice` values are explicit overrides
 null derives the three axes from the selected archetype. Generation preserves
 existing overrides rather than silently replacing operator choices.
 
-Read-only inventory found 15 saved directions, all with two-axis voice objects:
-4 Guide, 2 Caretaker, 1 Expert and 8 with no archetype. Existing choices remain
-valid; a missing warmth value derives from the selected archetype, or Balanced
-when none is selected. No global backfill is needed and no schema migration is
-required for the expanded JSON contract. The owning formatter resolves defaults
-for both UI and prompts. New generated revisions drop obsolete archetypeReason
-text; existing text is retained only for compatibility with saved briefs.
+Creative direction now accepts only the current strict schema: all three voice axes when voice is overridden, no obsolete archetypeReason. The operator requested purging invalid records; 15 outdated directions were cleared across 51 brands on 2026-10-09. Null direction remains an explicit unset state; archetype defaults remain valid when voice is null.
 
 ## Compact persona prompt context (2026-10-09)
 
@@ -324,10 +318,6 @@ objection arrays to supply creative context. The owning profile now stores
 Generation combines the strongest concerns and priorities into 2–5 natural
 phrases and picks a visual icon. Evidence notes have been removed as requested.
 
-The read-only production audit found 22 non-null legacy profiles, none compact,
-with at most 15 combined phrases. Migration 0024 preserves all phrases in order
-and removes the old fields without changing IDs or audience references. A
-temporary compatibility reader lives at the JSONB database boundary, rather
-than adding fallback chains to each UI or prompt consumer. Remove it after the
-cutover and retirement of old writers. Existing unstructured persona prose and
-null profiles remain valid; no synthetic profile is created for them.
+The initial migration audit found 22 old-format profiles. A subsequent audit found 26 non-null profiles: 4 compact, 6 old profiles accepted by the temporary reader, and 16 unreadable profiles with an additional icon on the old needs/criteria/objections shape. Those 16 affected Downtime Vacation, Zion Stays, Hollyhock Suites, Seasons 4, Porchlit Properties and Chalets Hocking Hills. The operator requested deleting all personas; all 29 records (including null profiles) were purged and persona references were cleared by database foreign keys. The compatibility parser was removed. Migration 0024 remains immutable historical SQL; its test verifies the migration without relying on a runtime compatibility parser.
+
+The same strict-format audit inspected all 51 brands and 34 campaign audiences. No story text or campaign audience failed its current schema; those records were retained. Story is plain text, not an old structured variant. Audience geography already uses its current schema. No legacy format reader was found in either owning path.

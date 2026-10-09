@@ -62,14 +62,7 @@ export async function CampaignView({
   if (!actor) notFound();
   const org = { id: actor.orgId };
 
-  // A read that fails is logged before it becomes a 404, so a broken query
-  // never masquerades as a missing campaign.
-  const draft = await getDraftCampaign(org.id, campaignId).catch(
-    (error: unknown) => {
-      console.error("campaign page could not load", campaignId, error);
-      return null;
-    },
-  );
+  const draft = await getDraftCampaign(org.id, campaignId);
   if (draft?.brand.slug !== brandSlug) notFound();
 
   const { campaign, audiences, ads, platformCampaigns, platformAudiences } =

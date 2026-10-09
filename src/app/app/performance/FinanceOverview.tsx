@@ -12,7 +12,13 @@ const dollars = new Intl.NumberFormat("en-US", {
 });
 
 /** Shared portfolio summary for the dashboard and detailed Finance view. */
-export function FinanceOverview({ accounts }: { accounts: FinanceAccount[] }) {
+export function FinanceOverview({
+  accounts,
+  showNotes = true,
+}: {
+  accounts: FinanceAccount[];
+  showNotes?: boolean;
+}) {
   const totals = financeTotals(accounts);
   const months = financeSeries(accounts);
   const tiles: { label: string; value: string; note?: string }[] = [
@@ -55,7 +61,7 @@ export function FinanceOverview({ accounts }: { accounts: FinanceAccount[] }) {
         ))}
       </div>
       <FinanceChart months={months} />
-      {totals.unrecordedFees > 0 || totals.paused > 0 ? (
+      {showNotes && (totals.unrecordedFees > 0 || totals.paused > 0) ? (
         <p className="text-xs text-muted-foreground">
           {[
             totals.unrecordedFees > 0

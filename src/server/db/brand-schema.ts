@@ -1,6 +1,5 @@
 import {
   personaProfileSchema,
-  readPersonaProfile,
   type PersonaProfile,
 } from "@/lib/persona-profile";
 import type { PerformanceCardState } from "@/lib/performance-card-state";
@@ -749,7 +748,9 @@ const personaProfileColumn = customType<{
 }>({
   dataType: () => "jsonb",
   fromDriver: (value) =>
-    readPersonaProfile(typeof value === "string" ? JSON.parse(value) : value),
+    personaProfileSchema.parse(
+      typeof value === "string" ? JSON.parse(value) : value,
+    ),
   toDriver: (value) => JSON.stringify(personaProfileSchema.parse(value)),
 });
 
