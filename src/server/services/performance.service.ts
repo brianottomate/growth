@@ -1,13 +1,18 @@
 import "server-only";
 import { generateBillingCycles } from "./billing-cycles.service";
 
-import { and, desc, eq, gte, ilike, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { performanceAmountSchema } from "@/lib/performance-card-state";
 import { currentPeriod } from "@/lib/performance-billing";
 import { PERFORMANCE_PLANS } from "@/lib/performance-billing";
-import { db } from "@/server/db";
+import {
+  db,
+  withTransaction,
+  type Database,
+  type TransactionClient,
+} from "@/server/db";
 import {
   brandTable,
   platformAdTable,
@@ -278,9 +283,9 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
   if (cycleIds.length > 0) {
     const [campaigns, lifecycleCampaigns, amplifications] = await Promise.all([
       db
-        .select({ cycleId: campaignTable.performanceCycleId })
-        .from(campaignTable)
-        .where(inArray(campaignTable.performanceCycleId, cycleIds)),
+        .select({ cycleId: platformCampaignTable.performanceCycleId })
+        .from(platformCampaignTable)
+        .where(inArray(platformCampaignTable.performanceCycleId, cycleIds)),
       db
         .select({ cycleId: lifecycleCampaignTable.performanceCycleId })
         .from(lifecycleCampaignTable)
@@ -365,15 +370,19 @@ export async function getPerformanceAccount(
       ? [[], [], []]
       : await Promise.all([
           db
-            .select({
+            .selectDistinct({
               id: campaignTable.id,
               name: campaignTable.name,
               status: campaignTable.status,
               budget: campaignTable.budget,
-              performanceCycleId: campaignTable.performanceCycleId,
+              performanceCycleId: platformCampaignTable.performanceCycleId,
             })
             .from(campaignTable)
-            .where(inArray(campaignTable.performanceCycleId, cycleIds)),
+            .innerJoin(
+              platformCampaignTable,
+              eq(platformCampaignTable.campaignId, campaignTable.id),
+            )
+            .where(inArray(platformCampaignTable.performanceCycleId, cycleIds)),
           db
             .select({
               id: lifecycleCampaignTable.id,
@@ -400,9 +409,8 @@ export async function getPerformanceAccount(
 
   // The ads themselves, so "is the right creative running" is answerable here
   // rather than only in Ads Manager.
-  const campaignIds = campaigns.map((row) => row.id);
   const platformCampaigns =
-    campaignIds.length === 0
+    cycleIds.length === 0
       ? []
       : await db
           .select({
@@ -415,9 +423,10 @@ export async function getPerformanceAccount(
             manageUrl: platformCampaignTable.manageUrl,
             heroThumbnailUrl: platformCampaignTable.heroThumbnailUrl,
             campaignId: platformCampaignTable.campaignId,
+            performanceCycleId: platformCampaignTable.performanceCycleId,
           })
           .from(platformCampaignTable)
-          .where(inArray(platformCampaignTable.campaignId, campaignIds));
+          .where(inArray(platformCampaignTable.performanceCycleId, cycleIds));
   const platformCampaignIds = platformCampaigns.map((row) => row.id);
   const ads =
     platformCampaignIds.length === 0
@@ -613,27 +622,34 @@ export async function updatePerformanceCycle(
   input: z.infer<typeof updatePerformanceCycleSchema>,
 ) {
   const currentCycle = await requireCycle(actor, input.cycleId);
-  const account = await requireAccount(actor, currentCycle.accountId);
-  validateAmounts({
-    agreedAdSpend:
-      input.mediaBudget === undefined
-        ? currentCycle.mediaBudget
-        : input.mediaBudget,
-    clientMediaContribution:
-      input.clientMediaContribution === undefined
-        ? currentCycle.clientMediaContribution
-        : input.clientMediaContribution,
-  });
+  if (
+    input.mediaBudget !== undefined ||
+    input.clientMediaContribution !== undefined
+  )
+    validateAmounts({
+      agreedAdSpend:
+        input.mediaBudget === undefined
+          ? currentCycle.mediaBudget
+          : input.mediaBudget,
+      clientMediaContribution:
+        input.clientMediaContribution === undefined
+          ? currentCycle.clientMediaContribution
+          : input.clientMediaContribution,
+    });
   const { cycleId, startAt, endAt, feePaid, mediaPaid, ...changes } = input;
   const [cycle] = await db
     .update(performanceCycleTable)
     .set({
       ...changes,
       ...(feePaid !== undefined
-        ? { feePaidAt: feePaid ? (currentCycle.feePaidAt ?? new Date()) : null }
+        ? {
+            feePaidAt: feePaid ? (currentCycle.feePaidAt ?? new Date()) : null,
+            feeInvoiceState: feePaid ? null : "Open",
+          }
         : {}),
       ...(mediaPaid !== undefined
         ? {
+            mediaInvoiceState: mediaPaid ? null : "Open",
             mediaPaidAt: mediaPaid
               ? (currentCycle.mediaPaidAt ?? new Date())
               : null,
@@ -651,18 +667,7 @@ export async function updatePerformanceCycle(
   return { cycle };
 }
 
-/**
- * Attach one delivery row (campaign, lifecycle campaign, or amplification
- * target) to a cycle, or detach with cycleId null. The write targets tables
- * without org scoping of their own, so the cycle's account is the boundary
- * checked here; a detach revalidates via the row's current cycle.
- */
-/**
- * Campaigns that could be attached to a cycle: platform campaigns that either
- * have no campaign at all (the shape every synced campaign arrives in) or
- * whose campaign is not already on a cycle. Ordered by platform start date,
- * because sync stamps `createdAt` with the ingest time and that sorts useless.
- */
+/** Unassigned platform deliveries, scoped to the workspace and ordered by provider start date. */
 export async function searchAttachableCampaigns(
   actor: PerformanceActor,
   input: z.infer<typeof searchAttachableCampaignsSchema>,
@@ -679,16 +684,15 @@ export async function searchAttachableCampaigns(
       externalId: platformCampaignTable.externalId,
       heroThumbnailUrl: platformCampaignTable.heroThumbnailUrl,
       campaignId: platformCampaignTable.campaignId,
-      campaignCycleId: campaignTable.performanceCycleId,
+      campaignCycleId: platformCampaignTable.performanceCycleId,
     })
     .from(platformCampaignTable)
-    .leftJoin(
-      campaignTable,
-      eq(campaignTable.id, platformCampaignTable.campaignId),
-    )
+    .innerJoin(brandTable, eq(brandTable.id, platformCampaignTable.brandId))
     .where(
       and(
-        isNull(campaignTable.performanceCycleId),
+        eq(brandTable.organizationId, actor.orgId),
+        isNull(brandTable.deletedAt),
+        isNull(platformCampaignTable.performanceCycleId),
         input.query
           ? ilike(platformCampaignTable.name, `%${input.query}%`)
           : undefined,
@@ -703,26 +707,24 @@ export async function searchAttachableCampaigns(
 }
 
 /**
- * Sum observed spend for every campaign under the cycle's attached
- * campaigns, in cents.
+ * Sum observed spend for the cycle's directly attached platform deliveries, in cents.
  *
  * Reads `stats.spend` (unrounded) in preference to `campaign.spend`, which the
  * schema documents as a coarse whole-dollar rollup — $24.66 is stored there as
  * 25, and summing rounded dollars across a portfolio drifts against the media
  * budget in the customer's favour or ours, unpredictably.
  */
-export async function recomputePerformanceCycleSpend(cycleId: string) {
-  const campaigns = await db
+export async function recomputePerformanceCycleSpend(
+  cycleId: string,
+  client: Database | TransactionClient = db,
+) {
+  const campaigns = await client
     .select({
       spend: platformCampaignTable.spend,
       stats: platformCampaignTable.stats,
     })
     .from(platformCampaignTable)
-    .innerJoin(
-      campaignTable,
-      eq(campaignTable.id, platformCampaignTable.campaignId),
-    )
-    .where(eq(campaignTable.performanceCycleId, cycleId));
+    .where(eq(platformCampaignTable.performanceCycleId, cycleId));
 
   const cents = campaigns.reduce((total, row) => {
     const precise = row.stats?.spend;
@@ -730,7 +732,7 @@ export async function recomputePerformanceCycleSpend(cycleId: string) {
     return total + Math.round(dollars * 100);
   }, 0);
 
-  await db
+  await client
     .update(performanceCycleTable)
     .set({ actualSpendCents: cents, actualSpendAt: new Date() })
     .where(eq(performanceCycleTable.id, cycleId));
@@ -765,36 +767,83 @@ export async function refreshPerformanceCycleSpend(
 export async function attachToPerformanceCycle(
   actor: PerformanceActor,
   input: z.infer<typeof attachToPerformanceCycleSchema>,
-) {
+  client?: Database | TransactionClient,
+): Promise<{
+  kind: z.infer<typeof attachToPerformanceCycleSchema>["kind"];
+  id: string;
+  performanceCycleId: string | null;
+  previousCycleId: string | null;
+}> {
+  if (!client)
+    return withTransaction((tx) => attachToPerformanceCycle(actor, input, tx));
   if (input.cycleId) await requireCycle(actor, input.cycleId);
 
-  // A platform campaign has no cycle FK of its own — it reaches a cycle through
-  // its campaign. Synced campaigns have no campaign at all, so attaching
-  // one mints a wrapper campaign for the cycle and reuses it thereafter.
   if (input.kind === "platformCampaign") {
-    return attachCampaignToCycle(actor, input.cycleId, input.id);
+    const campaign = await client.query.platformCampaignTable.findFirst({
+      where: eq(platformCampaignTable.id, input.id),
+      columns: { id: true, brandId: true, performanceCycleId: true },
+    });
+    if (!campaign)
+      throw new PerformanceError("NOT_FOUND", "Campaign not found");
+    const brand = await client.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, campaign.brandId),
+        eq(brandTable.organizationId, actor.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (!brand) throw new PerformanceError("NOT_FOUND", "Campaign not found");
+    if (input.cycleId) {
+      const cycle = await requireCycle(actor, input.cycleId);
+      const account = await requireAccount(actor, cycle.accountId);
+      if (account.brandId !== campaign.brandId)
+        throw new PerformanceError(
+          "BAD_REQUEST",
+          "Campaign and cycle must belong to the same brand",
+        );
+    }
+    await client
+      .update(platformCampaignTable)
+      .set({ performanceCycleId: input.cycleId })
+      .where(eq(platformCampaignTable.id, campaign.id));
+    for (const cycleId of new Set([campaign.performanceCycleId, input.cycleId]))
+      if (cycleId) await recomputePerformanceCycleSpend(cycleId, client);
+    return {
+      kind: input.kind,
+      id: input.id,
+      performanceCycleId: input.cycleId,
+      previousCycleId: campaign.performanceCycleId,
+    };
   }
 
   const target = {
     campaign: {
       table: campaignTable,
+      brandColumn: campaignTable.brandId,
       idColumn: campaignTable.id,
       cycleColumn: campaignTable.performanceCycleId,
     },
     lifecycleCampaign: {
       table: lifecycleCampaignTable,
+      brandColumn: lifecycleCampaignTable.brandId,
       idColumn: lifecycleCampaignTable.id,
       cycleColumn: lifecycleCampaignTable.performanceCycleId,
     },
     amplificationTarget: {
       table: amplificationTargetTable,
+      brandColumn: sql<string>`(select brand_id from platform_post where id = ${amplificationTargetTable.platformPostId})`,
       idColumn: amplificationTargetTable.id,
       cycleColumn: amplificationTargetTable.performanceCycleId,
     },
   }[input.kind];
 
-  const existing = await db
-    .select({ id: target.idColumn, cycleId: target.cycleColumn })
+  const existing = await client
+    .select({
+      id: target.idColumn,
+      cycleId: target.cycleColumn,
+      brandId: target.brandColumn,
+    })
     .from(target.table)
     .where(eq(target.idColumn, input.id));
   const row = existing[0];
@@ -804,160 +853,51 @@ export async function attachToPerformanceCycle(
       `${input.kind} not found: ${input.id}`,
     );
   }
+  const brand = await client.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.id, row.brandId),
+      eq(brandTable.organizationId, actor.orgId),
+      isNull(brandTable.deletedAt),
+    ),
+    columns: { id: true },
+  });
+  if (!brand) throw new PerformanceError("NOT_FOUND", "Delivery not found");
+  if (input.cycleId) {
+    const cycle = await requireCycle(actor, input.cycleId);
+    const account = await requireAccount(actor, cycle.accountId);
+    if (account.brandId !== row.brandId)
+      throw new PerformanceError(
+        "BAD_REQUEST",
+        "Delivery and cycle must belong to the same brand",
+      );
+  }
   if (!input.cycleId && row.cycleId) await requireCycle(actor, row.cycleId);
 
-  await db
+  await client
     .update(target.table)
     .set({ performanceCycleId: input.cycleId })
     .where(eq(target.idColumn, input.id));
+  if (input.kind === "campaign") {
+    const previous = await client
+      .select({ cycleId: platformCampaignTable.performanceCycleId })
+      .from(platformCampaignTable)
+      .where(eq(platformCampaignTable.campaignId, input.id));
+    await client
+      .update(platformCampaignTable)
+      .set({ performanceCycleId: input.cycleId })
+      .where(eq(platformCampaignTable.campaignId, input.id));
+    for (const cycleId of new Set([
+      ...previous.map((row) => row.cycleId),
+      row.cycleId,
+      input.cycleId,
+    ]))
+      if (cycleId) await recomputePerformanceCycleSpend(cycleId, client);
+  }
   return {
     kind: input.kind,
     id: input.id,
     performanceCycleId: input.cycleId,
     previousCycleId: row.cycleId,
-  };
-}
-
-/** Wrapper-campaign slug for a cycle, so repeated attaches reuse one row. */
-const cycleWrapperSlug = (cycleId: string) => `perf-cycle-${cycleId}`;
-
-async function attachCampaignToCycle(
-  actor: PerformanceActor,
-  cycleId: string | null,
-  platformCampaignId: string,
-) {
-  const campaign = await db.query.platformCampaignTable.findFirst({
-    where: eq(platformCampaignTable.id, platformCampaignId),
-    columns: {
-      id: true,
-      name: true,
-      brandId: true,
-      platform: true,
-      campaignId: true,
-      budget: true,
-      startAt: true,
-      endAt: true,
-    },
-  });
-  if (!campaign) {
-    throw new PerformanceError(
-      "NOT_FOUND",
-      `Campaign not found: ${platformCampaignId}`,
-    );
-  }
-
-  // Detach: clear the campaign's link to a cycle-owned wrapper. A campaign
-  // whose campaign is a real strategic push is left alone — detaching must
-  // not silently orphan Wander's own campaign from its campaign.
-  if (!cycleId) {
-    const current = campaign.campaignId
-      ? await db.query.campaignTable.findFirst({
-          where: eq(campaignTable.id, campaign.campaignId),
-          columns: { id: true, slug: true, performanceCycleId: true },
-        })
-      : null;
-    if (current?.performanceCycleId) {
-      await requireCycle(actor, current.performanceCycleId);
-      const isWrapper =
-        current.slug === cycleWrapperSlug(current.performanceCycleId);
-      if (isWrapper) {
-        await db
-          .update(platformCampaignTable)
-          .set({ campaignId: null })
-          .where(eq(platformCampaignTable.id, platformCampaignId));
-        // A wrapper exists only to carry campaigns. Left on the cycle once its
-        // last campaign detaches it renders as an empty delivery row, so it
-        // comes off the cycle with the campaign it was minted for.
-        const siblings = await db
-          .select({ id: platformCampaignTable.id })
-          .from(platformCampaignTable)
-          .where(eq(platformCampaignTable.campaignId, current.id))
-          .limit(1);
-        if (siblings.length === 0) {
-          await db
-            .update(campaignTable)
-            .set({ performanceCycleId: null, status: "archived" })
-            .where(eq(campaignTable.id, current.id));
-        }
-      }
-      await recomputePerformanceCycleSpend(current.performanceCycleId);
-      return {
-        kind: "platformCampaign" as const,
-        id: platformCampaignId,
-        performanceCycleId: null,
-        detachedFromWrapper: isWrapper,
-      };
-    }
-    return {
-      kind: "platformCampaign" as const,
-      id: platformCampaignId,
-      performanceCycleId: null,
-      detachedFromWrapper: false,
-    };
-  }
-
-  const cycle = await requireCycle(actor, cycleId);
-
-  // Already has a campaign: put that campaign on the cycle rather than
-  // rewriting the campaign's parent, so an existing push keeps its grouping.
-  if (campaign.campaignId) {
-    await db
-      .update(campaignTable)
-      .set({ performanceCycleId: cycleId })
-      .where(eq(campaignTable.id, campaign.campaignId));
-    const spend = await recomputePerformanceCycleSpend(cycleId);
-    return {
-      kind: "platformCampaign" as const,
-      id: platformCampaignId,
-      performanceCycleId: cycleId,
-      campaignId: campaign.campaignId,
-      createdWrapper: false,
-      actualSpendCents: spend.actualSpendCents,
-    };
-  }
-
-  const slug = cycleWrapperSlug(cycleId);
-  const existing = await db.query.campaignTable.findFirst({
-    where: eq(campaignTable.slug, slug),
-    columns: { id: true },
-  });
-  const wrapperId =
-    existing?.id ??
-    (
-      await db
-        .insert(campaignTable)
-        .values({
-          brandId: campaign.brandId,
-          name: `Performance · ${cycle.period}`,
-          slug,
-          goal: "performance",
-          description:
-            "Wrapper campaign created by attaching a platform campaign to a performance cycle. Platform campaigns reach a cycle through a campaign; a hand-built one has none.",
-          status: "active",
-          performanceCycleId: cycleId,
-          startAt: campaign.startAt,
-          endAt: campaign.endAt,
-        })
-        .returning({ id: campaignTable.id })
-    )[0]!.id;
-
-  await db
-    .update(campaignTable)
-    .set({ performanceCycleId: cycleId })
-    .where(eq(campaignTable.id, wrapperId));
-  await db
-    .update(platformCampaignTable)
-    .set({ campaignId: wrapperId })
-    .where(eq(platformCampaignTable.id, platformCampaignId));
-
-  const spend = await recomputePerformanceCycleSpend(cycleId);
-  return {
-    kind: "platformCampaign" as const,
-    id: platformCampaignId,
-    performanceCycleId: cycleId,
-    campaignId: wrapperId,
-    createdWrapper: !existing,
-    actualSpendCents: spend.actualSpendCents,
   };
 }
 

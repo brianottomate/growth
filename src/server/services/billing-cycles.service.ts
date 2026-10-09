@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { billingPeriods, shiftBillingPeriod } from "@/lib/billing-cycles";
-import { db, type Database, type TransactionClient } from "@/server/db";
+import { db } from "@/server/db";
 import {
   performanceAccountTable,
   performanceCycleTable,
@@ -60,34 +60,4 @@ export async function generateBillingCycles(
     created += rows.length;
   }
   return { created };
-}
-
-/** Keep the existing tracker/chat commercial fields writing to the account. */
-export async function syncAccountTermsFromSettings(input: {
-  orgId: string;
-  brandId: string;
-  client?: Database | TransactionClient;
-  patch: {
-    monthlyFee?: number | null;
-    agreedAdSpend?: number | null;
-    effectiveDate?: string | null;
-    terms?: string | null;
-    endDate?: string | null;
-  };
-}) {
-  const patch = Object.fromEntries(
-    Object.entries(input.patch).filter(([, value]) => value !== undefined),
-  );
-  if (!Object.keys(patch).length) return;
-  await (input.client ?? db)
-    .update(performanceAccountTable)
-    .set(patch)
-    .where(
-      and(
-        eq(performanceAccountTable.organizationId, input.orgId),
-        eq(performanceAccountTable.brandId, input.brandId),
-        isNull(performanceAccountTable.deletedAt),
-      ),
-    );
-  // Generation is run by the daily job; monthly edits are never overwritten.
 }

@@ -2,15 +2,25 @@
 
 Commercial terms live on `performance_account`: monthly management fee,
 agreed ad budget, client media contribution, effective date, term and exclusive
-end date. Amounts are USD with two decimal places. The existing tracker/chat
-commercial fields also write these account defaults.
+end date. Amounts are USD with two decimal places. Tracker/chat commercial settings remain on the brand and are edited
+independently. Neither store automatically synchronizes commercial edits to
+the other.
 
 Each `performance_cycle` snapshots one calendar month. `billedAmount` is the
 management fee, `mediaBudget` is the full ad spending limit, and
 `clientMediaContribution` is the client media charge. Wander's media contribution
 is budget minus client contribution. Null amounts mean unrecorded; zero means a
 recorded zero. Actual spend remains in cents. Fee/media paid dates are manual
-receipts, independent of the cycle's delivery status.
+receipts, independent of the cycle's delivery status. The cycle also owns
+fee/media invoice states (Open, Not invoiced, or unrecorded). Card reads derive
+Paid from these timestamps for the selected billing month; there is no separate
+brand JSON payment flag to synchronize. Clearing Paid records Open. Brand
+business-stage progression is a separate decision and does not reverse on undo.
+
+Platform campaigns attach directly to a cycle. A planned campaign's cycle is a
+default for new deliveries and an explicit bulk-assignment choice; reports use
+each platform campaign's direct membership. Attaching one platform campaign
+leaves its strategic parent and siblings alone. No synthetic campaign is made.
 
 The client Billing tab edits account defaults and individual months. Account
 updates never rewrite existing cycles. The daily `/api/cron/billing` job inserts

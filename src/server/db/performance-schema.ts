@@ -256,6 +256,8 @@ export const performanceCycleTable = pgTable(
      * fee (`billedAmount`) and the media that reaches the platforms
      * (`clientMediaContribution`). Null means no payment has been recorded.
      */
+    feeInvoiceState: t.text().$type<"Not invoiced" | "Open">(),
+    mediaInvoiceState: t.text().$type<"Not invoiced" | "Open">(),
     feePaidAt: t.timestamp({ withTimezone: true }),
     mediaPaidAt: t.timestamp({ withTimezone: true }),
 

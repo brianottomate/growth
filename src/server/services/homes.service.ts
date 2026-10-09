@@ -10,6 +10,7 @@ import { primaryHomeIds, setInPrimaryGroup } from "./home-groups.service";
 import {
   brandTable,
   homeMediaTable,
+  mediaAssetTable,
   homeTable,
   homeGroupTable,
   homeGroupMemberTable,
@@ -174,7 +175,7 @@ export async function loadBrandHome(input: {
     where: eq(homeMediaTable.homeId, row.id),
     orderBy: [asc(homeMediaTable.sortOrder), asc(homeMediaTable.createdAt)],
   });
-  const assetIds = stored
+  const assetIds = [...stored, ...row.carousel]
     .map((media) => media.assetId)
     .filter((id): id is string => Boolean(id));
   const assets = assetIds.length
@@ -208,7 +209,7 @@ export async function loadBrandHome(input: {
         sortOrder: decided?.sortOrder ?? null,
         assetId: null,
         isHero: hero === photo.url,
-        inCarousel: decided?.role === "carousel",
+        inCarousel: row.carousel.some((item) => item.sourceUrl === photo.url),
       },
     ];
   });
@@ -227,19 +228,41 @@ export async function loadBrandHome(input: {
         sortOrder: media.sortOrder,
         assetId: media.assetId,
         isHero: hero === asset.url,
-        inCarousel: media.role === "carousel",
+        inCarousel: row.carousel.some((item) => item.assetId === media.assetId),
       },
     ];
   });
 
   const photos = [...libraryPhotos, ...feedPhotos];
-  const carousel = photos
-    .filter((photo) => photo.inCarousel)
-    .sort(
-      (a, b) =>
-        (a.sortOrder ?? Number.MAX_SAFE_INTEGER) -
-        (b.sortOrder ?? Number.MAX_SAFE_INTEGER),
+  const carousel = row.carousel.flatMap((item, index) => {
+    const decision = stored.find((media) =>
+      item.assetId
+        ? media.assetId === item.assetId
+        : media.sourceUrl === item.sourceUrl,
     );
+    if (decision?.role === "excluded") return [];
+    const asset = item.assetId ? assetById.get(item.assetId) : null;
+    const url = asset?.url ?? item.sourceUrl;
+    if (!url) return [];
+    const photo = photos.find((photo) =>
+      item.assetId ? photo.assetId === item.assetId : photo.url === url,
+    );
+    return [
+      {
+        key: `carousel-${index}`,
+        url,
+        thumbUrl:
+          item.thumbUrl ?? asset?.thumbnailUrl ?? photo?.thumbUrl ?? url,
+        from: item.assetId ? ("library" as const) : ("feed" as const),
+        room: photo?.room ?? null,
+        role: "carousel" as const,
+        sortOrder: index,
+        assetId: item.assetId ?? null,
+        isHero: hero === url,
+        inCarousel: true,
+      },
+    ];
+  });
 
   return {
     brand,
@@ -342,13 +365,7 @@ export async function setHomeMedia(input: {
   return { homeId: home.id, mediaId: created!.id };
 }
 
-/**
- * The carousel, replaced wholesale in the order given. Anything that was in
- * it and is not in the list drops back to being an ordinary photo.
- *
- * One call rather than one per photo: reordering is a single decision about
- * a sequence, and sending it a nudge at a time invites half-saved orders.
- */
+/** Save ordered photo occurrences in one last-write-wins update. */
 export async function setHomeCarousel(input: {
   homeId: string;
   orgId: string;
@@ -360,39 +377,31 @@ export async function setHomeCarousel(input: {
   addedBy?: string | null;
 }) {
   const home = await ownedHome(input);
-  const existing = await db.query.homeMediaTable.findMany({
-    where: eq(homeMediaTable.homeId, home.id),
-  });
-  const keyOf = (row: { assetId?: string | null; sourceUrl?: string | null }) =>
-    row.assetId ?? row.sourceUrl ?? "";
-  const wanted = new Set(input.photos.map(keyOf).filter(Boolean));
-
-  // Out of the carousel, but still one of the home's photos.
-  for (const row of existing) {
-    if (row.role !== "carousel") continue;
-    if (wanted.has(keyOf(row))) continue;
-    await db
-      .update(homeMediaTable)
-      .set({ role: "gallery", sortOrder: null })
-      .where(eq(homeMediaTable.id, row.id));
-  }
-
-  let index = 0;
   for (const photo of input.photos) {
-    if (!photo.assetId && !photo.sourceUrl) continue;
-    await setHomeMedia({
-      homeId: home.id,
-      orgId: input.orgId,
-      assetId: photo.assetId ?? null,
-      sourceUrl: photo.sourceUrl ?? null,
-      thumbUrl: photo.thumbUrl ?? null,
-      role: "carousel",
-      sortOrder: index,
-      addedBy: input.addedBy ?? null,
-    });
-    index += 1;
+    if (!photo.assetId && !photo.sourceUrl)
+      throw new HomeError(422, "A photo needs an asset or a URL");
   }
-  return { homeId: home.id, count: index };
+  const ids = input.photos.flatMap((photo) =>
+    photo.assetId ? [photo.assetId] : [],
+  );
+  if (ids.length) {
+    const assets = await db.query.mediaAssetTable.findMany({
+      where: and(
+        inArray(mediaAssetTable.id, ids),
+        eq(mediaAssetTable.brandId, home.brandId),
+        isNull(mediaAssetTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    const allowed = new Set(assets.map((asset) => asset.id));
+    if (ids.some((id) => !allowed.has(id)))
+      throw new HomeError(404, "Photo not found in this brand");
+  }
+  await db
+    .update(homeTable)
+    .set({ carousel: input.photos })
+    .where(eq(homeTable.id, home.id));
+  return { homeId: home.id, count: input.photos.length };
 }
 
 /** The home, only when its brand belongs to the caller's organization. */
@@ -432,6 +441,12 @@ export type BrandHome = {
   rating: number | null;
   nightlyFrom: number | null;
   heroSourceUrl: string | null;
+  /** Ordered occurrences; an asset can appear more than once. */
+  carousel: {
+    assetId?: string | null;
+    sourceUrl?: string | null;
+    thumbUrl?: string | null;
+  }[];
   /** The full photo set, cached at pick time; null until a home is (re)picked. */
   galleryCache: { url: string; thumbUrl: string }[] | null;
 };
@@ -457,6 +472,7 @@ export async function listAllBrandHomes(brandId: string) {
         rating: true,
         nightlyFrom: true,
         heroSourceUrl: true,
+        carousel: true,
         galleryCache: true,
       },
     }),
@@ -507,6 +523,7 @@ export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
       rating: true,
       nightlyFrom: true,
       heroSourceUrl: true,
+      carousel: true,
       galleryCache: true,
     },
   });

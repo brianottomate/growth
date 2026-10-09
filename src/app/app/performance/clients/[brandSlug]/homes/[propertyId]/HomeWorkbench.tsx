@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, EyeOff, X } from "lucide-react";
@@ -26,14 +25,6 @@ const photoRef = (photo: HomePhoto) =>
 /** Choose the hero and ordered source photos for new campaign ads. */
 export function HomeWorkbench({ home }: { home: HomeDetail }) {
   const router = useRouter();
-  const [order, setOrder] = useState<string[]>(
-    home.carousel.map((photo) => photo.key),
-  );
-
-  const byKey = useMemo(
-    () => new Map(home.photos.map((photo) => [photo.key, photo])),
-    [home.photos],
-  );
 
   const onError = (error: { message: string }) => toast.error(error.message);
   const setHero = useMutation(
@@ -55,34 +46,19 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
     }),
   );
 
-  /** The carousel as photos, dropping any key whose photo has since gone. */
-  const carousel = order.flatMap((key) => {
-    const photo = byKey.get(key);
-    return photo ? [photo] : [];
-  });
-
-  const commit = (keys: string[]) => {
-    setOrder(keys);
-    saveCarousel.mutate({
-      homeId: home.id,
-      photos: keys.flatMap((key) => {
-        const photo = byKey.get(key);
-        return photo ? [photoRef(photo)] : [];
-      }),
-    });
+  const carousel = home.carousel;
+  const commit = (photos: HomePhoto[]) => {
+    saveCarousel.mutate({ homeId: home.id, photos: photos.map(photoRef) });
   };
-  const toggleCarousel = (photo: HomePhoto) => {
-    if (order.includes(photo.key)) {
-      return commit(order.filter((key) => key !== photo.key));
-    }
-    if (order.length >= MAX_CAROUSEL) {
+  const addToCarousel = (photo: HomePhoto) => {
+    if (carousel.length >= MAX_CAROUSEL) {
       toast.info(`Choose up to ${MAX_CAROUSEL} ad photos.`);
       return;
     }
-    commit([...order, photo.key]);
+    commit([...carousel, photo]);
   };
   const move = (index: number, by: -1 | 1) => {
-    const next = [...order];
+    const next = [...carousel];
     const target = index + by;
     if (target < 0 || target >= next.length) return;
     [next[index], next[target]] = [next[target]!, next[index]!];
@@ -132,8 +108,8 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          The hero leads new ads, followed by these photos in order (up to 10
-          total). Existing ads stay unchanged.
+          New carousel ads use these photos in the saved order (up to 10).
+          Existing ads stay unchanged.
         </p>
         {carousel.length === 0 ? (
           <p className={empty}>
@@ -144,7 +120,7 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
           <>
             <ul className="flex flex-wrap gap-2">
               {carousel.map((photo, index) => (
-                <li key={photo.key} className={cn(panel, "w-28")}>
+                <li key={`${photo.key}-${index}`} className={cn(panel, "w-28")}>
                   {/* oxlint-disable-next-line nextjs/no-img-element */}
                   <img
                     src={photo.thumbUrl}
@@ -175,7 +151,9 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => toggleCarousel(photo)}
+                      onClick={() =>
+                        commit(carousel.filter((_, i) => i !== index))
+                      }
                       title="Take out"
                       className="hover:text-foreground disabled:opacity-25"
                     >
@@ -203,8 +181,17 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
         ) : (
           <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6">
             {home.photos.map((photo) => {
-              const inCarousel = order.includes(photo.key);
-              const position = order.indexOf(photo.key) + 1;
+              const inCarousel = carousel.some((item) =>
+                item.assetId
+                  ? item.assetId === photo.assetId
+                  : item.url === photo.url,
+              );
+              const position =
+                carousel.findIndex((item) =>
+                  item.assetId
+                    ? item.assetId === photo.assetId
+                    : item.url === photo.url,
+                ) + 1;
               return (
                 <li key={photo.key} className={cn(panel, "group")}>
                   <div className="relative">
@@ -263,14 +250,10 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
                     <Chip
                       on={inCarousel}
                       disabled={busy}
-                      onClick={() => toggleCarousel(photo)}
-                      title={
-                        inCarousel
-                          ? "Remove from ad photos"
-                          : "Add to ad photos"
-                      }
+                      onClick={() => addToCarousel(photo)}
+                      title={inCarousel ? "Add again" : "Add to ad photos"}
                     >
-                      Ad photo
+                      {inCarousel ? "Add again" : "Add photo"}
                     </Chip>
                   </div>
                 </li>

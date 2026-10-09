@@ -48,7 +48,7 @@ export async function listMediaSuggestions(
       id: true,
       title: true,
       thumbnailUrl: true,
-      discoveredSourceUrl: true,
+      sourceUrl: true,
       metadata: true,
     },
     limit: 120,
@@ -110,7 +110,7 @@ export async function discoverMediaSuggestions(orgId: string, brandId: string) {
         const existing = await db.query.mediaAssetTable.findFirst({
           where: and(
             eq(mediaAssetTable.brandId, brandId),
-            sql`${mediaAssetTable.metadata}->>'sourceUrl' = ${url}`,
+            eq(mediaAssetTable.sourceUrl, url),
           ),
           columns: { id: true },
         });
@@ -123,23 +123,20 @@ export async function discoverMediaSuggestions(orgId: string, brandId: string) {
             kind: "image",
             status: "ready",
             reviewStatus: "suggested",
-            discoveredSourceUrl: url,
+            sourceUrl: url,
             externalUrl: url,
             thumbnailUrl: url,
             title: "From their website",
             sourceProvider: "website",
             metadata: {
               source: "firecrawl",
-              sourceUrl: url,
               sourcePage: page,
               discoveredAt: new Date().toISOString(),
             },
           })
           .onConflictDoNothing({
-            target: [
-              mediaAssetTable.brandId,
-              mediaAssetTable.discoveredSourceUrl,
-            ],
+            target: [mediaAssetTable.brandId, mediaAssetTable.sourceUrl],
+            where: sql`${mediaAssetTable.sourceProvider} = 'website'`,
           })
           .returning();
         added += inserted.length;
@@ -163,11 +160,11 @@ export async function reviewMediaSuggestion(
     where: and(
       eq(mediaAssetTable.id, input.mediaId),
       eq(mediaAssetTable.brandId, input.brandId),
+      eq(mediaAssetTable.sourceProvider, "website"),
       isNull(mediaAssetTable.deletedAt),
     ),
   });
-  if (!asset?.discoveredSourceUrl)
-    throw new Error("Website suggestion not found.");
+  if (!asset?.sourceUrl) throw new Error("Website suggestion not found.");
   if (input.decision === "reject") {
     if (asset.reviewStatus === "approved")
       throw new Error("This image is already approved.");
@@ -198,7 +195,7 @@ export async function reviewMediaSuggestion(
     return { id: asset.id, url: asset.url, reviewStatus: "approved" as const };
   if (asset.reviewStatus === "rejected")
     throw new Error("This suggestion has been rejected.");
-  const image = await fetchPublicImage(asset.discoveredSourceUrl);
+  const image = await fetchPublicImage(asset.sourceUrl);
   const filename = `website-photo.${image.contentType.split("/")[1] ?? "jpg"}`;
   const key = R2.buildKey(input.brandId, asset.id, filename);
   const url = await R2.putBuffer(key, image.body, image.contentType);

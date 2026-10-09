@@ -627,6 +627,10 @@ export const platformCampaignTable = pgTable(
       .text()
       .references(() => campaignTable.id, { onDelete: "set null" }),
 
+    /** Direct reporting membership, independent of the planned campaign parent. */
+    performanceCycleId: t
+      .text()
+      .references(() => performanceCycleTable.id, { onDelete: "set null" }),
     name: t.text().notNull(),
     status: platformCampaignStatusEnum().default("draft").notNull(),
     objective: t.text(),

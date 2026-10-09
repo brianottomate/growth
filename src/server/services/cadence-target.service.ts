@@ -2,10 +2,51 @@ import "server-only";
 
 import { and, eq, isNull } from "drizzle-orm";
 
-import { withTransaction } from "@/server/db";
+import {
+  db,
+  withTransaction,
+  type Database,
+  type TransactionClient,
+} from "@/server/db";
 import { cadenceTargetTable, mixTargetTable } from "@/server/db/schema";
 import type { ChannelPlatform } from "@/server/db/channel-schema";
 import { platformFormatsFor } from "@/server/content/formats";
+
+/** A baseline target has one nullable-key identity; series targets are separate. */
+export async function saveBaselineTarget(
+  input: {
+    brandId: string;
+    channelId: string;
+    platform: ChannelPlatform;
+    archetype: string;
+    template?: string | null;
+    count: number;
+    period: "day" | "week" | "month";
+  },
+  client: Database | TransactionClient = db,
+) {
+  const [row] = await client
+    .insert(cadenceTargetTable)
+    .values({
+      ...input,
+      template: input.template ?? null,
+      seriesId: null,
+      isActive: true,
+    })
+    .onConflictDoUpdate({
+      target: [
+        cadenceTargetTable.channelId,
+        cadenceTargetTable.archetype,
+        cadenceTargetTable.template,
+        cadenceTargetTable.seriesId,
+        cadenceTargetTable.period,
+        cadenceTargetTable.deletedAt,
+      ],
+      set: { count: input.count, isActive: true },
+    })
+    .returning();
+  return row!;
+}
 
 export type CadenceTargetInput = {
   archetype: string;

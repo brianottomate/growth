@@ -15,7 +15,7 @@ export const listMediaSuggestionsAction = growthAction({
       id: z.string(),
       title: z.string().nullable(),
       thumbnailUrl: z.string().nullable(),
-      discoveredSourceUrl: z.string().nullable(),
+      sourceUrl: z.string().nullable(),
       sourcePage: z.string().nullable(),
     }),
   ),

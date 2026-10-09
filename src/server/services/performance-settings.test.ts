@@ -16,6 +16,16 @@ function settingsClient(settings: PerformanceSettings) {
           performanceSettings: settings,
         }),
       },
+      performanceAccountTable: { findFirst: async () => ({ id: "account" }) },
+      performanceCycleTable: {
+        findFirst: async () => ({
+          period: "2026-10",
+          feePaidAt: new Date(),
+          mediaPaidAt: null,
+          feeInvoiceState: null,
+          mediaInvoiceState: null,
+        }),
+      },
       userTable: {
         findFirst: async () => ({
           id: "operator",
@@ -38,6 +48,10 @@ function settingsClient(settings: PerformanceSettings) {
             const next: PerformanceSettings = { ...settings, ...payloads[0] };
             if (payloads[1])
               next.cardState = { ...settings.cardState, ...payloads[1] };
+            if (next.cardState) {
+              delete next.cardState.managementPayment;
+              delete next.cardState.spendPayment;
+            }
             written = next;
             return [
               {
@@ -81,9 +95,10 @@ test("a chat update to catalog keeps the recorded platform, payment, and journey
   expect(result.settings.cardState).toEqual({
     ...stored.cardState,
     catalog: "In production",
+    spendPayment: null,
   });
   expect(result.settings.pipelineStage).toBe("onboarding");
   expect(result.settings.monthlyFee).toBe(2666.67);
   expect(result.changed).toEqual(["cardState"]);
-  expect(boundary.written()?.cardState?.managementPayment).toBe("Paid");
+  expect(boundary.written()?.cardState?.managementPayment).toBeUndefined();
 });

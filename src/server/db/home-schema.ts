@@ -109,6 +109,18 @@ export const homeTable = pgTable(
      * chosen the same way once its asset has a URL.
      */
     heroSourceUrl: t.text(),
+    /** Ordered occurrences; the same photo may appear more than once. */
+    carousel: t
+      .jsonb()
+      .$type<
+        {
+          assetId?: string | null;
+          sourceUrl?: string | null;
+          thumbUrl?: string | null;
+        }[]
+      >()
+      .default([])
+      .notNull(),
 
     /** WanderOS amenity labels from the listing detail, cached at ingestion. */
     amenities: t.jsonb().$type<string[]>(),

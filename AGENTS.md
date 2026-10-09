@@ -11,7 +11,7 @@ auth model), but the live product is the growth tooling. Treat the README and an
 starter-template language as historical — the demos and example `post` router
 have been removed.
 
-> Sibling repos and the wandercom monorepo layout are documented in `../CLAUDE.md`.
+> Sibling repo ownership is documented in `../AGENTS.md`.
 > This file is scoped to the `growth/` repo only.
 
 > **The pregen preview renderer now lives in its own repo**: `wandercom/pregen-preview`
@@ -28,6 +28,44 @@ content-equality, or other optimistic concurrency checks that reject a save
 because another edit happened. Keep permissions, valid state transitions,
 reviewed delivery snapshots, and send/job idempotency checks. Avoid deduplication
 guards on ordinary edits; require a concrete repeated-side-effect reason for them.
+
+Commercial terms in brand Performance settings and billing accounts are edited
+independently. Do not automatically synchronize edits between those stores.
+
+## Fix the model before adding checks
+
+When a write needs existence checks, deduplication, fallback chains, reconciliation,
+or synthetic records, first ask whether the domain model is missing an identity,
+relationship, ownership boundary, or distinction between states. Prefer fixing
+that model and removing the compensating code over adding another guard.
+
+- Name the fact and its authoritative owner. Derive other views from that owner;
+  avoid independently writable copies that require bidirectional synchronization.
+- Distinguish entity identity from list occurrences. A photo can be one asset but
+  appear more than once in an ordered carousel. Do not use entity uniqueness to
+  silently change an operator's submitted list.
+- Scope record identity explicitly (brand, channel, series, template, period,
+  active/deleted state). Use database keys and atomic upserts where the domain
+  requires one record, with last-write-wins values. Handle nullable key semantics
+  deliberately rather than relying on read-before-insert checks.
+- Model real relationships directly. Do not create a fake campaign or other
+  domain entity solely to carry a link missing from the schema.
+- Normalize external/provider data at its boundary into a canonical internal
+  representation. Keep raw provenance separately; avoid permanent fallback
+  chains across JSON metadata and typed columns for the same fact.
+- Treat missing, unknown, failed, draft, approved, and delivered as distinct when
+  they have different product meanings. Catch the expected missing-file case;
+  surface malformed data and operational failures instead of returning empty
+  success or manufacturing defaults.
+- For a model change, audit writers and readers, inspect existing data, migrate
+  and backfill deliberately, and remove obsolete paths and tests. Keep necessary
+  compatibility bounded to the migration rather than growing it indefinitely.
+
+This is a design preference, not a mandate to normalize every JSON field or
+remove permissions, delivery approval, provider replay protection, or useful
+asset reuse. Do not add abstractions or schema changes without a concrete
+simplification. Record findings and proposed removals in
+[`docs/model-first-audit.md`](docs/model-first-audit.md).
 
 ## Commands
 

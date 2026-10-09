@@ -26,6 +26,8 @@ const cycleItemSchema = z.strictObject({
   billedAmount: z.number().nullable(),
   createdAt: z.iso.datetime(),
   endAt: z.iso.datetime().nullable(),
+  feeInvoiceState: z.enum(["Not invoiced", "Open"]).nullable(),
+  mediaInvoiceState: z.enum(["Not invoiced", "Open"]).nullable(),
   feePaidAt: z.iso.datetime().nullable(),
   id: z.string(),
   mediaBudget: z.number().nullable(),
@@ -282,6 +284,7 @@ export const getPerformanceAccountActionOutputSchema = z.strictObject({
     platformCampaigns: z.array(
       z.strictObject({
         campaignId: z.string().nullable(),
+        performanceCycleId: z.string().nullable(),
         heroThumbnailUrl: z.string().nullable(),
         id: z.string(),
         manageUrl: z.string().nullable(),
@@ -719,30 +722,18 @@ export const syncAdCampaignsActionOutputSchema = z.strictObject({
   updated: z.number(),
 });
 
-export const attachToPerformanceCycleActionOutputSchema = z.union([
-  z.strictObject({
-    detachedFromWrapper: z.boolean(),
-    id: z.string(),
-    kind: z.literal("platformCampaign"),
-    performanceCycleId: z.null(),
-  }),
-  z.strictObject({
-    actualSpendCents: z.number(),
-    campaignId: z.string(),
-    createdWrapper: z.boolean(),
-    id: z.string(),
-    kind: z.literal("platformCampaign"),
-    performanceCycleId: z.string(),
-  }),
-  z.strictObject({
-    id: z.string(),
-    kind: z.enum(["campaign", "lifecycleCampaign", "amplificationTarget"]),
-    performanceCycleId: z.string().nullable(),
-    previousCycleId: z.string().nullable(),
-  }),
-]);
+export const attachToPerformanceCycleActionOutputSchema = z.strictObject({
+  kind: z.enum([
+    "platformCampaign",
+    "campaign",
+    "lifecycleCampaign",
+    "amplificationTarget",
+  ]),
+  id: z.string(),
+  performanceCycleId: z.string().nullable(),
+  previousCycleId: z.string().nullable(),
+});
 
-/** Native service result; the existing wire contract validates its JSON projection. */
 export const listPerformanceAccountsActionNativeResultSchema =
   listPerformanceAccountsActionOutputSchema.extend({
     accounts: z.array(

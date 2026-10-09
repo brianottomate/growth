@@ -542,7 +542,7 @@ export const syncAdCampaignsAction = growthAction({
 export const attachToPerformanceCycleAction = growthAction({
   outputSchema: attachToPerformanceCycleActionOutputSchema,
   description:
-    "Attach one delivery row to a performance cycle so it counts toward the customer's report, or detach it with cycleId null. Kind 'campaign' is the one to use for an ad campaign that already exists on the platform: platform campaigns reach a cycle through a campaign, and this creates or reuses a wrapper campaign when the platform campaign has none. This tags existing delivery; it never creates ads or sends anything.",
+    "Attach one delivery row to a performance cycle so it counts toward the customer's report, or detach it with cycleId null. Use platformCampaign for one platform delivery; campaign attaches all platform deliveries under that planned campaign. A platform delivery's cycle is independent of its planned campaign parent. This tags existing delivery; it never creates ads or sends anything.",
   inputSchema: attachToPerformanceCycleSchema,
   execute: (input, ctx) => attachToPerformanceCycle(actorFrom(ctx), input),
 });

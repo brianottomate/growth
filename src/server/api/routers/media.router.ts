@@ -325,20 +325,12 @@ export const mediaRouter = {
               eq(mediaAssetTable.status, "ready"),
               eq(mediaAssetTable.reviewStatus, "approved"),
               isNull(mediaAssetTable.deletedAt),
-              sql`${mediaAssetTable.metadata} ->> 'sourceUrl' in (${sql.join(
-                urls.map((url) => sql`${url}`),
-                sql`, `,
-              )})`,
+              inArray(mediaAssetTable.sourceUrl, urls),
             ),
-            columns: { id: true, metadata: true },
+            columns: { id: true, sourceUrl: true },
           })
         : [];
-      const byUrl = new Map(
-        imported.map((row) => [
-          (row.metadata as { sourceUrl?: string } | null)?.sourceUrl ?? "",
-          row.id,
-        ]),
-      );
+      const byUrl = new Map(imported.map((row) => [row.sourceUrl, row.id]));
       return {
         site,
         images: urls.map((url) => ({

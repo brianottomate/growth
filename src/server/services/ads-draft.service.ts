@@ -277,6 +277,7 @@ async function planPlatformInternal(input: {
       brandId: input.brandId,
       platform: input.platform,
       campaignId: input.campaign.id,
+      performanceCycleId: input.campaign.performanceCycleId,
       name: input.campaign.name,
       status: "draft",
       // Left for a person to set: the plan's number is a total with no flight
@@ -720,14 +721,32 @@ export async function starterIdeaHomes(input: {
           .filter((p) => p.role === "excluded")
           .map((p) => p.assetUrl ?? p.sourceUrl),
       );
-      const shortlist = media
-        .filter((p) => p.role === "carousel")
-        .map((p) => p.assetUrl ?? p.sourceUrl)
+      const carouselAssetIds = home.carousel.flatMap((photo) =>
+        photo.assetId ? [photo.assetId] : [],
+      );
+      const carouselAssets = carouselAssetIds.length
+        ? await db.query.mediaAssetTable.findMany({
+            where: inArray(mediaAssetTable.id, carouselAssetIds),
+            columns: { id: true, url: true },
+          })
+        : [];
+      const carouselUrls = new Map(
+        carouselAssets.map((asset) => [asset.id, asset.url]),
+      );
+      const shortlist = home.carousel
+        .map((photo) =>
+          photo.assetId ? carouselUrls.get(photo.assetId) : photo.sourceUrl,
+        )
         .filter((url): url is string => Boolean(url));
-      const urls = [
-        home.heroSourceUrl ?? listing?.imageUrl,
-        ...(shortlist.length ? shortlist : gallery.map((p) => p.url)),
-      ].filter(
+      const candidates = shortlist.length
+        ? shortlist
+        : [
+            ...new Set([
+              home.heroSourceUrl ?? listing?.imageUrl,
+              ...gallery.map((p) => p.url),
+            ]),
+          ];
+      const urls = candidates.filter(
         (url): url is string => Boolean(url) && !excluded.has(url ?? null),
       );
       return {
@@ -735,7 +754,7 @@ export async function starterIdeaHomes(input: {
         curated: shortlist.length > 0,
         name: listing?.name ?? home.name,
         url: listing?.url ?? home.url,
-        photos: [...new Set(urls)].map((url, index) => ({
+        photos: urls.map((url, index) => ({
           url,
           homeId: home.id,
           label: `${listing?.name ?? home.name} · Photo ${index + 1}`,

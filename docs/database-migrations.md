@@ -36,6 +36,10 @@ bun run db:push:experiment booking-site
 # Push the schema, then deploy the current checkout as an experiment preview.
 bun run preview:experiment booking-site
 
+# Rehearse committed migrations and deploy that schema, without DB push.
+# Use a fresh branch that has not already been modified by DB push.
+bun run preview:experiment verify-booking-site --migrate
+
 # Run another command against a branch instead of starting the dev server.
 bun run db:experiment booking-site -- bun run db:studio
 
@@ -55,7 +59,9 @@ Ordinary Git-triggered PR previews continue to use production. No Vercel integra
 or changes to shared project environment variables are required. Both build and
 runtime receive the branch's pooled/direct URLs and `DB_EXPERIMENT_BRANCH`.
 Experimental builds retain type checking but skip the migration snapshot check,
-because their schema comes from DB push. During iteration use `bun run typecheck`;
+because their schema comes from DB push or explicit committed migrations.
+Use `--migrate` for migration rehearsal previews; this avoids changing an already
+migrated schema through Drizzle introspection. Uploads use Vercel archives. During iteration use `bun run typecheck`;
 the normal PR check still requires a committed migration for schema changes.
 
 ## Settle the schema

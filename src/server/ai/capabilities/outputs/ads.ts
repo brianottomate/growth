@@ -999,6 +999,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
       budget: z.number().nullable(),
       budgetType: z.string().nullable(),
       campaignId: z.string().nullable(),
+      performanceCycleId: z.string().nullable(),
       channelId: z.string(),
       createdAt: z.iso.datetime(),
       endAt: z.iso.datetime().nullable(),

@@ -28,6 +28,8 @@ export type BillingLineKind = "fee" | "media";
 export async function ensureCurrentCycle(
   actor: PerformanceActor,
   brandId: string,
+  period = currentPeriod(),
+  recordPayment = true,
 ): Promise<PerformanceCycle> {
   const brand = await db.query.brandTable.findFirst({
     where: and(
@@ -39,14 +41,30 @@ export async function ensureCurrentCycle(
   });
   if (!brand) throw new PerformanceError("NOT_FOUND", "Brand not found");
 
-  const { accountId } = await promoteBrandToClient(actor, {
-    brandId,
-    signedAt: brand.businessStageAt,
+  const existingAccount = await db.query.performanceAccountTable.findFirst({
+    where: and(
+      eq(performanceAccountTable.brandId, brandId),
+      eq(performanceAccountTable.organizationId, actor.orgId),
+      isNull(performanceAccountTable.deletedAt),
+    ),
+    columns: { id: true },
   });
+  if (!recordPayment && !existingAccount)
+    throw new PerformanceError(
+      "BAD_REQUEST",
+      "Create the commercial account before recording invoice state",
+    );
+  const accountId = recordPayment
+    ? (
+        await promoteBrandToClient(actor, {
+          brandId,
+          signedAt: brand.businessStageAt,
+        })
+      ).accountId
+    : existingAccount!.id;
   const account = await db.query.performanceAccountTable.findFirst({
     where: eq(performanceAccountTable.id, accountId),
   });
-  const period = currentPeriod();
 
   const existing = await db.query.performanceCycleTable.findFirst({
     where: and(
@@ -93,32 +111,22 @@ export async function markCycleLinePaid(
   actor: PerformanceActor,
   input: { brandId: string; line: BillingLineKind; paid: boolean },
 ): Promise<PerformanceCycle> {
-  const cycle = await ensureCurrentCycle(actor, input.brandId);
+  const cycle = await ensureCurrentCycle(
+    actor,
+    input.brandId,
+    currentPeriod(),
+    input.paid,
+  );
   const at = input.paid ? new Date() : null;
   const [updated] = await db
     .update(performanceCycleTable)
-    .set(input.line === "fee" ? { feePaidAt: at } : { mediaPaidAt: at })
+    .set(
+      input.line === "fee"
+        ? { feePaidAt: at, feeInvoiceState: input.paid ? null : "Open" }
+        : { mediaPaidAt: at, mediaInvoiceState: input.paid ? null : "Open" },
+    )
     .where(eq(performanceCycleTable.id, cycle.id))
     .returning();
-  // The Overview card shows the same fact; keep it in step without going
-  // through setPerformanceSettings, which calls back into here.
-  const key = input.line === "fee" ? "managementPayment" : "spendPayment";
-  const state = JSON.stringify({ [key]: input.paid ? "Paid" : "Open" });
-  await db
-    .update(brandTable)
-    .set({
-      performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || jsonb_build_object('cardState', coalesce(${brandTable.performanceSettings}->'cardState', '{}'::jsonb) || ${state}::jsonb)`,
-    })
-    .where(
-      and(
-        eq(brandTable.id, input.brandId),
-        // Undoing only clears a Paid; a card already set to another state
-        // (Not invoiced) is the person's answer and stays.
-        input.paid
-          ? undefined
-          : sql`${brandTable.performanceSettings}->'cardState'->>${key} = 'Paid'`,
-      ),
-    );
   if (input.line === "fee" && input.paid) {
     await advanceBusinessStage(input.brandId, "paid");
   }

@@ -506,10 +506,8 @@ export async function importRemoteImage(input: {
       r2Key: key,
       url,
       thumbnailUrl: url,
-      metadata: {
-        source: "remote_import",
-        sourceUrl: input.url,
-      },
+      sourceUrl: input.url,
+      metadata: { source: "remote_import" },
     })
     .returning();
   if (!asset) throw new Error("Could not save imported image.");
@@ -534,7 +532,7 @@ export async function findImportedImage(input: {
       eq(mediaAssetTable.status, "ready"),
       eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
-      sql`${mediaAssetTable.metadata} ->> 'sourceUrl' = ${input.url}`,
+      eq(mediaAssetTable.sourceUrl, input.url),
     ),
     orderBy: (asset, { desc }) => [desc(asset.createdAt)],
     columns: { id: true, url: true },

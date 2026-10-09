@@ -127,7 +127,9 @@ async function run(command: string[]) {
   if (code !== 0) process.exit(code);
 }
 
-if (action === "push" || action === "preview")
+if (action === "preview" && args.includes("--migrate"))
+  await run(["bun", "run", "db:migrate"]);
+else if (action === "push" || action === "preview")
   await run(["bun", "x", "--no-install", "drizzle-kit", "push", "--force"]);
 if (action === "dev")
   await run(
@@ -148,6 +150,7 @@ if (action === "preview") {
   await run([
     "vercel",
     "deploy",
+    "--archive=tgz",
     "--yes",
     "--target",
     "preview",

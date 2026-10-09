@@ -720,7 +720,7 @@ export const brandRouter = {
         assetId: z.string().min(1).nullish(),
         sourceUrl: z.string().url().nullish(),
         thumbUrl: z.string().url().nullish(),
-        role: z.enum(["gallery", "excluded", "carousel"]).optional(),
+        role: z.enum(["gallery", "excluded"]).optional(),
         sortOrder: z.number().int().min(0).nullish(),
       }),
     )

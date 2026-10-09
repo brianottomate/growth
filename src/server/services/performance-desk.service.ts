@@ -1,3 +1,4 @@
+import { projectPaymentSettings } from "./performance-payment-state";
 import "server-only";
 import { inPrimaryGroup } from "./home-groups.service";
 
@@ -303,22 +304,14 @@ export async function loadPerformanceDesk(
           billedAmount: true,
           mediaBudget: true,
           clientMediaContribution: true,
+          feeInvoiceState: true,
+          mediaInvoiceState: true,
           feePaidAt: true,
           mediaPaidAt: true,
           actualSpendCents: true,
         },
       })
     : [];
-  // Newest first, so the first row seen per account is the current cycle.
-  const cycleByAccount = new Map<string, (typeof cycleRows)[number]>();
-  for (const cycle of cycleRows) {
-    if (
-      cycle.period === currentPeriod() &&
-      !cycleByAccount.has(cycle.accountId)
-    )
-      cycleByAccount.set(cycle.accountId, cycle);
-  }
-
   const campaigns: DeskCampaign[] = campaignRows.map((campaign) => {
     const rows = rowsByCampaign.get(campaign.id) ?? [];
     const spend = rows.reduce(
@@ -371,7 +364,19 @@ export async function loadPerformanceDesk(
     .map((brand) => {
       const own = campaignsByBrand.get(brand.id) ?? [];
       const account = accountByBrand.get(brand.id);
-      const cycle = account ? cycleByAccount.get(account.id) : undefined;
+      const cycle = account
+        ? cycleRows.find(
+            (cycle) =>
+              cycle.accountId === account.id &&
+              cycle.period ===
+                (brand.performanceSettings?.cardState?.billingPeriod ??
+                  currentPeriod()),
+          )
+        : undefined;
+      const paymentSettings = projectPaymentSettings(
+        brand.performanceSettings,
+        cycle,
+      );
       const billing: BillingSummary | null = cycle
         ? {
             period: cycle.period,
@@ -394,16 +399,7 @@ export async function loadPerformanceDesk(
         businessAt: brand.businessStageAt,
         delivery: brand.deliveryStage ?? "not_started",
         pipelineStage: brand.performanceSettings?.pipelineStage,
-        settings: account
-          ? {
-              ...brand.performanceSettings,
-              monthlyFee: account.monthlyFee,
-              agreedAdSpend: account.agreedAdSpend,
-              effectiveDate: account.effectiveDate,
-              endDate: account.endDate,
-              terms: account.terms,
-            }
-          : brand.performanceSettings,
+        settings: paymentSettings,
         deliveryAt: brand.deliveryStageAt,
         lead: brand.owner,
         csLead: brand.csLead,

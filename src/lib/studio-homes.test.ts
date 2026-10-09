@@ -17,6 +17,7 @@ const saved = {
   nightlyFrom: null,
   heroSourceUrl: null,
   featured: false,
+  carousel: [],
   galleryCache: [
     {
       url: "https://example.com/photo.jpg",

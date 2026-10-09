@@ -130,7 +130,7 @@ export function WebsiteMediaSuggestions({
                     Suggested · external image
                   </p>
                   <a
-                    href={asset.discoveredSourceUrl ?? undefined}
+                    href={asset.sourceUrl ?? undefined}
                     target="_blank"
                     rel="noreferrer"
                     className="block truncate text-xs underline"

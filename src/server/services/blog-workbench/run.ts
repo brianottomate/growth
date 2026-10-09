@@ -177,7 +177,11 @@ export async function executeBlogGoldenRun(
       grounding = JSON.parse(
         await readFile(groundingPath, "utf8"),
       ) as GroundingContextRecord;
-    } catch {
+    } catch (error) {
+      if (
+        !(error instanceof Error && "code" in error && error.code === "ENOENT")
+      )
+        throw error;
       grounding = await buildCrawlDerivedGrounding(raw.target_domain);
       await mkdir(path.dirname(groundingPath), { recursive: true });
       await writeFile(

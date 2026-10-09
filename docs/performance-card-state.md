@@ -27,11 +27,15 @@ confusion with shipped software. Creating, Drafting, and Building use blue;
 approved/live/paid facts use green, and review/paused/pending facts use yellow.
 
 `brand.performanceSettings.cardState` stores explicit current commercial, intake,
-creative, platform, site, DNS, and payment states in the existing JSONB column.
+creative, platform, site, and DNS states in the existing JSONB column. Payment
+facts are owned by the selected billing cycle and projected into card reads.
 `pipelineStage` is the separate manual journey. Management uses `monthlyFee`;
-Spend uses `agreedAdSpend`. Dollar amounts retain cents. These cards do not read
-billing cycles for either amounts or payment status. There is no schema push or
-physical-column migration for this change.
+Spend uses `agreedAdSpend`. Dollar amounts retain cents. Cards read payment
+facts from `billingPeriod`, or the UTC current month when no month is selected.
+Paid means a cycle receipt timestamp; Open and Not invoiced are separate invoice
+states. Card amounts use brand commercial settings. Billing account defaults are
+independently edited; neither store automatically synchronizes commercial edits
+to the other. See [model migration](model-first-audit.md).
 
 Missing means **Not recorded**, never unpaid, unstarted, or disconnected.
 Recording Paid does not charge a card. Recording Live does not launch an ad.
@@ -42,10 +46,9 @@ are reversible. Not-created platforms are hidden from read-only cards.
 
 Updates use the existing organization-scoped `setPerformanceSettings` service
 and `brandWrite.setPerformanceSettings` chat action. Partial nested patches
-preserve the other recorded facts; null clears one. Saves check that the original
-settings have not changed concurrently. The staged menu editor uses the same
+preserve the other recorded facts; null clears one. Saves use last-write-wins. The staged menu editor uses the same
 writer and Cancel discards its draft. No workflows, provider syncs, exports,
-intakes, or monthly timers automatically update these new statuses.
+intakes, or monthly timers automatically update the other workflow statuses.
 
 Older business/delivery enums and billing-cycle pages still exist for their
 legacy uses. The new client header shows the manual journey so those older

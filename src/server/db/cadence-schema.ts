@@ -1,5 +1,11 @@
 import { relations, sql } from "drizzle-orm";
-import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  index,
+  pgEnum,
+  pgTable,
+  unique,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { brandTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
@@ -82,6 +88,16 @@ export const cadenceTargetTable = pgTable(
     deletedAt: t.timestamp(),
   }),
   (table) => [
+    unique("cadence_target_identity")
+      .on(
+        table.channelId,
+        table.archetype,
+        table.template,
+        table.seriesId,
+        table.period,
+        table.deletedAt,
+      )
+      .nullsNotDistinct(),
     index("cadence_target_brand_idx").on(table.brandId),
     index("cadence_target_channel_idx").on(table.channelId),
     index("cadence_target_series_idx").on(table.seriesId),

@@ -3,7 +3,7 @@ import type {
   libraryMediaAnalysisSchema,
   timelineVideoAnalysisSchema,
 } from "@/server/ai/capabilities/outputs/media-analysis";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   index,
   pgEnum,
@@ -213,7 +213,8 @@ export const mediaAssetTable = pgTable(
     status: mediaStatusEnum().default("uploading").notNull(),
     reviewStatus: mediaReviewStatusEnum().default("approved").notNull(),
     // Durable scrape identity: rejection survives rediscovery of the same URL.
-    discoveredSourceUrl: t.text(),
+    // Canonical provenance; retain the physical name for deployed-app compatibility.
+    sourceUrl: t.text("discovered_source_url"),
 
     // Human-facing
     title: t.text(),
@@ -266,12 +267,12 @@ export const mediaAssetTable = pgTable(
   (table) => [
     index("media_asset_brand_idx").on(table.brandId),
     index("media_asset_folder_idx").on(table.folderId),
+    index("media_asset_source_url_idx").on(table.brandId, table.sourceUrl),
     index("media_asset_kind_idx").on(table.kind),
     index("media_asset_status_idx").on(table.status),
-    uniqueIndex("media_asset_discovered_source_idx").on(
-      table.brandId,
-      table.discoveredSourceUrl,
-    ),
+    uniqueIndex("media_asset_discovered_source_idx")
+      .on(table.brandId, table.sourceUrl)
+      .where(sql`${table.sourceProvider} = 'website'`),
     index("media_asset_uploaded_by_idx").on(table.uploadedBy),
     // Non-unique: a chat image promoted into several brand libraries shares
     // one underlying object key.

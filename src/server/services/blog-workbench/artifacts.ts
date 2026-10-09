@@ -22,7 +22,9 @@ export async function loadLatestBlogRun(): Promise<BlogRunRecord | null> {
         "utf8",
       ),
     ) as BlogRunRecord;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
+      throw error;
     return null;
   }
 }
@@ -37,7 +39,9 @@ export async function loadDatoDraft(
         "utf8",
       ),
     ) as DatoDraftExport;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
+      throw error;
     return null;
   }
 }

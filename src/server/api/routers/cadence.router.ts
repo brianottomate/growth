@@ -1,3 +1,4 @@
+import { saveBaselineTarget } from "@/server/services/cadence-target.service";
 import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -136,41 +137,9 @@ export const cadenceRouter = {
         });
       }
 
-      // Manual upsert: the unique index includes nullable `template`, where
-      // Postgres treats NULLs as distinct (so ON CONFLICT wouldn't dedup).
-      const template = input.template ?? null;
-      const existing = await ctx.db.query.cadenceTargetTable.findFirst({
-        where: and(
-          eq(cadenceTargetTable.channelId, input.channelId),
-          eq(cadenceTargetTable.archetype, input.archetype),
-          template === null
-            ? isNull(cadenceTargetTable.template)
-            : eq(cadenceTargetTable.template, template),
-          eq(cadenceTargetTable.period, input.period),
-        ),
-      });
-
-      if (existing) {
-        const [row] = await ctx.db
-          .update(cadenceTargetTable)
-          .set({ count: input.count, isActive: true })
-          .where(eq(cadenceTargetTable.id, existing.id))
-          .returning();
-        return row;
-      }
-      const [row] = await ctx.db
-        .insert(cadenceTargetTable)
-        .values({
-          brandId: input.brandId,
-          channelId: input.channelId,
-          platform: channel.platform,
-          archetype: input.archetype,
-          template,
-          count: input.count,
-          period: input.period,
-          isActive: true,
-        })
-        .returning();
-      return row;
+      return saveBaselineTarget(
+        { ...input, platform: channel.platform },
+        ctx.db,
+      );
     }),
 };
