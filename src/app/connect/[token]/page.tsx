@@ -95,7 +95,7 @@ export default async function ConnectPage({
           renders below the task, so a phone opens on the four buttons. */}
       <aside className="order-2 flex flex-col justify-between gap-10 border-t px-6 py-10 lg:order-1 lg:min-h-screen lg:border-t-0 lg:border-r lg:px-10 lg:py-12">
         <div>
-          <Logo variant="wordmark" className="h-5 w-auto" />
+          <Logo variant="logo" className="h-6 w-auto" />
           <Logo
             variant="logomark"
             aria-hidden
