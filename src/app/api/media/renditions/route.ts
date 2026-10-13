@@ -12,8 +12,9 @@ import {
 } from "@/server/services/video-rendition.service";
 
 /**
- * Server ffmpeg lives only in this function (see next.config.ts
- * outputFileTracingIncludes). POST cuts one video right after its upload;
+ * Server ffmpeg is traced into this function, the chat route and the MCP
+ * route (see next.config.ts outputFileTracingIncludes), the three places a
+ * video enters the library. POST cuts one video right after its upload;
  * the cron GET sweeps videos that arrived another way or whose run died.
  */
 export const maxDuration = 800;

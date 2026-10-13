@@ -22,7 +22,11 @@ import {
   isOwnedChatAttachmentUrl,
   maxChatAttachmentBytes,
 } from "@/lib/chat-attachment";
-import { MEDIA_MIME } from "@/lib/media-accept";
+import {
+  formatUploadLimit,
+  MEDIA_MIME,
+  maxUploadBytesFor,
+} from "@/lib/media-accept";
 import { classifyFetchUrl } from "@/server/ai/url-safety";
 import {
   MAX_STORYBOARD_BOARDS,
@@ -376,13 +380,23 @@ export async function verifyR2Upload(mediaId: string) {
   ) {
     throw new Error("Media upload is not available to finalize.");
   }
+  if (asset.kind !== "image" && asset.kind !== "gif" && asset.kind !== "video")
+    throw new Error("Only image and video uploads can be finalized here.");
+  const noun = asset.kind === "video" ? "video" : "image";
+  const maximum =
+    maxUploadBytesFor(asset.mimeType ?? "") ?? MAX_IMPORTED_IMAGE_BYTES;
   const object = await R2.head(asset.r2Key);
-  if (object.size === 0) throw new Error("Uploaded image is empty.");
-  if (object.size && object.size > MAX_IMPORTED_IMAGE_BYTES) {
-    throw new Error("Uploaded image exceeds 25 MB.");
+  if (object.size === 0) throw new Error(`Uploaded ${noun} is empty.`);
+  if (object.size && object.size > maximum) {
+    throw new Error(`Uploaded ${noun} exceeds ${formatUploadLimit(maximum)}.`);
   }
-  if (object.contentType && !object.contentType.startsWith("image/")) {
-    throw new Error("Uploaded object is not an image.");
+  if (
+    object.contentType &&
+    !object.contentType.startsWith(asset.kind === "video" ? "video/" : "image/")
+  ) {
+    throw new Error(
+      `Uploaded object is not ${noun === "video" ? "a" : "an"} ${noun}.`,
+    );
   }
   return asset;
 }

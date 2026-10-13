@@ -20,7 +20,11 @@ const config: NextConfig = {
   // with that one function.
   outputFileTracingIncludes: {
     "/api/og": ["./public/auth-hero.jpg"],
+    // Server ffmpeg: the renditions route, plus the chat and MCP routes whose
+    // saveChatMedia and mediaLibraryWrite.finishUpload cut renditions inline.
     "/api/media/renditions": ["./node_modules/ffmpeg-static/ffmpeg"],
+    "/api/overview/chat": ["./node_modules/ffmpeg-static/ffmpeg"],
+    "/api/mcp": ["./node_modules/ffmpeg-static/ffmpeg"],
   },
   turbopack: {
     root: process.cwd(),

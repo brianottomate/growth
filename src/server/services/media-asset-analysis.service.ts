@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import { db, withTransaction } from "@/server/db";
 import {
@@ -105,11 +105,6 @@ export async function analyzeStoredMediaAsset(input: {
   const aiTagIds = analysis.tags
     .map((name) => tagIdByName.get(name.toLowerCase()))
     .filter((id): id is string => Boolean(id));
-  const metadata =
-    asset.metadata && typeof asset.metadata === "object"
-      ? (asset.metadata as Record<string, unknown>)
-      : {};
-
   await withTransaction(async (tx) => {
     await tx
       .delete(mediaAssetTagTable)
@@ -133,7 +128,9 @@ export async function analyzeStoredMediaAsset(input: {
       .set({
         title: asset.title || analysis.name,
         alt: asset.alt || analysis.altText,
-        metadata: { ...metadata, aiAnalysis: analysis },
+        // Merged in the database: renditions write their own key while
+        // this runs, and a snapshot spread here would erase it.
+        metadata: sql`coalesce(${mediaAssetTable.metadata}, '{}'::jsonb) || ${JSON.stringify({ aiAnalysis: analysis })}::jsonb`,
       })
       .where(eq(mediaAssetTable.id, asset.id));
   });

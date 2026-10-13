@@ -283,6 +283,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   sessionRead: ["get"],
   mediaLibraryWrite: [
     "saveChatMedia",
+    "prepareUpload",
+    "finishUpload",
     "importListingPhotos",
     "discoverWebsiteImages",
     "reviewWebsiteImage",

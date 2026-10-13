@@ -621,6 +621,8 @@ export const growthActionPolicies = {
     // Promotion dedups by URL, so re-saving the same paste is a no-op; the
     // model-write consequence covers the auto-tag analysis pass.
     saveChatMedia: write({ idempotent: true, consequence: "model-write" }),
+    prepareUpload: write(),
+    finishUpload: write(),
     // Idempotent per photo URL: a hero already in the library is returned.
     importListingPhotos: write({
       idempotent: true,

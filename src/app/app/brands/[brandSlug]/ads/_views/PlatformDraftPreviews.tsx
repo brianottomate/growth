@@ -2,6 +2,9 @@
 
 import type { Ad } from "@/server/db/ads-schema";
 import { AdIdeaPreview } from "./AdIdeaPreview";
+import { VideoAdPreview } from "./VideoAdPreview";
+import { adFormatOf } from "@/lib/performance-ads";
+import { posterForMedia } from "@/lib/media-url";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 
 export function PlatformDraftPreviews({
@@ -30,15 +33,17 @@ export function PlatformDraftPreviews({
         {ads.map((ad) => {
           if (!("media" in ad.content)) return null;
           const content = ad.content;
+          const video = adFormatOf(content) === "video";
+          const cover = content.media[0] && posterForMedia(content.media[0]);
           return (
             <details
               key={ad.id}
               className="group min-w-0 rounded-lg border p-3"
             >
               <summary className="flex cursor-pointer items-center gap-3 text-sm font-medium">
-                {content.media[0]?.url && (
+                {cover && (
                   <img
-                    src={content.media[0].url}
+                    src={cover}
                     alt=""
                     className="size-16 shrink-0 rounded-md object-cover"
                   />
@@ -46,22 +51,34 @@ export function PlatformDraftPreviews({
                 <span>
                   {ad.name}
                   <span className="block text-xs font-normal text-muted-foreground">
-                    Studio draft · {content.format ?? "static"}
+                    Studio draft · {adFormatOf(content)}
                   </span>
                 </span>
               </summary>
               <div className="mt-3 max-w-xl space-y-3">
-                <AdIdeaPreview
-                  studio={
-                    content.ideaStudio ?? {
-                      document: ideaDocumentFromAd({ name: ad.name, content }),
+                {video ? (
+                  <VideoAdPreview
+                    content={content}
+                    brandId={brandId}
+                    brandName={brandName}
+                    brandLogo={brandLogo}
+                  />
+                ) : (
+                  <AdIdeaPreview
+                    studio={
+                      content.ideaStudio ?? {
+                        document: ideaDocumentFromAd({
+                          name: ad.name,
+                          content,
+                        }),
+                      }
                     }
-                  }
-                  brandId={brandId}
-                  brandName={brandName}
-                  brandLogo={brandLogo}
-                  content={content}
-                />
+                    brandId={brandId}
+                    brandName={brandName}
+                    brandLogo={brandLogo}
+                    content={content}
+                  />
+                )}
               </div>
             </details>
           );

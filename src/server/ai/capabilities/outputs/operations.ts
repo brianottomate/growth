@@ -266,6 +266,36 @@ export const saveChatMediaToLibraryOutputSchema = z.strictObject({
   url: z.string(),
 });
 
+export const prepareLibraryUploadsOutputSchema = z.strictObject({
+  brandId: z.string(),
+  next: z.string(),
+  uploads: z.array(
+    z.strictObject({
+      filename: z.string(),
+      mediaId: z.string(),
+      mimeType: z.string(),
+      publicUrl: z.string(),
+      uploadUrl: z.string(),
+    }),
+  ),
+});
+
+export const finishLibraryUploadsOutputSchema = z.strictObject({
+  brandId: z.string(),
+  ok: z.literal(true),
+  saved: z.array(
+    z.strictObject({
+      kind: z.enum(mediaKindEnum.enumValues),
+      mediaAssetId: z.string(),
+      renditionError: z.string().optional(),
+      renditions: z.enum(["processing", "ready", "error"]).nullable(),
+      thumbnailUrl: z.string().nullable(),
+      url: z.string(),
+    }),
+  ),
+  url: z.string(),
+});
+
 export const listPublishingConnectionsOutputSchema = z.strictObject({
   brand: z.strictObject({ id: z.string(), name: z.string() }),
   channels: z.array(

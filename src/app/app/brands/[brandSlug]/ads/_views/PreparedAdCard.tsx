@@ -32,6 +32,8 @@ import { textAdCopySchema, textAdReady } from "@/lib/ad-authoring";
 import type { AdReview } from "@/lib/ad-review";
 import type { AdContent, MediaItem } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
+import { VideoAdPreview } from "./VideoAdPreview";
+import { CopyAdLinkButton } from "./CopyAdLinkButton";
 
 export type PreparedAd = {
   id: string;
@@ -68,6 +70,7 @@ export function PreparedAdCard({
   ad,
   brandId,
   brandName = "",
+  brandLogo = null,
   campaignId,
   metadata,
   website,
@@ -76,6 +79,7 @@ export function PreparedAdCard({
   ad: PreparedAd;
   brandId: string;
   brandName?: string;
+  brandLogo?: string | null;
   campaignId?: string;
   metadata?: ReactNode;
   website: string | null;
@@ -329,9 +333,15 @@ export function PreparedAdCard({
       </p>
       <p className="text-sm">{text.descriptions.slice(0, 2).join(" ")}</p>
     </div>
-  ) : (
-    videoPreview(video?.media[0], "Base video")
-  );
+  ) : video ? (
+    <VideoAdPreview
+      content={video}
+      brandId={brandId}
+      brandName={brandName}
+      brandLogo={brandLogo}
+      showMetaPreview={false}
+    />
+  ) : null;
   return (
     <article
       aria-label={ad.name}
@@ -346,27 +356,29 @@ export function PreparedAdCard({
             {metadata && <> · {metadata}</>}
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="shrink-0"
-          onClick={() =>
-            sendAssistantIntent({
-              type: "work_ad_campaign",
-              newThread: true,
-              brandId,
-              brandName,
-              campaignId,
-              campaignName: ad.name,
-              adId: ad.id,
-              focus: "ads",
-              visibleText: `Help me shape “${ad.name}”. Read this ad and discuss what I want to refine before making changes.`,
-            })
-          }
-        >
-          <MessageSquare className="size-3.5" />
-          Shape
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <CopyAdLinkButton adId={ad.id} />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              sendAssistantIntent({
+                type: "work_ad_campaign",
+                newThread: true,
+                brandId,
+                brandName,
+                campaignId,
+                campaignName: ad.name,
+                adId: ad.id,
+                focus: "ads",
+                visibleText: `Help me shape “${ad.name}”. Read this ad and discuss what I want to refine before making changes.`,
+              })
+            }
+          >
+            <MessageSquare className="size-3.5" />
+            Shape
+          </Button>
+        </div>
       </header>
       {!expanded ? (
         preview

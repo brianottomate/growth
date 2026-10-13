@@ -13,6 +13,8 @@ import {
   proposeContentGroupingsOutputSchema,
   analyzeMediaAssetOutputSchema,
   saveChatMediaToLibraryOutputSchema,
+  prepareLibraryUploadsOutputSchema,
+  finishLibraryUploadsOutputSchema,
   listPublishingConnectionsOutputSchema,
   openTimelinePostOutputSchema,
   analyzeTimelineVideoOutputSchema,
@@ -69,6 +71,14 @@ import {
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { findLatestOwnedChatMedia } from "@/lib/chat-attachment";
 import { MediaService } from "@/server/services/media.service";
+import { renderVideoRenditions } from "@/server/services/video-rendition.service";
+import { readVideoRenditions } from "@/lib/video-renditions";
+import {
+  MAX_VIDEO_UPLOAD_BYTES,
+  MEDIA_STILL_MIME_TYPES,
+  MEDIA_VIDEO_MIME_TYPES,
+  maxUploadBytesFor,
+} from "@/lib/media-accept";
 import {
   findImportedImage,
   importRemoteImage,
@@ -368,21 +378,28 @@ export const saveChatMediaToLibrary = growthAction({
     }
     const assets = [];
     for (const item of media) {
-      assets.push(
-        await MediaService.promoteChatMedia({
-          brandId: brand.id,
-          userId: ctx.userId,
-          url: item.url,
-          mimeType: item.mediaType,
-          title: item.title,
-        }),
-      );
+      const asset = await MediaService.promoteChatMedia({
+        brandId: brand.id,
+        userId: ctx.userId,
+        url: item.url,
+        mimeType: item.mediaType,
+        title: item.title,
+      });
+      assets.push(asset);
     }
     // Tagging is best-effort — a failed analysis must not lose the save. Runs
     // in parallel because a video analysis transcribes and reads several
-    // boards, and five clips in series would not fit the request.
+    // boards, and five clips in series would not fit the request. A video's
+    // renditions are cut alongside, so a draftAd later in the same turn gets
+    // the 4:5 feed crop and 9:16 Reels file rather than the raw master.
     const saved = await Promise.all(
       assets.map(async (asset) => {
+        // Best-effort like tagging: a failed cut is recorded on the asset
+        // and draftAd says so later; it must not lose the save.
+        const rendered =
+          asset.kind === "video"
+            ? renderVideoRenditions(asset.id).catch(() => null)
+            : null;
         let suggestedTags: string[] = [];
         let analyzed = false;
         if (
@@ -400,18 +417,133 @@ export const saveChatMediaToLibrary = growthAction({
             analyzed = false;
           }
         }
+        const renditions = await rendered;
         return {
           mediaAssetId: asset.id,
           kind: asset.kind,
           url: asset.url,
-          // Video needs its poster passed to adsWrite.draftAd, so return it
-          // here rather than making the model go and look the asset up again.
-          thumbnailUrl: asset.thumbnailUrl,
+          // For display. adsWrite.draftAd finds the poster for each crop
+          // itself; this one need not be passed on.
+          thumbnailUrl:
+            asset.thumbnailUrl ?? renditions?.deliveryPoster?.url ?? null,
           analyzed,
           suggestedTags,
         };
       }),
     );
+    return { ok: true as const, brandId: brand.id, saved, url: "/app/media" };
+  },
+});
+
+const libraryUploadMimeType = z.enum([
+  ...MEDIA_STILL_MIME_TYPES,
+  ...MEDIA_VIDEO_MIME_TYPES,
+]);
+
+export const prepareLibraryUploads = growthAction({
+  outputSchema: prepareLibraryUploadsOutputSchema,
+  description:
+    "Prepare direct uploads of local image or video files (Claude Code, a creative tool, a camera roll export) into an owned brand's media library. Returns short-lived presigned PUT URLs; PUT each file with the exact mimeType as Content-Type, then call finishUpload with the media IDs. Videos up to 250 MB (MOV, MP4, WebM), images up to 25 MB.",
+  inputSchema: z.object({
+    brandId: z.string(),
+    files: z
+      .array(
+        z
+          .object({
+            filename: z.string().trim().min(1).max(300),
+            mimeType: libraryUploadMimeType,
+            size: z.number().int().positive().max(MAX_VIDEO_UPLOAD_BYTES),
+          })
+          .refine((file) => file.size <= maxUploadBytesFor(file.mimeType)!, {
+            error: "Images are capped at 25 MB and videos at 250 MB.",
+            path: ["size"],
+          }),
+      )
+      .min(1)
+      .max(20),
+  }),
+  execute: async ({ brandId, files }, ctx) => {
+    const brand = await requireOwnedBrand(brandId, ctx);
+    const uploads = [];
+    for (const file of files) {
+      const prepared = await MediaService.createR2Upload({
+        brandId: brand.id,
+        uploadedBy: ctx.userId,
+        ...file,
+      });
+      uploads.push({
+        mediaId: prepared.mediaId,
+        uploadUrl: prepared.uploadUrl,
+        publicUrl: prepared.publicUrl,
+        filename: file.filename,
+        mimeType: file.mimeType,
+      });
+    }
+    return {
+      brandId: brand.id,
+      uploads,
+      next: "PUT each local file to its uploadUrl with the exact mimeType as Content-Type, then call mediaLibraryWrite.finishUpload with the mediaIds.",
+    };
+  },
+});
+
+export const finishLibraryUploads = growthAction({
+  outputSchema: finishLibraryUploadsOutputSchema,
+  description:
+    "Verify and finalize uploads prepared by mediaLibraryWrite.prepareUpload. A video also gets its poster, an H.264 delivery file and a 4:5 feed crop cut on the server before this returns (about a minute per clip), so adsWrite.draftAd can use its url straight away.",
+  inputSchema: z.object({
+    brandId: z.string(),
+    uploads: z
+      .array(
+        z.object({
+          mediaId: z.string(),
+          width: z.number().int().positive().max(20_000).optional(),
+          height: z.number().int().positive().max(20_000).optional(),
+        }),
+      )
+      .min(1)
+      .max(20),
+  }),
+  execute: async ({ brandId, uploads }, ctx) => {
+    const brand = await requireOwnedBrand(brandId, ctx);
+    const finalized = [];
+    for (const upload of uploads) {
+      const asset = await MediaService.verifyR2Upload(upload.mediaId);
+      if (asset.brandId !== brand.id || asset.uploadedBy !== ctx.userId) {
+        throw new Error(
+          "That upload does not belong to this operator and brand.",
+        );
+      }
+      const row = await MediaService.finalizeR2Upload({
+        mediaId: asset.id,
+        url: asset.url!,
+        pathname: asset.r2Key!,
+        width: upload.width,
+        height: upload.height,
+      });
+      if (!row?.url) throw new Error("Could not finalize media upload.");
+      finalized.push(row);
+    }
+    // No browser cut a poster, so the renditions are what give a video one.
+    // One clip at a time: each render takes every core and a /tmp workspace.
+    // A clip already cut (a retried call) reads its state off the asset.
+    const saved = [];
+    for (const row of finalized) {
+      const renditions =
+        row.kind === "video"
+          ? ((await renderVideoRenditions(row.id)) ??
+            readVideoRenditions(row.metadata))
+          : null;
+      saved.push({
+        mediaAssetId: row.id,
+        kind: row.kind,
+        url: row.url!,
+        thumbnailUrl:
+          row.thumbnailUrl ?? renditions?.deliveryPoster?.url ?? null,
+        renditions: renditions?.status ?? null,
+        ...(renditions?.error ? { renditionError: renditions.error } : {}),
+      });
+    }
     return { ok: true as const, brandId: brand.id, saved, url: "/app/media" };
   },
 });

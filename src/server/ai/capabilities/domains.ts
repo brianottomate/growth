@@ -232,6 +232,8 @@ import {
   getSharedSession,
   listMediaLibrary,
   saveChatMediaToLibrary,
+  prepareLibraryUploads,
+  finishLibraryUploads,
   scrapeBrandPosts,
   setSeriesCadence,
   syncBrandBlog,
@@ -731,9 +733,11 @@ export const mediaAnalysisWrite = growthDomainTool({
 
 export const mediaLibraryWrite = growthDomainTool({
   description:
-    "Save operator-pasted chat media, import listing photos, discover website image suggestions, and approve or reject suggestions for an owned brand's media library. Website discovery does not approve images or update pitches.",
+    "Save operator-pasted chat media, upload local image and video files (prepareUpload → PUT → finishUpload), import listing photos, discover website image suggestions, and approve or reject suggestions for an owned brand's media library. Website discovery does not approve images or update pitches.",
   actions: {
     saveChatMedia: saveChatMediaToLibrary,
+    prepareUpload: prepareLibraryUploads,
+    finishUpload: finishLibraryUploads,
     importListingPhotos,
     discoverWebsiteImages: discoverMediaSuggestionsAction,
     reviewWebsiteImage: reviewMediaSuggestionAction,

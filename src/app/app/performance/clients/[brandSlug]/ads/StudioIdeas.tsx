@@ -171,6 +171,7 @@ export function StudioIdeas({
                     ad={{ ...idea, content: idea.content }}
                     brandId={brandId}
                     brandName={brandName}
+                    brandLogo={brandLogo}
                     campaignId={idea.campaignId ?? undefined}
                     metadata={adMetadata}
                     website={website}
@@ -198,6 +199,7 @@ export function StudioIdeas({
                     ad={idea}
                     brandId={brandId}
                     brandName={brandName}
+                    brandLogo={brandLogo}
                     campaignId={idea.campaignId ?? undefined}
                     metadata={adMetadata}
                     website={website}

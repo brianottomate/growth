@@ -158,7 +158,8 @@ import {
 import { MediaService } from "@/server/services/media.service";
 import { mediaTypeForUrl } from "@/lib/media-url";
 
-import { type MediaItem } from "@/server/db/schema";
+import { type AdCard, type MediaItem } from "@/server/db/schema";
+import { videoAdCardFor } from "@/server/services/video-delivery.service";
 import {
   addAdShell,
   attachAdSet,
@@ -634,7 +635,7 @@ export const draftAdAction = growthAction({
         .url()
         .optional()
         .describe(
-          "Meta wants a still alongside the clip. Optional: for our own uploads the poster frame is found automatically, so only pass this to override it.",
+          "Meta wants a still alongside the clip. Only read while the clip has no renditions; once they exist each crop carries its own poster and this is ignored.",
         ),
       callToAction: z
         .string()
@@ -699,7 +700,7 @@ export const draftAdAction = growthAction({
       { error: "A text ad needs headlines and descriptions." },
     ),
   execute: async (input, ctx) => {
-    let media: MediaItem[] = [];
+    let media: AdCard[] = [];
     if (input.type === "creative") {
       const { brand } = await resolveAdAuthoringScope({
         ...input,
@@ -714,20 +715,22 @@ export const draftAdAction = growthAction({
 
       if (input.videoUrl) {
         const resolved = await resolve(input.videoUrl);
-        const thumbnail = input.videoThumbnailUrl ?? resolved.thumbnailUrl;
+        const item: MediaItem = {
+          url: resolved.url,
+          type: "video",
+          assetId: input.assetId ?? resolved.assetId,
+        };
+        // A library video with renditions becomes the 4:5 feed crop carrying
+        // its 9:16 file as the Stories/Reels cut, as the studio builds it.
+        const card = (await videoAdCardFor(item)) ?? item;
+        const thumbnail =
+          card.thumbnail ?? input.videoThumbnailUrl ?? resolved.thumbnailUrl;
         if (!thumbnail) {
           throw new Error(
-            "This video has no poster frame, and Meta will not take a video ad without one. Re-upload it on /app/media, which cuts a poster from the file, then draft from the library asset. Passing videoThumbnailUrl explicitly also works.",
+            "This video has no poster frame yet, and Meta will not take a video ad without one. A library video gets its poster when its renditions finish, a few minutes after upload; try again then, or pass videoThumbnailUrl.",
           );
         }
-        media = [
-          {
-            url: resolved.url,
-            type: "video",
-            thumbnail,
-            assetId: input.assetId ?? resolved.assetId,
-          },
-        ];
+        media = [{ ...card, thumbnail }];
       } else {
         const urls = input.imageUrls?.length
           ? input.imageUrls
@@ -762,6 +765,7 @@ export const draftAdAction = growthAction({
               body: input.body!,
               linkUrl: input.linkUrl,
               callToAction: input.callToAction,
+              ...(input.videoUrl ? { format: "video" as const } : {}),
               media,
             },
       organizationId: ctx.orgId,

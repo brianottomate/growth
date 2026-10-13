@@ -143,9 +143,18 @@ export function growthResultSummary(
       copy.headline,
       text(copy.body, "Creative saved for review."),
     );
+    const lead = obj(list(content.media)[0]);
+    const video = content.format === "video" || lead.type === "video";
     summary.facts = [
-      ad.approved ? "Approved" : status(ad.status || "draft"),
-      `${list(doc.cards).length} slides`,
+      // `drawn` is the stored name of the draft state the studio calls Draft.
+      ad.approved
+        ? "Approved"
+        : status(ad.status === "drawn" ? "draft" : ad.status || "draft"),
+      video
+        ? lead.story
+          ? "Video · Feed + Stories/Reels"
+          : "Video"
+        : `${list(doc.cards).length} slides`,
     ];
     const source =
       obj(list(doc.cards)[0]).source ||
