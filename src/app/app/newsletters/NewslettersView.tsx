@@ -283,8 +283,13 @@ export async function NewslettersView({
         brandId={selectedBrand?.id}
         brandName={selectedBrand?.name}
         emails={ownedEmails
-          .filter(
-            (email) => !seriesId || email.contentPost?.seriesId === seriesId,
+          // A client's Broadcasts are standalone emails; a series' editions
+          // live on its Newsletters tab.
+          .filter((email) =>
+            seriesId
+              ? email.contentPost?.seriesId === seriesId
+              : !basePath.startsWith("/app/performance/clients/") ||
+                !email.contentPost?.seriesId,
           )
           .map((email) => {
             const document = documentByEmail.get(email.id);
