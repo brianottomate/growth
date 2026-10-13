@@ -362,10 +362,33 @@ export async function catalogState(
     brand,
     refresh,
   );
-  const exports = await db.query.catalogExportTable.findMany({
-    where: eq(catalogExportTable.brandId, brandId),
-    orderBy: desc(catalogExportTable.createdAt),
-  });
+  const [exports, lastRun] = await Promise.all([
+    db.query.catalogExportTable.findMany({
+      where: eq(catalogExportTable.brandId, brandId),
+      orderBy: desc(catalogExportTable.createdAt),
+    }),
+    db.query.workflowRunTable.findFirst({
+      where: and(
+        eq(workflowRunTable.brandId, brandId),
+        eq(workflowRunTable.workflowType, "catalog-export"),
+        isNull(workflowRunTable.dismissedAt),
+      ),
+      orderBy: desc(workflowRunTable.createdAt),
+      columns: { id: true, status: true, error: true, createdAt: true },
+    }),
+  ]);
+  // A run that failed writes no export row, so it would otherwise vanish.
+  const failed: CatalogExport[] =
+    lastRun?.status === "failed"
+      ? [
+          {
+            id: lastRun.id,
+            status: "error",
+            error: lastRun.error ?? "Export failed",
+            createdAt: lastRun.createdAt.toISOString(),
+          },
+        ]
+      : [];
   return {
     reviewPath: `/app/performance/clients/${encodeURIComponent(brand.slug ?? brand.id)}/catalog`,
     homes,
@@ -376,17 +399,20 @@ export async function catalogState(
     format: DEFAULT_CATALOG_FORMAT,
     draft,
     unwritten,
-    exports: exports.map((run): CatalogExport => ({
-      ...run.output,
-      id: run.id,
-      status: "ready",
-      error: null,
-      createdAt: run.createdAt.toISOString(),
-      label: exportLabel(run.input),
-      ...((run.input as { draft?: CatalogDraft } | null)?.draft?.ad
-        ? { ad: (run.input as { draft: CatalogDraft }).draft.ad }
-        : {}),
-    })),
+    exports: [
+      ...failed,
+      ...exports.map((run): CatalogExport => ({
+        ...run.output,
+        id: run.id,
+        status: "ready",
+        error: null,
+        createdAt: run.createdAt.toISOString(),
+        label: exportLabel(run.input),
+        ...((run.input as { draft?: CatalogDraft } | null)?.draft?.ad
+          ? { ad: (run.input as { draft: CatalogDraft }).draft.ad }
+          : {}),
+      })),
+    ],
   };
 }
 

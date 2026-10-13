@@ -483,6 +483,13 @@ export function CatalogCards({
   const activeExport = activity.data?.some(
     (run) => run.destination === "Catalog" && running(run.status),
   );
+  const exportBlocker = !draft
+    ? null
+    : !draft.cards.some((c) => c.included)
+      ? "No cards included"
+      : unapproved.length > 0
+        ? `${unapproved.length} included card${unapproved.length === 1 ? "" : "s"} not approved yet`
+        : (catalogArtworkIssues(draft)[0] ?? null);
   const exportActions = draft ? (
     <>
       <label className="flex items-center gap-2 text-sm">
@@ -493,19 +500,11 @@ export function CatalogCards({
         />
         Redraw every card
       </label>
+      {exportBlocker && !busy && !activeExport && (
+        <span className="text-sm text-muted-foreground">{exportBlocker}</span>
+      )}
       <Button
-        disabled={
-          busy ||
-          activeExport ||
-          !draft.cards.some((c) => c.included) ||
-          catalogArtworkIssues(draft).length > 0 ||
-          unapproved.length > 0
-        }
-        title={
-          unapproved.length > 0
-            ? `${unapproved.length} included card${unapproved.length === 1 ? "" : "s"} not approved yet`
-            : undefined
-        }
+        disabled={busy || activeExport || Boolean(exportBlocker)}
         loading={busy || activeExport}
         onClick={() => void exportCatalog()}
       >
@@ -1169,13 +1168,15 @@ export function CatalogCards({
                           : "Show all"}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="text-destructive underline"
-                      onClick={() => setDeletingExport(item)}
-                    >
-                      Delete
-                    </button>
+                    {item.status !== "error" && (
+                      <button
+                        type="button"
+                        className="text-destructive underline"
+                        onClick={() => setDeletingExport(item)}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
                 {item.error && (
