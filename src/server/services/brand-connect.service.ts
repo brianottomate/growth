@@ -87,23 +87,21 @@ export type BrandConnectChannelKey =
   (typeof BRAND_CONNECT_CHANNELS)[number]["key"];
 
 /**
- * Which kinds of connection a client is asked for.
+ * Which channels a client is asked for.
  *
- * Posting is parked while Performance by Wander focuses on paid. The channel
- * definitions above stay exactly as they are: turning social back on is adding
- * "posting" to this list, not rebuilding the flow, the OAuth routes or the
- * sync. Nothing here disconnects anything — a brand that already has Instagram
- * keeps it, and content sync keeps reading it. This decides what we ASK for.
+ * Performance by Wander asks for Meta and Google ads only. The definitions
+ * above stay as they are: offering social posting (Instagram, Facebook) or
+ * LinkedIn later is adding its key here, not rebuilding the flow, the OAuth
+ * routes or the sync. Nothing here disconnects anything: a brand that already
+ * has a channel keeps it. This decides what we ASK for.
  */
-export const OFFERED_CONNECT_KINDS: readonly ZernioConnectPlatform["kind"][] = [
-  "ads",
+export const OFFERED_CONNECT_CHANNELS: readonly BrandConnectChannelKey[] = [
+  "meta-ads",
+  "google-ads",
 ];
 
 export function isOfferedConnectChannel(key: string): boolean {
-  const channel = BRAND_CONNECT_CHANNELS.find((row) => row.key === key);
-  return Boolean(
-    channel && OFFERED_CONNECT_KINDS.includes(channel.target.kind),
-  );
+  return OFFERED_CONNECT_CHANNELS.some((offered) => offered === key);
 }
 
 /** Exported so brand creation can stamp a token at insert (no Zernio call). */
@@ -296,7 +294,7 @@ export async function getBrandConnectStatus(brandId: string) {
       // Every channel is returned so the internal card can still show a
       // parked-but-connected account. The client page renders only what we
       // currently offer.
-      offered: OFFERED_CONNECT_KINDS.includes(channel.target.kind),
+      offered: OFFERED_CONNECT_CHANNELS.includes(channel.key),
       connected: connected.length > 0,
       accounts: connected.map((row) => row.handle ?? row.displayName ?? ""),
       // An ad channel carries the platform's own account id once sync learns

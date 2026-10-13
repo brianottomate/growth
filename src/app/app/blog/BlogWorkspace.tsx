@@ -270,7 +270,7 @@ export function BlogWorkspace({
                     {content.title}
                   </h2>
                   <p className="text-muted-foreground">{content.description}</p>
-                  <div className="prose max-w-none dark:prose-invert">
+                  <div className="article-prose prose max-w-none">
                     <Streamdown mode="static">
                       {content.bodyMarkdown}
                     </Streamdown>

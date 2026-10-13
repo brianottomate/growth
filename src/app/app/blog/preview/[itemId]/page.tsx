@@ -50,8 +50,8 @@ export default async function DatoPreviewReactPage({
         <span
           className={`rounded-full px-2 py-0.5 font-medium ${
             published
-              ? "bg-emerald-500/15 text-emerald-300"
-              : "bg-amber-500/15 text-amber-300"
+              ? "bg-success/15 text-success"
+              : "bg-warning/15 text-warning"
           }`}
         >
           {published ? "Published in Dato" : "Dato draft — not public"}
@@ -82,7 +82,7 @@ export default async function DatoPreviewReactPage({
             {article.description}
           </p>
         )}
-        <div className="prose mt-8 max-w-none prose-neutral prose-invert">
+        <div className="article-prose prose mt-8 max-w-none">
           <StructuredText
             data={article.body}
             renderBlock={({ record }) => <PreviewBlock block={record} />}

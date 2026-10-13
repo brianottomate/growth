@@ -216,7 +216,7 @@ export default async function BlogArticlePage({
               </span>
             )}
           </div>
-          <div className="prose max-w-none prose-neutral prose-invert">
+          <div className="article-prose prose max-w-none">
             <StructuredText
               data={datoArticle.body}
               renderBlock={({ record }) => <PreviewBlock block={record} />}
