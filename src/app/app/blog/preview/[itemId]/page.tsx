@@ -1,9 +1,11 @@
+import { createHmac } from "node:crypto";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 // Subpath import on purpose: the package root re-exports a Mux-backed
 // VideoPlayer, which drags in @mux/mux-player-react (a peer we don't install).
 import { StructuredText } from "react-datocms/structured-text";
 
+import { env } from "@/env";
 import { getSession } from "@/server/better-auth/server";
 import {
   getBlogArticleDraft,
@@ -28,6 +30,15 @@ import { PreviewBlock } from "./PreviewBlocks";
 
 export const dynamic = "force-dynamic";
 
+/** wander.com's preview page for this article. wander.com trusts the link because only Growth and it hold the key. */
+function wanderPreviewUrl(slug: string) {
+  if (!env.DATOCMS_PREVIEW_SECRET) return null;
+  const sig = createHmac("sha256", env.DATOCMS_PREVIEW_SECRET)
+    .update(slug)
+    .digest("base64url");
+  return `${env.WANDER_COM_BASE_URL}/article/preview/${encodeURIComponent(slug)}?sig=${sig}`;
+}
+
 export default async function DatoPreviewReactPage({
   params,
 }: {
@@ -43,6 +54,7 @@ export default async function DatoPreviewReactPage({
 
   const published = article._status === "published";
   const hero = article.image;
+  const wanderUrl = article.url ? wanderPreviewUrl(article.url) : null;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -62,6 +74,16 @@ export default async function DatoPreviewReactPage({
         <span>Rendered with the same tooling as wander.com.</span>
         {article.url && (
           <span className="font-mono">wander.com/article/{article.url}</span>
+        )}
+        {wanderUrl && (
+          <a
+            href={wanderUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-foreground"
+          >
+            Open on wander.com
+          </a>
         )}
       </div>
 

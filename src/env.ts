@@ -50,6 +50,7 @@ export const env = createEnv({
     REPLICATE_API_TOKEN: z.string().optional(), // Legacy Wander motion pipeline: Seedance, segmentation, upscaling
     GEMINI_API_KEY: z.string().optional(), // Direct Google Gemini image generation
     DATOCMS_CMA_TOKEN: z.string().optional(), // wander.com blog publishing (Content Management API)
+    DATOCMS_PREVIEW_SECRET: z.string().optional(), // signs wander.com /article/preview links
     FIRECRAWL_API_KEY: z.string().min(1), // For web scraping
     OUTREACH_S2S_GUID: z.string().optional(), // For Outreach S2S auth
     OUTREACH_PRIVATE_KEY: z.string().optional(), // For Outreach S2S JWT signing
@@ -223,6 +224,7 @@ export const env = createEnv({
     REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     DATOCMS_CMA_TOKEN: process.env.DATOCMS_CMA_TOKEN,
+    DATOCMS_PREVIEW_SECRET: process.env.DATOCMS_PREVIEW_SECRET,
     FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
     OUTREACH_S2S_GUID: process.env.OUTREACH_S2S_GUID,
     OUTREACH_PRIVATE_KEY: process.env.OUTREACH_PRIVATE_KEY,
