@@ -969,7 +969,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
           id: z.string(),
           linkUrl: z.string().nullable(),
           manageUrl: z.string().nullable(),
-          media: z.array(creativePoolItemSchema).nullable(),
+          media: z.array(mediaItemSchema).nullable(),
           name: z.string().nullable(),
           optimizationGoal: z.string().nullable(),
           platform: z.enum(channelPlatformEnum.enumValues),
