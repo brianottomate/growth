@@ -1,4 +1,7 @@
-import { previewEmailAudience } from "@/server/services/email-audience.service";
+import {
+  importEmailList,
+  previewEmailAudience,
+} from "@/server/services/email-audience.service";
 import { emailAudienceDefinitionSchema } from "@/lib/email-audience";
 import {
   listEmailAudiencesAction,
@@ -126,6 +129,32 @@ export const newsletterRouter = {
     )
     .handler(({ input, context }) =>
       previewEmailAudience(input, {
+        organizationId: context.workspace.orgId,
+        userId: context.workspace.userId,
+      }),
+    ),
+  /** Rows only: the browser parses the file, so the request stays small. */
+  importList: workspaceProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        name: z.string().trim().min(1).max(160),
+        fileName: z.string().max(300).nullable(),
+        consentConfirmed: z.boolean(),
+        rows: z
+          .array(
+            z.object({
+              email: z.string().max(320),
+              firstName: z.string().max(200).nullable(),
+              sourceId: z.string().max(200).nullable(),
+            }),
+          )
+          .min(1)
+          .max(200_000),
+      }),
+    )
+    .handler(({ input, context }) =>
+      importEmailList(input, {
         organizationId: context.workspace.orgId,
         userId: context.workspace.userId,
       }),

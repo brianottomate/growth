@@ -37,6 +37,7 @@ export * from "./home-group-schema";
 export * from "./client-page-schema";
 
 export * from "./email-audience-schema";
+export * from "./email-list-schema";
 
 export * from "./initiative-schema";
 export * from "./lifecycle-execution-schema";

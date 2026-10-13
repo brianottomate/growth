@@ -324,6 +324,8 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 - `/api/cron/x` — every 6h (X listening scan)
 - `/api/cron/affiliate` — daily 09:00 + weekly report Mon 14:00 (Impact.com monitor)
 - `/api/cron/channels` — daily 04:00 (channel stats refresh)
+- `/api/cron/retention` — monthly, 03:00 on the 1st (deletes raw `leads.hubspot_webhook_event`
+  rows older than 30 days, pending included; same mark as the daily sync backstop)
 
 ### Cron cadence is a Neon compute budget
 

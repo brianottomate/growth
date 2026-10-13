@@ -18,8 +18,8 @@ export default {
       }
     : {}),
   migrations: { schema: "drizzle", table: "__drizzle_migrations" },
-  // `leads` lives in its own Postgres schema (see leads-schema.ts) so it stays
-  // decoupled and droppable. introspection includes both schemas.
-  schemaFilter: ["public", "leads"],
+  // `leads` and `email` live in their own Postgres schemas (leads-schema.ts,
+  // email-list-schema.ts) so they stay decoupled and droppable.
+  schemaFilter: ["public", "leads", "email"],
   casing: "snake_case",
 } satisfies Config;

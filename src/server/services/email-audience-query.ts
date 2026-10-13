@@ -7,6 +7,22 @@ export function buildEmailAudienceQuery(
   definition: EmailAudienceDefinition,
   websiteId: string | null,
 ) {
+  const query = sourceQuery(definition, websiteId);
+  if (!definition.sampleSize) return query;
+  // FARM_FINGERPRINT orders the same list the same way every time, so a
+  // smaller sample is always inside a larger one.
+  return {
+    params: { ...query.params, sampleSize: definition.sampleSize },
+    sql: `SELECT * FROM (${query.sql}) ORDER BY FARM_FINGERPRINT(email) LIMIT @sampleSize`,
+  };
+}
+
+function sourceQuery(
+  definition: EmailAudienceDefinition,
+  websiteId: string | null,
+): { params: Record<string, string | number>; sql: string } {
+  if (definition.source === "list")
+    throw new Error("Uploaded lists are read from Growth, not the warehouse.");
   if (definition.source === "wander_cio")
     return {
       params: {

@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { parse } from "csv-parse/browser/esm/sync";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { orpc } from "@/orpc/client";
@@ -56,12 +57,31 @@ export function EmailAudiencesClient({
   const [savedDefinition, setSavedDefinition] = useState<string>();
   const [revision, setRevision] = useState<number | undefined>();
   const [snapshotId, setSnapshotId] = useState<string | undefined>();
+  const [listId, setListId] = useState<string | null>(null);
+  const [sample, setSample] = useState("");
+  const [upload, setUpload] = useState<{
+    fileName: string;
+    rows: Array<{
+      email: string;
+      firstName: string | null;
+      sourceId: string | null;
+    }>;
+  }>();
+  const fileInput = useRef<HTMLInputElement>(null);
   const definition: EmailAudienceDefinition = {
-    source: brand?.slug === "wander" ? "wander_cio" : "wanderos",
+    source: listId
+      ? "list"
+      : brand?.slug === "wander"
+        ? "wander_cio"
+        : "wanderos",
+    listId,
     clickedWithinDays:
-      brand?.slug === "wander" && days !== "all" ? Number(days) : null,
+      !listId && brand?.slug === "wander" && days !== "all"
+        ? Number(days)
+        : null,
     guestKinds: kinds,
     consentConfirmed: consent,
+    sampleSize: Number(sample) > 0 ? Math.floor(Number(sample)) : null,
   };
   const audiences = useQuery(
     orpc.newsletter.audiences.queryOptions({
@@ -74,6 +94,7 @@ export function EmailAudiencesClient({
     orpc.newsletter.previewAudience.mutationOptions(),
   );
   const save = useMutation(orpc.newsletter.saveAudience.mutationOptions());
+  const importList = useMutation(orpc.newsletter.importList.mutationOptions());
   const compile = useMutation(
     orpc.newsletter.compileAudience.mutationOptions(),
   );
@@ -99,6 +120,69 @@ export function EmailAudiencesClient({
     preview.reset();
     setSnapshotId(undefined);
   };
+  const startNew = () => {
+    setOpen(true);
+    setSelectedId(undefined);
+    setRevision(undefined);
+    setName("New audience");
+    setConsent(false);
+    setListId(null);
+    setSample("");
+    setUpload(undefined);
+    resetPreview();
+  };
+  // Parsed here so only the needed columns travel: a newsletter export is
+  // several megabytes, mostly columns we never use.
+  const readList = async (file: File) => {
+    const records: Array<Record<string, string>> = parse(await file.text(), {
+      columns: true,
+      bom: true,
+      skip_empty_lines: true,
+      relax_column_count: true,
+    });
+    const headers = Object.keys(records[0] ?? {});
+    const column = (pattern: RegExp) => headers.find((h) => pattern.test(h));
+    const email = column(/^e-?mail( address)?$/i);
+    if (!email) {
+      toast.error("The file needs an Email or Email Address column.");
+      return;
+    }
+    const firstName = column(/^first[ _]?name$/i);
+    const sourceId = column(/^(leid|id|contact id)$/i);
+    startNew();
+    setName(file.name.replace(/\.csv$/i, ""));
+    setUpload({
+      fileName: file.name,
+      rows: records.map((r) => ({
+        email: r[email] ?? "",
+        firstName: firstName ? (r[firstName] ?? null) : null,
+        sourceId: sourceId ? (r[sourceId] ?? null) : null,
+      })),
+    });
+  };
+  const uploadButton = (
+    <>
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) void readList(file).catch(report);
+        }}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={!brand || importList.isPending}
+        onClick={() => fileInput.current?.click()}
+      >
+        Upload list
+      </Button>
+    </>
+  );
   const savedAudiences = (
     <aside
       className={embedded ? "space-y-3" : "space-y-4 rounded-xl border p-4"}
@@ -163,6 +247,11 @@ export function EmailAudiencesClient({
             );
             setKinds(a.definition.guestKinds);
             setConsent(a.definition.consentConfirmed);
+            setListId(a.definition.listId ?? null);
+            setSample(
+              a.definition.sampleSize ? String(a.definition.sampleSize) : "",
+            );
+            setUpload(undefined);
             resetPreview();
             setSnapshotId(a.latestSnapshotId ?? undefined);
           }}
@@ -187,21 +276,17 @@ export function EmailAudiencesClient({
         </button>
       ))}
       {!embedded && (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={save.isPending || compile.isPending}
-          onClick={() => {
-            setOpen(true);
-            setSelectedId(undefined);
-            setRevision(undefined);
-            setName("New audience");
-            setConsent(false);
-            resetPreview();
-          }}
-        >
-          New audience
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={save.isPending || compile.isPending}
+            onClick={startNew}
+          >
+            New audience
+          </Button>
+          {uploadButton}
+        </div>
       )}
     </aside>
   );
@@ -219,11 +304,15 @@ export function EmailAudiencesClient({
       </label>
       <p className="text-sm text-muted-foreground">
         Source:{" "}
-        {brand?.slug === "wander"
-          ? "Wander’s Customer.io warehouse export"
-          : "This brand’s WanderOS guests and signups"}
+        {upload
+          ? `${upload.fileName} · ${upload.rows.length.toLocaleString()} rows, not uploaded yet`
+          : listId
+            ? "An uploaded list"
+            : brand?.slug === "wander"
+              ? "Wander’s Customer.io warehouse export"
+              : "This brand’s WanderOS guests and signups"}
       </p>
-      {brand?.slug === "wander" ? (
+      {upload || listId ? null : brand?.slug === "wander" ? (
         <label className="block text-sm">
           Email engagement
           <select
@@ -271,6 +360,27 @@ export function EmailAudiencesClient({
           ))}
         </fieldset>
       )}
+      {!upload && (
+        <label className="block text-sm">
+          Random sample
+          <Input
+            type="number"
+            min={1}
+            placeholder="Everyone"
+            value={sample}
+            className="mt-2 w-40"
+            onChange={(e) => {
+              setSample(e.target.value);
+              resetPreview();
+            }}
+          />
+          <span className="mt-2 block text-xs text-muted-foreground">
+            The same people every time, and a smaller sample sits inside a
+            larger one. Sending one email to 100, then 1,000, then everyone
+            reaches each person once.
+          </span>
+        </label>
+      )}
       <label className="flex items-start gap-2 text-sm">
         <input
           type="checkbox"
@@ -283,73 +393,116 @@ export function EmailAudiencesClient({
         I have confirmed marketing permission for this audience. A booking alone
         does not establish it.
       </label>
-      <div className="flex flex-wrap gap-2">
+      {upload ? (
         <Button
-          loading={preview.isPending}
+          loading={importList.isPending}
+          disabled={!name.trim() || !brandId}
           onClick={() =>
-            preview.mutate({ brandId, definition }, { onError: report })
-          }
-        >
-          {preview.isPending ? "Previewing recipients…" : "Preview audience"}
-        </Button>
-        <Button
-          variant="outline"
-          loading={save.isPending}
-          disabled={!name.trim()}
-          onClick={() =>
-            save.mutate(
+            importList.mutate(
               {
                 brandId,
-                id: selectedId,
                 name,
-                definition,
+                fileName: upload.fileName,
+                consentConfirmed: consent,
+                rows: upload.rows,
               },
               {
-                onSuccess: (a) => {
+                onSuccess: (result) => {
+                  const a = result.audience;
+                  setUpload(undefined);
                   setSelectedId(a.id);
                   setRevision(a.revision);
+                  setListId(a.definition.listId);
                   setSavedDefinition(emailAudienceDefinitionKey(a.definition));
                   void audiences.refetch();
-                  toast.success("Audience saved");
+                  toast.success(
+                    `${result.imported.toLocaleString()} addresses saved` +
+                      (result.duplicates || result.invalid
+                        ? ` · ${result.duplicates} duplicates and ${result.invalid} invalid dropped`
+                        : "") +
+                      (result.namesCleared
+                        ? ` · ${result.namesCleared.toLocaleString()} generated first names cleared`
+                        : ""),
+                  );
                 },
                 onError: report,
               },
             )
           }
         >
-          {save.isPending ? "Saving audience…" : "Save audience"}
+          {importList.isPending ? "Uploading list…" : "Upload list"}
         </Button>
-        <Button
-          variant="outline"
-          loading={compile.isPending}
-          disabled={
-            !selectedId ||
-            !previewMatches ||
-            preview.isPending ||
-            save.isPending ||
-            savedDefinition !== emailAudienceDefinitionKey(definition) ||
-            (preview.variables
-              ? emailAudienceDefinitionKey(preview.variables.definition)
-              : undefined) !== emailAudienceDefinitionKey(definition)
-          }
-          onClick={() =>
-            compile.mutate(
-              { audienceId: selectedId! },
-              {
-                onSuccess: (s) => {
-                  setSnapshotId(s.id);
-                  void audiences.refetch();
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            loading={preview.isPending}
+            onClick={() =>
+              preview.mutate({ brandId, definition }, { onError: report })
+            }
+          >
+            {preview.isPending ? "Previewing recipients…" : "Preview audience"}
+          </Button>
+          <Button
+            variant="outline"
+            loading={save.isPending}
+            disabled={!name.trim()}
+            onClick={() =>
+              save.mutate(
+                {
+                  brandId,
+                  id: selectedId,
+                  name,
+                  definition,
                 },
-                onError: report,
-              },
-            )
-          }
-        >
-          {compile.isPending
-            ? "Compiling recipients…"
-            : "Compile saved revision"}
-        </Button>
-      </div>
+                {
+                  onSuccess: (a) => {
+                    setSelectedId(a.id);
+                    setRevision(a.revision);
+                    setSavedDefinition(
+                      emailAudienceDefinitionKey(a.definition),
+                    );
+                    void audiences.refetch();
+                    toast.success("Audience saved");
+                  },
+                  onError: report,
+                },
+              )
+            }
+          >
+            {save.isPending ? "Saving audience…" : "Save audience"}
+          </Button>
+          <Button
+            variant="outline"
+            loading={compile.isPending}
+            disabled={
+              !selectedId ||
+              !previewMatches ||
+              preview.isPending ||
+              save.isPending ||
+              savedDefinition !== emailAudienceDefinitionKey(definition) ||
+              (preview.variables
+                ? emailAudienceDefinitionKey(preview.variables.definition)
+                : undefined) !== emailAudienceDefinitionKey(definition)
+            }
+            onClick={() =>
+              compile.mutate(
+                { audienceId: selectedId! },
+                {
+                  onSuccess: (s) => {
+                    setSnapshotId(s.id);
+                    void audiences.refetch();
+                  },
+                  onError: report,
+                },
+              )
+            }
+          >
+            {compile.isPending
+              ? "Compiling recipients…"
+              : "Compile saved revision"}
+          </Button>
+        </div>
+      )}
       {preview.error && (
         <p role="alert" className="text-sm text-destructive">
           {preview.error.message}
@@ -453,17 +606,11 @@ export function EmailAudiencesClient({
         variant={audiences.data?.length ? "outline" : "default"}
         size="sm"
         disabled={save.isPending || compile.isPending}
-        onClick={() => {
-          setOpen(true);
-          setSelectedId(undefined);
-          setRevision(undefined);
-          setName("New audience");
-          setConsent(false);
-          resetPreview();
-        }}
+        onClick={startNew}
       >
         New audience
       </Button>
+      {uploadButton}
       <Button
         size="sm"
         variant="outline"

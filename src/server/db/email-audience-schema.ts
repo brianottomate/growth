@@ -35,7 +35,8 @@ export const emailAudienceTable = audienceTable(
   (t) => [index("email_audience_brand_idx").on(t.brandId)],
 );
 
-/** Warehouse references and audit metadata only; recipient PII stays in BigQuery. */
+/** References and audit metadata only; recipients stay in BigQuery or, for an
+ * uploaded list, in email.list_member. */
 export const emailAudienceSnapshotTable = audienceTable(
   "email_audience_snapshot",
   (t) => ({
@@ -51,8 +52,10 @@ export const emailAudienceSnapshotTable = audienceTable(
     definition: jsonb().$type<EmailAudienceDefinition>().notNull(),
     querySql: t.text().notNull(),
     queryHash: t.text().notNull(),
-    jobId: t.text().notNull(),
-    tableId: t.text().notNull(),
+    /** The warehouse compile job and table. An uploaded list has neither:
+     * its members never change, so the definition alone fixes who is in it. */
+    jobId: t.text(),
+    tableId: t.text(),
     status: t
       .text()
       .$type<"compiling" | "ready" | "failed">()

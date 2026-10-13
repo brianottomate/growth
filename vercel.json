@@ -33,6 +33,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/retention",
+      "schedule": "0 3 1 * *"
+    },
+    {
       "path": "/api/cron/meta-leadgen",
       "schedule": "*/20 13-22 * * 1-5"
     },

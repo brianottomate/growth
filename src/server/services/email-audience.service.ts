@@ -7,6 +7,7 @@ import {
   brandTable,
   emailAudienceTable,
   emailAudienceSnapshotTable,
+  emailListTable,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { getBigQueryClient } from "@/server/clients/bigquery.client";
@@ -18,6 +19,14 @@ import {
   type EmailAudienceRecipient,
 } from "@/lib/email-audience";
 import { buildEmailAudienceQuery } from "./email-audience-query";
+import {
+  createEmailList,
+  emailListAudienceCount,
+  type EmailListUploadRow,
+  previewEmailListMembers,
+  readEmailListPage,
+  requireBrandEmailList,
+} from "./email-list.service";
 
 const PROJECT = "wander-9fc9c";
 const DATASET = "growth_email_audiences";
@@ -52,6 +61,20 @@ const snapshotSummary = (
   createdAt: snapshot.createdAt.toISOString(),
   blockers: emailAudienceBlockers(snapshot.definition),
 });
+
+/** Source rules, plus: an uploaded list must be this brand's own. */
+async function assertAudienceSource(
+  definition: EmailAudienceDefinition,
+  brand: { id: string; slug: string | null; wanderOsWebsiteId: string | null },
+) {
+  assertEmailAudienceSource(definition, {
+    slug: brand.slug,
+    websiteId: brand.wanderOsWebsiteId,
+  });
+  return definition.listId
+    ? requireBrandEmailList(definition.listId, brand.id)
+    : null;
+}
 
 export async function listEmailAudiences(
   input: { brandId: string },
@@ -111,10 +134,7 @@ export async function saveEmailAudience(
 ) {
   const brand = await requireBrand(input.brandId, actor);
   const definition = emailAudienceDefinitionSchema.parse(input.definition);
-  assertEmailAudienceSource(definition, {
-    slug: brand.slug,
-    websiteId: brand.wanderOsWebsiteId,
-  });
+  await assertAudienceSource(definition, brand);
   let id: string;
   if (input.id) {
     const { audience } = await requireAudience(input.id, actor);
@@ -150,10 +170,18 @@ export async function previewEmailAudience(
 ) {
   const brand = await requireBrand(input.brandId, actor);
   const definition = emailAudienceDefinitionSchema.parse(input.definition);
-  assertEmailAudienceSource(definition, {
-    slug: brand.slug,
-    websiteId: brand.wanderOsWebsiteId,
-  });
+  const list = await assertAudienceSource(definition, brand);
+  if (list)
+    return {
+      sourceLoadedThrough: null,
+      candidateCount: emailListAudienceCount(list, definition.sampleSize),
+      sample: await previewEmailListMembers(list),
+      querySql: `Uploaded list ${list.id} (${list.memberCount} members)`,
+      estimatedBytes: null,
+      blockers: emailAudienceBlockers(definition),
+      source: definition.source,
+      checkedAt: new Date().toISOString(),
+    };
   const query = buildEmailAudienceQuery(definition, brand.wanderOsWebsiteId);
   const client = await getBigQueryClient();
   const [estimate] = await client.createQueryJob({
@@ -210,27 +238,8 @@ export async function previewEmailAudience(
   };
 }
 
-export async function compileEmailAudience(
-  input: { audienceId: string },
-  actor: Actor,
-) {
-  const { audience, brand } = await requireAudience(input.audienceId, actor);
-  assertEmailAudienceSource(audience.definition, {
-    slug: brand.slug,
-    websiteId: brand.wanderOsWebsiteId,
-  });
-  const query = buildEmailAudienceQuery(
-    audience.definition,
-    brand.wanderOsWebsiteId,
-  );
+async function audienceDataset() {
   const client = await getBigQueryClient();
-  await client.createQueryJob({
-    query: query.sql,
-    params: query.params,
-    location: LOCATION,
-    dryRun: true,
-    maximumBytesBilled: MAXIMUM_BYTES,
-  });
   const dataset = client.dataset(DATASET, { projectId: PROJECT });
   const [exists] = await dataset.exists();
   if (!exists) {
@@ -244,6 +253,90 @@ export async function compileEmailAudience(
       if (!nowExists) throw error;
     }
   }
+  return dataset;
+}
+
+/** Upload an operator's list and save it as the brand's audience. */
+export async function importEmailList(
+  input: {
+    brandId: string;
+    name: string;
+    fileName: string | null;
+    consentConfirmed: boolean;
+    rows: EmailListUploadRow[];
+  },
+  actor: Actor,
+) {
+  const brand = await requireBrand(input.brandId, actor);
+  const list = await createEmailList({
+    brandId: brand.id,
+    name: input.name,
+    fileName: input.fileName,
+    createdBy: actor.userId,
+    rows: input.rows,
+  });
+  const audience = await saveEmailAudience(
+    {
+      brandId: brand.id,
+      name: input.name,
+      definition: emailAudienceDefinitionSchema.parse({
+        source: "list",
+        listId: list.id,
+        clickedWithinDays: null,
+        consentConfirmed: input.consentConfirmed,
+      }),
+    },
+    actor,
+  );
+  return {
+    audience,
+    imported: list.memberCount,
+    invalid: list.invalidCount,
+    duplicates: list.duplicateCount,
+    namesCleared: list.namesCleared,
+  };
+}
+
+export async function compileEmailAudience(
+  input: { audienceId: string },
+  actor: Actor,
+) {
+  const { audience, brand } = await requireAudience(input.audienceId, actor);
+  const list = await assertAudienceSource(audience.definition, brand);
+  if (list) {
+    // Members never change, so the definition alone fixes who is in it.
+    const description = `Uploaded list ${list.id}, sample ${audience.definition.sampleSize ?? "all"}`;
+    const [snapshot] = await db
+      .insert(emailAudienceSnapshotTable)
+      .values({
+        audienceId: audience.id,
+        revision: audience.revision,
+        definition: audience.definition,
+        querySql: description,
+        queryHash: createHash("sha256").update(description).digest("hex"),
+        status: "ready",
+        recipientCount: emailListAudienceCount(
+          list,
+          audience.definition.sampleSize,
+        ),
+        expiresAt: new Date(Date.now() + 30 * 86400000),
+      })
+      .returning();
+    return snapshotSummary(snapshot!);
+  }
+  const query = buildEmailAudienceQuery(
+    audience.definition,
+    brand.wanderOsWebsiteId,
+  );
+  const client = await getBigQueryClient();
+  await client.createQueryJob({
+    query: query.sql,
+    params: query.params,
+    location: LOCATION,
+    dryRun: true,
+    maximumBytesBilled: MAXIMUM_BYTES,
+  });
+  const dataset = await audienceDataset();
   const id = createId("easnap");
   const tableId = `snapshot_${id}`;
   const jobId = `compile_${id}`;
@@ -300,7 +393,9 @@ export async function getEmailAudienceSnapshot(
   });
   if (!snapshot) throw new Error("Snapshot not found.");
   await requireAudience(snapshot.audienceId, actor);
-  if (snapshot.status !== "compiling") return snapshotSummary(snapshot);
+  // Only warehouse snapshots compile; an uploaded list's is ready at once.
+  if (snapshot.status !== "compiling" || !snapshot.jobId || !snapshot.tableId)
+    return snapshotSummary(snapshot);
   const client = await getBigQueryClient();
   const [metadata] = (await client
     .job(snapshot.jobId, { location: LOCATION, projectId: PROJECT })
@@ -337,13 +432,32 @@ export async function readEmailAudienceBatch(
   if (snapshot.status !== "ready") throw new Error("Snapshot is not ready.");
   if (Date.parse(snapshot.expiresAt) <= Date.now())
     throw new Error("Snapshot expired. Compile a new audience.");
+  const pageSize = Math.min(10000, Math.max(1, input.pageSize ?? 500));
+  if (snapshot.definition.listId) {
+    const list = await db.query.emailListTable.findFirst({
+      where: eq(emailListTable.id, snapshot.definition.listId),
+    });
+    if (!list) throw new Error("The uploaded list no longer exists.");
+    const page = await readEmailListPage({
+      list,
+      sampleSize: snapshot.definition.sampleSize,
+      pageSize,
+      pageToken: input.pageToken,
+    });
+    return {
+      ...page,
+      snapshotId: snapshot.id,
+      requiresLiveEligibilityCheck: true as const,
+    };
+  }
+  if (!snapshot.tableId) throw new Error("Snapshot has no warehouse table.");
   const client = await getBigQueryClient();
   const [rows, next] = await client
     .dataset(DATASET, { projectId: PROJECT })
     .table(snapshot.tableId)
     .getRows({
       autoPaginate: false,
-      maxResults: Math.min(10000, Math.max(1, input.pageSize ?? 500)),
+      maxResults: pageSize,
       pageToken: input.pageToken,
     });
   return {

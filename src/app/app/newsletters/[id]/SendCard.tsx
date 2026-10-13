@@ -152,7 +152,7 @@ export function SendCard({
                 })
               }
               disabled={
-                !snapshotId || prepare.isPending || dirty || !creativeApproved
+                !snapshotId || prepare.isPending || dirty || !canDispatch
               }
               className={buttonClass}
             >
@@ -195,7 +195,7 @@ export function SendCard({
                       onClick={() =>
                         approve.mutate({ messageSendId: latest.id })
                       }
-                      disabled={approve.isPending || !creativeApproved}
+                      disabled={approve.isPending || !canDispatch}
                       className={buttonClass}
                     >
                       <Check className="size-4" /> Approve

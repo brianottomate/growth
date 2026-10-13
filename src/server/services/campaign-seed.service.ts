@@ -62,9 +62,11 @@ export async function prepareCampaignSeed(
       name: `${brand.name} · past bookers seed`,
       definition: {
         source: "wanderos",
+        listId: null,
         guestKinds: ["bookers"],
         clickedWithinDays: null,
         consentConfirmed: false,
+        sampleSize: null,
       },
     },
     warehouseActor,

@@ -34,6 +34,36 @@ catalog exposes `emailRead.audiences`, `emailRead.previewAudience`,
 validated parameters rather than running arbitrary SQL. Customer.io API read tools
 are not added.
 
+## Uploaded lists and send waves
+
+"Upload list" takes a CSV with an `Email` or `Email Address` column (a
+Mailchimp export works as is). The browser sends only email, first name and
+id; the server lowercases, deduplicates, drops invalid addresses and clears
+bot-generated first names (`GYCETzIUgVASAdh`) so `{{first_name|there}}` falls
+back. The list is stored in Growth's own database, in the `email` Postgres
+schema (`email.list`, `email.list_member`), not in the warehouse. Like `leads`,
+that schema references only `brand`, so it can move to a separate email service
+as it is. Members never change; a new export is a new list. A request is capped
+by Vercel at 4.5 MB, so a list much beyond about 50,000 rows needs a chunked
+upload first.
+
+Any audience can set a random sample. Uploaded lists order members by
+`sha256(email)`, stored on the row at upload; warehouse audiences use
+`FARM_FINGERPRINT(email)`. Either way a sample of 100 always sits inside a
+sample of 1,000. An uploaded list's snapshot needs no compiling: its members
+are fixed, so the definition alone decides who is in it.
+
+One email reaches an address at most once across all its sends: prepare the
+same issue against the 100 sample, then the 1,000, then everyone, and each wave
+skips the people an earlier wave reached (`already_sent`). A published issue
+can take further waves. This per-recipient check belongs to Postmark's batch
+endpoint; once the Bulk API is enabled, a wave becomes one bulk request over a
+range of sample ranks and the per-recipient rows can go.
+
+Uploaded lists carry no WanderOS opt-outs. The brand's Postmark broadcast stream
+holds their unsubscribes, bounces and complaints, and the dispatcher records
+those as skipped.
+
 ## Selection and sending are separate
 
 Customer.io people/attributes are historical exports. The query chooses each

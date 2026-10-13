@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 
-import { and, eq, inArray, lt, or } from "drizzle-orm";
+import { and, eq, inArray, lt, ne, or } from "drizzle-orm";
 
 import { emailDocumentDraftSchema } from "@/lib/email-document";
 import {
@@ -151,7 +151,8 @@ export async function prepareBrandSend(
     input.organizationId,
   );
   const blockers = brandSendBlockers(spot.brand);
-  if (spot.status !== "approved")
+  // Published: an earlier wave of this email went out; the next one may follow.
+  if (!["approved", "published"].includes(spot.status))
     throw new Error("Approve the email creative before preparing delivery.");
   if (blockers.length) throw new Error(blockers.join(" "));
   const snapshot = await getEmailAudienceSnapshot(
@@ -283,7 +284,9 @@ async function failSend(id: string, message: string) {
  * it again) or whose run died in `sending`. The per-guest ledger means a
  * resumed send only reaches guests it has not already claimed.
  * Before the first guest: the email must still be the approved revision and
- * every link must open. Per page of guests: WanderOS opt-outs are dropped,
+ * every link must open. Per page of guests: WanderOS opt-outs are dropped
+ * (uploaded lists have none; the brand's Postmark stream holds their
+ * unsubscribes), so is anyone an earlier send of this email already reached,
  * each address is written to the ledger before Postmark is called, and
  * Postmark's own suppressions come back as skipped rather than failed.
  */
@@ -362,33 +365,80 @@ export async function dispatchBrandSend(input: {
       if (broken.length) throw new Error(`Broken links: ${broken.join(", ")}`);
     }
 
-    const websiteId = spot.brand.wanderOsWebsiteId;
-    if (!websiteId)
-      throw new Error(
-        "The brand has no WanderOS website to read opt-outs from.",
-      );
-    const optedOut = await websiteEmailOptOuts(websiteId);
+    const source = (
+      await getEmailAudienceSnapshot({ snapshotId: audience.snapshotId }, actor)
+    ).definition.source;
+    let optedOut = new Set<string>();
+    if (source !== "list") {
+      const websiteId = spot.brand.wanderOsWebsiteId;
+      if (!websiteId)
+        throw new Error(
+          "The brand has no WanderOS website to read opt-outs from.",
+        );
+      optedOut = await websiteEmailOptOuts(websiteId);
+    }
     const token = await postmarkServerToken(audience.serverId);
     const sender = snapshot.sender;
 
     const sendPage = async (recipients: EmailAudienceRecipient[]) => {
+      const emails = [
+        ...new Set(
+          recipients.map((recipient) => recipient.email.trim().toLowerCase()),
+        ),
+      ];
+      // Waves of one email (100, then 1,000, then everyone) overlap by design.
+      const reached = new Set(
+        emails.length
+          ? (
+              await db
+                .select({ email: messageSendRecipientTable.email })
+                .from(messageSendRecipientTable)
+                .innerJoin(
+                  messageSendTable,
+                  eq(
+                    messageSendTable.id,
+                    messageSendRecipientTable.messageSendId,
+                  ),
+                )
+                .where(
+                  and(
+                    eq(messageSendTable.platformPostId, spot.id),
+                    ne(messageSendTable.id, claimed.id),
+                    inArray(messageSendRecipientTable.status, [
+                      "pending",
+                      "sent",
+                    ]),
+                    inArray(messageSendRecipientTable.email, emails),
+                  ),
+                )
+            ).map((row) => row.email)
+          : [],
+      );
       const eligible = await filterEmailAudienceBatch(
         recipients,
-        async (emails) =>
-          new Map(emails.map((email) => [email, !optedOut.has(email)])),
+        async (batch) =>
+          new Map(
+            batch.map((email) => [
+              email,
+              !optedOut.has(email) && !reached.has(email),
+            ]),
+          ),
       );
-      const skipped = recipients
-        .map((recipient) => recipient.email.trim().toLowerCase())
-        .filter((email) => optedOut.has(email));
+      const skipped = emails.flatMap((email) =>
+        optedOut.has(email)
+          ? [{ email, reason: "opted_out" }]
+          : reached.has(email)
+            ? [{ email, reason: "already_sent" }]
+            : [],
+      );
       if (skipped.length)
         await db
           .insert(messageSendRecipientTable)
           .values(
-            [...new Set(skipped)].map((email) => ({
+            skipped.map((row) => ({
               messageSendId: claimed.id,
-              email,
+              ...row,
               status: "skipped" as const,
-              reason: "opted_out",
             })),
           )
           .onConflictDoNothing();

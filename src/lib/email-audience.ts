@@ -2,13 +2,17 @@ import { z } from "zod";
 
 /** Parameters are editable by chat; source SQL and tenant scope are owned by code. */
 export const emailAudienceDefinitionSchema = z.object({
-  source: z.enum(["wander_cio", "wanderos"]),
+  source: z.enum(["wander_cio", "wanderos", "list"]),
+  /** The uploaded list (email.list), for `source: "list"`. */
+  listId: z.string().min(1).nullable().default(null),
   clickedWithinDays: z.number().int().min(1).max(730).nullable().default(90),
   guestKinds: z
     .array(z.enum(["bookers", "signups"]))
     .min(1)
     .default(["bookers", "signups"]),
   consentConfirmed: z.boolean().default(false),
+  /** A stable random subset of this size, for test sends and send waves. */
+  sampleSize: z.number().int().min(1).max(1_000_000).nullable().default(null),
 });
 export type EmailAudienceDefinition = z.infer<
   typeof emailAudienceDefinitionSchema
@@ -27,6 +31,12 @@ export function assertEmailAudienceSource(
   definition: EmailAudienceDefinition,
   brand: { slug: string | null; websiteId: string | null },
 ) {
+  if ((definition.source === "list") !== Boolean(definition.listId))
+    throw new Error("Only uploaded-list audiences name a list.");
+  if (definition.source === "list" && definition.clickedWithinDays !== null)
+    throw new Error(
+      "Click history is not available for uploaded lists. Choose no click filter.",
+    );
   if (definition.source === "wander_cio" && brand.slug !== "wander")
     throw new Error(
       "Wander's Customer.io export is only available to the Wander brand.",
@@ -95,8 +105,10 @@ export function emailAudienceDefinitionKey(
   const definition = emailAudienceDefinitionSchema.parse(input);
   return JSON.stringify([
     definition.source,
+    definition.listId,
     definition.clickedWithinDays,
     [...new Set(definition.guestKinds)].sort(),
     definition.consentConfirmed,
+    definition.sampleSize,
   ]);
 }
