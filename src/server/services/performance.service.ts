@@ -266,7 +266,13 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
         },
       },
       reports: {
-        columns: { id: true, cycleId: true, status: true },
+        columns: {
+          id: true,
+          cycleId: true,
+          startDate: true,
+          endDate: true,
+          status: true,
+        },
       },
     },
   });
@@ -317,8 +323,12 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
                 emails: 0,
                 influencers: 0,
               },
+              // A report covers its own window (often launch to date), so
+              // it counts for every month it overlaps.
               hasReport: account.reports.some(
-                (report) => report.cycleId === current.id,
+                (report) =>
+                  report.startDate.slice(0, 7) <= current.period &&
+                  report.endDate.slice(0, 7) >= current.period,
               ),
             }
           : null,

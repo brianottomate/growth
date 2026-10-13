@@ -11,7 +11,7 @@ import type { AdPreviewPage } from "@/server/services/ad-preview.service";
 
 import { CatalogCollectionPreview } from "@/app/app/performance/clients/[brandSlug]/catalog/CatalogPreview";
 
-import { EXPORT_HIDE, PngExport } from "./PngExport";
+import { EXPORT_HIDE, PngExport } from "@/components/png-export";
 
 export function AdPreviewBoard({
   token,
@@ -40,7 +40,12 @@ export function AdPreviewBoard({
             </span>
           </div>
           <div {...{ [EXPORT_HIDE]: "" }} className="flex gap-2 print:hidden">
-            <PngExport token={token} filename={filename} />
+            <PngExport
+              mediaBase={`/ad-preview/${token}`}
+              filename={filename}
+              sectionsLabel="Each ad / catalog (zip)"
+              sheetHref={`/ad-preview/${token}/sheet?download=1`}
+            />
             <Button variant="outline" size="sm" onClick={() => window.print()}>
               <Printer className="size-3.5" />
               Save as PDF

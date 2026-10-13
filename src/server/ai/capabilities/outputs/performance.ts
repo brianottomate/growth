@@ -179,8 +179,10 @@ export const listPerformanceAccountsActionOutputSchema = z.strictObject({
       ),
       reports: z.array(
         z.strictObject({
-          cycleId: z.string(),
+          cycleId: z.string().nullable(),
+          endDate: z.string(),
           id: z.string(),
+          startDate: z.string(),
           status: z.enum(["draft", "published"]),
         }),
       ),
@@ -217,7 +219,7 @@ export const getPerformanceAccountActionOutputSchema = z.strictObject({
     properties: z.array(propertyItemSchema),
     reports: z.array(
       z.strictObject({
-        cycleId: z.string(),
+        cycleId: z.string().nullable(),
         id: z.string(),
         periodLabel: z.string(),
         publishedAt: z.iso.datetime().nullable(),

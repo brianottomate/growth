@@ -33,14 +33,14 @@ const MAX_EDGE = 1200;
  * route, downscaled, JPEG unless it is a PNG (logos keep their transparency).
  * Embedding dozens of full-size originals stalls the capture outright.
  */
-function inline(token: string, src: string) {
+function inline(mediaBase: string, src: string) {
   let data = inlined.get(src);
   if (!data) {
     data = (async () => {
       const response = await fetch(
         new URL(src, location.href).origin === location.origin
           ? src
-          : `/ad-preview/${token}/media?u=${encodeURIComponent(src)}`,
+          : `${mediaBase}/media?u=${encodeURIComponent(src)}`,
       );
       if (!response.ok) throw new Error(`Image ${response.status}`);
       const blob = await response.blob();
@@ -71,7 +71,7 @@ function inline(token: string, src: string) {
  * through this link's media route (R2 sends no CORS headers, so the capture
  * could not read them), and return a function that puts them back.
  */
-async function inlineImages(root: HTMLElement, token: string) {
+async function inlineImages(root: HTMLElement, mediaBase: string) {
   const images = [...root.querySelectorAll("img")].filter((img) => {
     const src = img.currentSrc || img.src;
     return src.startsWith("http://") || src.startsWith("https://");
@@ -88,7 +88,7 @@ async function inlineImages(root: HTMLElement, token: string) {
     Array.from({ length: Math.min(3, sources.length) }, async () => {
       while (next < sources.length) {
         const src = sources[next++]!;
-        data.set(src, await inline(token, src));
+        data.set(src, await inline(mediaBase, src));
       }
     }),
   );
@@ -120,16 +120,22 @@ async function inlineImages(root: HTMLElement, token: string) {
 }
 
 /**
- * PNG exports. Two are drawn from the page itself in the browser: the whole
- * page as one tall image (a big screenshot), or one image per ad, zipped.
- * The third is the composed sheet, a fixed layout rendered on the server.
+ * PNG exports of a public link page, drawn in the browser: the whole page as
+ * one tall image (a big screenshot), or one image per `[data-export-ad]`
+ * section, zipped. With `sheetHref`, also the link's composed sheet, a fixed
+ * layout rendered on the server. `mediaBase` is the link's path; its `/media`
+ * route serves the page's images same-origin.
  */
 export function PngExport({
-  token,
+  mediaBase,
   filename,
+  sectionsLabel,
+  sheetHref,
 }: {
-  token: string;
+  mediaBase: string;
   filename: string;
+  sectionsLabel?: string;
+  sheetHref?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const run = async (mode: "page" | "ads") => {
@@ -138,7 +144,7 @@ export function PngExport({
     setBusy(true);
     let restore: (() => void) | null = null;
     try {
-      restore = await inlineImages(root, token);
+      restore = await inlineImages(root, mediaBase);
       const { toPng } = await import("html-to-image");
       const options = {
         backgroundColor: "#ffffff",
@@ -196,14 +202,16 @@ export function PngExport({
         <DropdownMenuItem onSelect={() => void run("page")}>
           Full page (one image)
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void run("ads")}>
-          Each ad / catalog (zip)
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <a href={`/ad-preview/${token}/sheet?download=1`}>
-            Composed sheet (server)
-          </a>
-        </DropdownMenuItem>
+        {sectionsLabel && (
+          <DropdownMenuItem onSelect={() => void run("ads")}>
+            {sectionsLabel}
+          </DropdownMenuItem>
+        )}
+        {sheetHref && (
+          <DropdownMenuItem asChild>
+            <a href={sheetHref}>Composed sheet (server)</a>
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -9,6 +9,14 @@ import {
 
 import { organizationTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
+import type {
+  PerformanceReportChannel,
+  PerformanceReportDeliverable,
+  PerformanceReportHighlight,
+  PerformanceReportMetrics,
+  PerformanceReportOtherBookings,
+  PerformanceReportSource,
+} from "@/lib/performance-report";
 import { createId } from "./utils";
 
 // ---- PERFORMANCE (the commercial layer of Performance by Wander) ------------
@@ -287,7 +295,7 @@ export const performanceCycleTable = pgTable(
 export type PerformanceCycle = typeof performanceCycleTable.$inferSelect;
 export type PerformanceCycleInsert = typeof performanceCycleTable.$inferInsert;
 
-// ---- REPORT (customer-facing snapshot for one cycle) ------------------------
+// ---- REPORT (customer-facing snapshot of results) ---------------------------
 
 export const performanceReportStatusEnum = pgEnum("performance_report_status", [
   "draft",
@@ -296,25 +304,16 @@ export const performanceReportStatusEnum = pgEnum("performance_report_status", [
 export type PerformanceReportStatus =
   (typeof performanceReportStatusEnum.enumValues)[number];
 
-/** Deterministic numbers computed at generation time; the narrative is written
- * around them (affiliate-report pattern). Snapshot, not a live join — what was
- * reported must stay readable after the underlying rows move on. */
-export type PerformanceReportMetrics = {
-  spend?: number;
-  impressions?: number;
-  reach?: number;
-  clicks?: number;
-  ctr?: number;
-  emailSends?: number;
-  propertyViews?: number;
-  bookings?: number;
-  [key: string]: number | undefined;
-};
-
 /**
  * Customers get no Growth access: a report is served at a tokenized public URL
- * (the pregen claim-link pattern) and delivered by email. `token` is the whole
- * credential — treat it like one.
+ * (the pregen claim-link pattern). `token` is the whole credential — treat it
+ * like one.
+ *
+ * A report covers its own date window, which need not match a billing month
+ * (a first report is usually "launch to date"), so the cycle link is optional.
+ * The content is a snapshot written by whoever pulls the data; its shape and
+ * validation live in `@/lib/performance-report`, and `sources` records where
+ * each number came from.
  */
 export const performanceReportTable = pgTable(
   "performance_report",
@@ -323,22 +322,39 @@ export const performanceReportTable = pgTable(
       .text()
       .primaryKey()
       .$defaultFn(() => createId("perfrpt")),
-    cycleId: t
-      .text()
-      .references(() => performanceCycleTable.id, { onDelete: "cascade" })
-      .notNull(),
-    // Denormalized so account-level report lists skip the cycle join.
     accountId: t
       .text()
       .references(() => performanceAccountTable.id, { onDelete: "cascade" })
       .notNull(),
+    cycleId: t
+      .text()
+      .references(() => performanceCycleTable.id, { onDelete: "set null" }),
 
-    periodLabel: t.text().notNull(), // "August 2026", "Week 35"
+    periodLabel: t.text().notNull(), // "Launch to date", "October 2026"
+    startDate: t.date({ mode: "string" }).notNull(),
+    endDate: t.date({ mode: "string" }).notNull(),
     token: t.text().notNull(),
 
-    metrics: t.jsonb().$type<PerformanceReportMetrics>(),
+    channels: t.jsonb().$type<PerformanceReportChannel[]>().notNull(),
+    metrics: t.jsonb().$type<PerformanceReportMetrics>().notNull(),
+    otherBookings: t
+      .jsonb()
+      .$type<PerformanceReportOtherBookings[]>()
+      .default([])
+      .notNull(),
+    highlights: t
+      .jsonb()
+      .$type<PerformanceReportHighlight[]>()
+      .default([])
+      .notNull(),
+    deliverables: t
+      .jsonb()
+      .$type<PerformanceReportDeliverable[]>()
+      .default([])
+      .notNull(),
+    sources: t.jsonb().$type<PerformanceReportSource[]>().default([]).notNull(),
     narrative: t.text(),
-    recommendations: t.text(),
+    recommendations: t.text(), // shown as "Next steps"
 
     status: performanceReportStatusEnum().default("draft").notNull(),
     publishedAt: t.timestamp(),
