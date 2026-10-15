@@ -392,3 +392,18 @@ Provider-declared unselectable accounts also block the Meta readiness line and
 setup summary, independently of funding presence. Clients sharing an explicit
 destination share its provider read within one load to avoid duplicate quota
 usage; a later page load or handoff reads billing again.
+
+### Sites Performance booking attribution (2026-10-15)
+
+Amplitude owns event history; Growth owns the Performance booking projection.
+The unshipped generic `amplitude_event` archive was replaced with one
+`performance_booking` per backend booking ID. Existing website → brand → live
+Performance-account relationships own customer assignment; replay cannot change
+that ownership. Website IDs are not unique across brands today, so ambiguous
+matches are explicitly discarded rather than selecting an arbitrary customer.
+Only client bookings with Meta/email evidence are retained. Provider retries
+reuse booking identity, and `after()` enriches the durable booking rather than
+requiring an event inbox. Existing workflow authentication is reused. Current
+name-based marketing tags support possible attribution; exact scoped campaign
+or sent-message identifiers can confirm a matching touch. There is no automatic
+backfill, lifecycle send or report publication in this change.

@@ -225,6 +225,13 @@
       "when": 1792084702102,
       "tag": "0030_email_opt_out",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792104251333,
+      "tag": "0031_performance_bookings",
+      "breakpoints": true
     }
   ]
 }

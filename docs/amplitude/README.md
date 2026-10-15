@@ -1,0 +1,47 @@
+# Sites bookings for Performance
+
+Only the Sites Amplitude project (767045) forwards `Order Completed` to Growth. Marketplace reporting stays in Amplitude. The existing Marketplace funnel receiver and abandonment workflow are unchanged.
+
+## What happens to a booking
+
+1. Authenticate with the existing `CUSTOMERIO_WEBHOOK_BEARER_TOKEN`. `AMPLITUDE_INGEST_ENABLED` defaults to false.
+2. Validate Amplitude's default payload, project, server/production envelope, booking ID, website ID, property ID, currency and amounts. UTC timestamps without an offset are normalized explicitly. Guest bookings do not need a user ID.
+3. Resolve the website through `brand.wanderOsWebsiteId` to a non-deleted Performance account in the brand's Growth organization. A missing or ambiguous customer is acknowledged and discarded. Never guess by email, domain or property name.
+4. Inspect event, current user, `last_` and `initial_` attribution separately. Retain candidates with Meta or email signals, including a Facebook click ID or email medium alone. A matched customer without those signals is acknowledged and discarded.
+5. Insert one `performance_booking` keyed by the backend booking ID, initially `possible`. The record contains selected attribution evidence, not the raw event or guest contact details. Persistence failures return 503 for retry; repeated delivery cannot duplicate or reassign the booking.
+6. Schedule deeper classification through Next.js `after()` and acknowledge the request. The classification checks our managed campaigns and sent messages. Failure leaves the durable booking as possible with a null `classifiedAt`; `classifyPerformanceBooking(bookingId)` can be called again. There is no new queue, cron or automatic recovery worker in this change.
+
+## Attribution meaning
+
+- **Possible:** a relevant signal, such as `fbclid`, Meta source, email medium or a known campaign name. Initial acquisition evidence remains possible, even when its ID matches.
+- **Confirmed:** an exact campaign ID matches a Growth-planned Meta campaign for that brand or a campaign assigned to that customer's Performance cycle; or an exact message-send ID matches a sent email for that brand before the booking. Matching remains scoped to the client. Confirmation means a recorded touch matches our campaign, not proof of incremental causation or last-click credit.
+
+The current Meta link helper sends campaign/ad **names**, and newsletter links use title-derived campaign slugs. Those links usually produce possible attribution. Stable identifiers must reach Amplitude before these paths can confirm an exact match. This PR does not change outbound tagging or invent identifiers. It also does not fetch user history from Amplitude or assume its channel classifier is included in the payload.
+
+## Business data
+
+`performance_booking` stores the backend booking ID, account, website/property, confirmed time, stay dates, currency, total/revenue, selected attribution, confidence and evidence. Amounts use the Sites producer's major currency units. There is no generic Amplitude event table and no Marketplace ingestion endpoint.
+
+Only `Order Completed` is supported in this first slice. These are candidate gross bookings, not net revenue: cancellation/refund handling and integration into report aggregation remain follow-ups. Published Performance reports are not modified. No lifecycle enrollment, email delivery or ad conversion is triggered.
+
+The additive `0031_performance_bookings` migration follows current `dev`'s `0030_email_opt_out`. Neither was applied to a hosted database by this task. The previous unshipped Amplitude event-storage migration was removed.
+
+## Configuration and rollout
+
+Use [destinations.json](./destinations.json) as the exact worksheet, not as an Amplitude API request:
+
+- Sites destination: `Growth Performance - Sites bookings`, still **not created or enabled**.
+- URL: `https://growth-red.vercel.app/api/workflows/amplitude-sites-order`.
+- Default event payload; only `Order Completed`; Send Users off; Status Disabled until activation is authorized.
+- Reuse the existing bearer value in `CUSTOMERIO_WEBHOOK_BEARER_TOKEN`. No new secret or token rotation is required.
+- Deploy the migration/receiver before setting `AMPLITUDE_INGEST_ENABLED=true` and enabling the Sites destination. Neither was enabled here.
+
+An earlier Marketplace draft, `Growth Attribution - Marketplace (storage only)` (30174921), remains disabled without credentials. It is obsolete and must not be enabled; its proposed receiver was removed. Existing operational destinations were not changed.
+
+## Producer readiness
+
+Current Wander backend `dev` already calls the Sites `Order Completed` emitter for confirmed `GENERATED_WEBSITE` bookings. `trackSitesEvent` adds `website_id`, `org_id`, `event_source=server`, environment and browser journey context. This Amplitude path is independent of the open Meta CAPI PRs #22065/#22137. This is code evidence, not confirmation of production delivery or complete historical coverage.
+
+## Validation
+
+Focused tests cover project/source validation, guest purchases, authentication, failed persistence before acknowledgement, real migration/insert behavior in local PGlite, duplicate bookings, cross-customer isolation, ambiguous ownership and attribution confidence. No live events or emails were sent. Full repository checks are recorded in the PR.
