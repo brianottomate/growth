@@ -26,6 +26,7 @@ import {
   Target,
   TrendingUp,
   Users,
+  Wrench,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -38,6 +39,16 @@ import {
 } from "@/lib/creative-image-models";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@/components/ui/trace";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import type { WorkContentIntent } from "@/lib/assistant-events";
@@ -741,10 +752,14 @@ export function ToolCallPending({
   state?: OrbState;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
-      <ThinkingOrb state={state} size={20} aria-label={label} />
-      {label}
-    </div>
+    <Trace>
+      <TraceLine status="running">
+        <TraceIcon>
+          <ThinkingOrb state={state} size={20} />
+        </TraceIcon>
+        <TraceTitle>{label}</TraceTitle>
+      </TraceLine>
+    </Trace>
   );
 }
 
@@ -2258,19 +2273,24 @@ export function GenericToolCard({
   output: unknown;
 }) {
   return (
-    <details className="rounded-lg border bg-card px-3.5 py-2.5">
-      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-        <span className="text-foreground">{label ?? action ?? name}</span>
-        {action && (
-          <span className="ml-2 font-mono text-[10px] font-normal opacity-60">
-            {action}
-          </span>
-        )}
-      </summary>
-      <pre className="mt-2 overflow-x-auto text-xs">
-        {JSON.stringify(output, null, 2)}
-      </pre>
-    </details>
+    <Trace>
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>
+          <TraceLine>
+            <TraceIcon>
+              <Wrench />
+            </TraceIcon>
+            <TraceTitle>{label ?? action ?? name}</TraceTitle>
+            {action && <TraceDescription>{action}</TraceDescription>}
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          <pre className="overflow-x-auto text-xs">
+            {JSON.stringify(output, null, 2)}
+          </pre>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 

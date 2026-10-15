@@ -54,8 +54,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         userEmail={session.user.email ?? ""}
         userImage={session.user.image ?? undefined}
       />
-      <div className="flex h-svh min-w-0 flex-1 overflow-hidden">
-        <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
+      {/* On /app/next/<threadId> the assistant fills this row in place of the page. */}
+      <div className="group/shell flex h-svh min-w-0 flex-1 overflow-hidden">
+        <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden group-has-data-assistant-page/shell:hidden">
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
             <ContentWidthToggle className="-ml-1" />
           </header>

@@ -1,23 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, MessageSquare, Users } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { orpc } from "@/orpc/client";
 
 /**
- * The assistant's home. The conversation itself lives in the persistent dock
- * that AppLayout mounts on every route, so this surface is the session list
- * that drives it: opening a session sets `?thread=`, which the dock reads.
- * Creating a session stays with the dock's own control rather than growing a
- * second create path here.
+ * The assistant's home: the session list. The conversation itself is the
+ * persistent dock that AppLayout mounts on every route; opening a session goes
+ * to `/app/next/<threadId>`, where that dock fills the page. Creating a session
+ * stays with the dock's own control rather than growing a second create path.
  */
 export default function NextPage() {
-  const searchParams = useSearchParams();
-  const activeThreadId = searchParams.get("thread");
   const threadsQuery = useQuery(orpc.creativeWork.listThreads.queryOptions());
 
   return (
@@ -25,8 +20,8 @@ export default function NextPage() {
       <div>
         <h1 className="text-2xl font-semibold">Next</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sessions with the growth assistant. Pick one up here and it opens in
-          the panel on the right, beside whatever you navigate to next.
+          Sessions with the growth assistant. Open one to work in it at full
+          width, or keep using the panel on the right beside any page.
         </p>
       </div>
 
@@ -39,11 +34,8 @@ export default function NextPage() {
           {threadsQuery.data.map((thread) => (
             <li key={thread.id}>
               <Link
-                href={`/app/next?thread=${encodeURIComponent(thread.id)}`}
-                className={cn(
-                  "flex items-start gap-3 rounded-lg border bg-card px-4 py-3 transition-all duration-200 hover:-translate-y-px hover:border-foreground/20 hover:shadow-md",
-                  thread.id === activeThreadId && "border-primary/50",
-                )}
+                href={`/app/next/${encodeURIComponent(thread.id)}`}
+                className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3 transition-all duration-200 hover:-translate-y-px hover:border-foreground/20 hover:shadow-md"
               >
                 <span className="mt-0.5 grid size-7 shrink-0 grid-cols-1 place-items-center rounded-md bg-primary/10 text-primary">
                   <MessageSquare className="size-3.5" />

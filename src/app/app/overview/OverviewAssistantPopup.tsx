@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -9,7 +9,9 @@ import {
   Copy,
   Hash,
   Loader2,
+  Maximize2,
   MessageSquare,
+  Minimize2,
   PanelRightClose,
   Plus,
   Sparkles,
@@ -41,7 +43,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { assistantThreadAsMarkdown } from "@/lib/assistant-thread-markdown";
-import { shouldAutoOpenAssistant } from "@/lib/assistant-route-behavior";
+import {
+  assistantPageThreadId,
+  shouldAutoOpenAssistant,
+} from "@/lib/assistant-route-behavior";
 
 /**
  * Persistent right-hand workspace for the growth assistant.
@@ -50,7 +55,8 @@ import { shouldAutoOpenAssistant } from "@/lib/assistant-route-behavior";
  * the surface the assistant is discussing. Mobile: an overlay. The chat stays
  * mounted while collapsed, preserving one conversation across route changes.
  * It is the same dock on every route including `/app/next` — the assistant sits
- * beside the workspace rather than replacing it.
+ * beside the workspace rather than replacing it. On `/app/next/<threadId>` the
+ * same instance fills the main area and the URL decides the session.
  */
 export function OverviewAssistantPopup({
   userName,
@@ -60,7 +66,10 @@ export function OverviewAssistantPopup({
   brands: { id: string; name: string; slug: string | null }[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const pageThreadId = assistantPageThreadId(pathname);
+  const pageMode = pageThreadId !== null;
   const [open, setOpen] = useState(false);
   const [focusByThread, setFocusByThread] = useState<
     Record<
@@ -76,7 +85,12 @@ export function OverviewAssistantPopup({
   const [scopeByThread, setScopeByThread] = useState<
     Record<string, "page" | "pinned">
   >({});
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [dockThreadId, setDockThreadId] = useState<string | null>(null);
+  const activeThreadId = pageThreadId ?? dockThreadId;
+  const openThread = (threadId: string) => {
+    setDockThreadId(threadId);
+    if (pageMode) router.push(`/app/next/${threadId}`);
+  };
   const creatingInitialThread = useRef(false);
   const creatingCampaignThread = useRef(false);
   const [threadIntent, setThreadIntent] = useState<{
@@ -113,7 +127,7 @@ export function OverviewAssistantPopup({
     };
   }, [desktop, open]);
 
-  const nextMode = pathname === "/app/next";
+  const nextMode = pathname === "/app/next" || pageMode;
   const pageQuery = useQuery(
     orpc.creativeWork.pageContext.queryOptions({
       input: {
@@ -131,7 +145,7 @@ export function OverviewAssistantPopup({
     orpc.creativeWork.createThread.mutationOptions({
       onSuccess: (thread) => {
         creatingInitialThread.current = false;
-        setActiveThreadId(thread.id);
+        openThread(thread.id);
         void queryClient.invalidateQueries({
           queryKey: orpc.creativeWork.listThreads.queryKey(),
         });
@@ -197,29 +211,16 @@ export function OverviewAssistantPopup({
         )
       : activeBrand;
 
-  // The assistant home lists sessions as links; opening one selects it in this
-  // dock instead of routing to a second chat surface. An unknown id is ignored
-  // rather than handed to getThread, which would 404 into a permanent spinner.
-  //
-  // Applied once per URL change: listThreads refetches on every create and
-  // thread-finish, and re-running on its data would snap the dock back to the
-  // URL's thread and undo a session the operator just created or picked.
-  const requestedThreadId = searchParams.get("thread");
-  const appliedThreadId = useRef<string | null>(null);
+  // Collapsing the full page keeps the dock on the session it was showing.
   useEffect(() => {
-    if (!requestedThreadId || !threadsQuery.data) return;
-    if (appliedThreadId.current === requestedThreadId) return;
-    if (threadsQuery.data.some((thread) => thread.id === requestedThreadId)) {
-      appliedThreadId.current = requestedThreadId;
-      setActiveThreadId(requestedThreadId);
-    }
-  }, [requestedThreadId, threadsQuery.data]);
+    if (pageThreadId) setDockThreadId(pageThreadId);
+  }, [pageThreadId]);
 
   useEffect(() => {
     if (activeThreadId || !threadsQuery.data) return;
     const latest = threadsQuery.data[0];
     if (latest) {
-      setActiveThreadId(latest.id);
+      setDockThreadId(latest.id);
       return;
     }
     if (creatingInitialThread.current) return;
@@ -230,8 +231,12 @@ export function OverviewAssistantPopup({
   useEffect(() => {
     const stored = window.localStorage.getItem("growth_assistant_open");
     const preferred = stored == null ? desktop : stored === "true";
-    setOpen(desktop && shouldAutoOpenAssistant(pathname) ? true : preferred);
-  }, [desktop, pathname]);
+    setOpen(
+      pageMode || (desktop && shouldAutoOpenAssistant(pathname))
+        ? true
+        : preferred,
+    );
+  }, [desktop, pageMode, pathname]);
 
   useEffect(() => {
     const receiveIntent = (event: Event) => {
@@ -272,6 +277,7 @@ export function OverviewAssistantPopup({
       window.removeEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
   }, [createThread.mutate, activeThreadId]);
 
+  const shown = open || pageMode;
   const setVisible = (next: boolean) => {
     setOpen(next);
     window.localStorage.setItem("growth_assistant_open", String(next));
@@ -302,19 +308,22 @@ export function OverviewAssistantPopup({
       {/* One persistent chat instance: a reflowing dock on desktop, overlay below. */}
       <aside
         aria-label="Growth assistant"
-        aria-hidden={!open}
-        inert={!open}
+        data-assistant-page={pageMode || undefined}
+        aria-hidden={!shown}
+        inert={!shown}
         data-keyboard-open={!desktop && mobileViewport?.keyboardOpen}
         style={
-          !desktop && open && mobileViewport
+          !desktop && shown && mobileViewport
             ? { top: mobileViewport.top, height: mobileViewport.height }
             : undefined
         }
         className={cn(
           "group/assistant fixed inset-x-0 top-0 z-50 flex h-dvh flex-col overflow-hidden border bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl transition-[width,opacity,transform] duration-200 lg:static lg:inset-auto lg:z-auto lg:h-svh lg:shrink-0 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:p-0 lg:shadow-none",
-          open
-            ? "translate-y-0 opacity-100 lg:w-[400px] xl:w-[472px]"
-            : "pointer-events-none invisible translate-y-2 opacity-0 lg:visible lg:w-0 lg:translate-y-0 lg:border-l-0",
+          pageMode
+            ? "lg:flex-1 lg:border-l-0"
+            : open
+              ? "translate-y-0 opacity-100 lg:w-[400px] xl:w-[472px]"
+              : "pointer-events-none invisible translate-y-2 opacity-0 lg:visible lg:w-0 lg:translate-y-0 lg:border-l-0",
         )}
       >
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-3 lg:h-12 lg:gap-3">
@@ -344,7 +353,7 @@ export function OverviewAssistantPopup({
                   {threadsQuery.data.map((thread) => (
                     <DropdownMenuItem
                       key={thread.id}
-                      onSelect={() => setActiveThreadId(thread.id)}
+                      onSelect={() => openThread(thread.id)}
                     >
                       <span className="min-w-0 flex-1 truncate">
                         {thread.title}
@@ -418,17 +427,52 @@ export function OverviewAssistantPopup({
               <Plus className="size-4" />
             )}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-11 lg:size-8"
-            onClick={() => setVisible(false)}
-            aria-label="Collapse assistant"
-          >
-            <PanelRightClose className="hidden size-4 lg:block" />
-            <X className="size-4 lg:hidden" />
-          </Button>
+          {pageMode ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className="size-11 lg:size-8"
+            >
+              <Link
+                href="/app/next"
+                aria-label="Exit full page"
+                title="Exit full page"
+              >
+                <Minimize2 className="size-4" />
+              </Link>
+            </Button>
+          ) : (
+            <>
+              {activeThreadId && (
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="hidden size-8 lg:inline-flex"
+                >
+                  <Link
+                    href={`/app/next/${activeThreadId}`}
+                    aria-label="Open full page"
+                    title="Open full page"
+                  >
+                    <Maximize2 className="size-4" />
+                  </Link>
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-11 lg:size-8"
+                onClick={() => setVisible(false)}
+                aria-label="Collapse assistant"
+              >
+                <PanelRightClose className="hidden size-4 lg:block" />
+                <X className="size-4 lg:hidden" />
+              </Button>
+            </>
+          )}
         </header>
         <div
           className="flex min-w-0 items-center gap-1.5 border-b px-3 py-2 text-xs"
@@ -485,7 +529,8 @@ export function OverviewAssistantPopup({
           ) : (
             <span className="min-w-0 flex-1 truncate">
               {contextMode === "page"
-                ? (pageQuery.data?.label ?? pathname)
+                ? (pageQuery.data?.label ??
+                  (pageMode ? "Whole workspace" : pathname))
                 : (effectiveBrand?.name ?? "Workspace")}
             </span>
           )}
@@ -567,7 +612,7 @@ export function OverviewAssistantPopup({
                 });
               }}
               userName={userName}
-              active={open}
+              active={shown}
               mode={nextMode ? "next" : "overview"}
               brandId={effectiveBrand?.id}
               brandName={effectiveBrand?.name}
@@ -588,6 +633,16 @@ export function OverviewAssistantPopup({
                   : undefined
               }
             />
+          ) : threadQuery.isError ? (
+            <div className="grid h-full grid-cols-1 place-content-center gap-2 p-6 text-center text-sm text-muted-foreground">
+              <p>This session is not available.</p>
+              <Link
+                href="/app/next"
+                className="text-foreground underline underline-offset-4"
+              >
+                All sessions
+              </Link>
+            </div>
           ) : (
             <div className="grid h-full grid-cols-1 place-items-center text-muted-foreground">
               <Loader2 className="size-5 animate-spin" />
@@ -596,7 +651,7 @@ export function OverviewAssistantPopup({
         </div>
       </aside>
 
-      {!open && (
+      {!shown && (
         <Button
           type="button"
           size="icon"

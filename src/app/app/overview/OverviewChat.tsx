@@ -40,7 +40,10 @@ import {
   ArrowUp,
   CalendarClock,
   Check,
+  Ban,
+  Brain,
   ChevronRight,
+  CircleX,
   Copy,
   ExternalLink,
   FileText,
@@ -59,6 +62,15 @@ import { Streamdown } from "streamdown";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@/components/ui/trace";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { toast } from "@/components/ui/toast";
 import { ThinkingOrb, capabilityOrbState } from "@/components/thinking-orb";
@@ -987,7 +999,7 @@ export function OverviewChat({
           aria-label="Overview assistant conversation"
           className="h-full scrollbar-thin overflow-x-hidden overflow-y-auto"
         >
-          <div className="mx-auto w-full min-w-0 space-y-4 px-4 pb-4">
+          <div className="mx-auto w-full max-w-3xl min-w-0 space-y-4 px-4 pb-4">
             {isEmpty && (
               <div
                 className={cn(
@@ -1087,18 +1099,23 @@ export function OverviewChat({
                             i === message.parts.length - 1;
                           if (streamingTail || !part.text.trim()) return null;
                           return (
-                            <details
-                              key={key}
-                              className="group/r text-xs text-muted-foreground"
-                            >
-                              <summary className="flex cursor-pointer list-none items-center gap-1 select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
-                                <ChevronRight className="h-3 w-3 transition-transform group-open/r:rotate-90" />
-                                Thought process
-                              </summary>
-                              <p className="mt-1 border-l-2 border-border pl-3 break-words whitespace-pre-wrap">
-                                {part.text}
-                              </p>
-                            </details>
+                            <Trace key={key}>
+                              <TraceCollapsible>
+                                <TraceCollapsibleTrigger>
+                                  <TraceLine>
+                                    <TraceIcon>
+                                      <Brain />
+                                    </TraceIcon>
+                                    <TraceTitle>Thought process</TraceTitle>
+                                  </TraceLine>
+                                </TraceCollapsibleTrigger>
+                                <TraceCollapsibleContent>
+                                  <p className="text-xs whitespace-pre-wrap">
+                                    {part.text}
+                                  </p>
+                                </TraceCollapsibleContent>
+                              </TraceCollapsible>
+                            </Trace>
                           );
                         }
                         if (part.type === "text") {
@@ -1216,7 +1233,7 @@ export function OverviewChat({
       </div>
 
       <div className="mx-auto w-full shrink-0 border-t px-3 pb-3">
-        <form className="mt-3" onSubmit={submit}>
+        <form className="mx-auto mt-3 max-w-3xl" onSubmit={submit}>
           <div
             className={cn(
               "relative rounded-xl border border-border bg-card p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 focus-within:border-primary/50 focus-within:shadow-md",
@@ -1523,9 +1540,14 @@ export function renderToolPart(
   }
   if (loose.state === "output-denied") {
     return (
-      <p key={key} className="text-xs text-muted-foreground">
-        {toolLabel(toolName, action)} — skipped.
-      </p>
+      <Trace key={key}>
+        <TraceLine status="pending">
+          <TraceIcon>
+            <Ban />
+          </TraceIcon>
+          <TraceTitle>{toolLabel(toolName, action)} — skipped</TraceTitle>
+        </TraceLine>
+      </Trace>
     );
   }
 
@@ -1539,14 +1561,17 @@ export function renderToolPart(
       return null;
     if (!isRunning) {
       return (
-        <p
-          key={key}
-          className="text-xs [overflow-wrap:anywhere] text-destructive"
-          role="alert"
-        >
-          {toolLabel(toolName, action)} did not finish. Generation ended before
-          a result was received. Try again.
-        </p>
+        <Trace key={key} role="alert">
+          <TraceLine status="error">
+            <TraceIcon>
+              <CircleX />
+            </TraceIcon>
+            <TraceTitle className="whitespace-normal">
+              {toolLabel(toolName, action)} did not finish. Generation ended
+              before a result was received. Try again.
+            </TraceTitle>
+          </TraceLine>
+        </Trace>
       );
     }
     return (
@@ -1559,12 +1584,21 @@ export function renderToolPart(
   }
   if (part.state === "output-error") {
     return (
-      <p
-        key={key}
-        className="text-xs [overflow-wrap:anywhere] text-destructive"
-      >
-        {toolLabel(toolName, action)} failed: {part.errorText}
-      </p>
+      <Trace key={key}>
+        <TraceCollapsible>
+          <TraceCollapsibleTrigger>
+            <TraceLine status="error">
+              <TraceIcon>
+                <CircleX />
+              </TraceIcon>
+              <TraceTitle>{toolLabel(toolName, action)} failed</TraceTitle>
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>
+            <p className="text-xs [overflow-wrap:anywhere]">{part.errorText}</p>
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
+      </Trace>
     );
   }
   if (part.state !== "output-available") return null;
