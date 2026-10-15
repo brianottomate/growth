@@ -100,6 +100,7 @@ import {
   ZERNIO_AD_PLATFORMS,
 } from "@/lib/ad-platforms";
 import {
+  AD_CALL_TO_ACTIONS,
   LINKEDIN_CALL_TO_ACTIONS,
   LINKEDIN_COST_TYPES,
 } from "@/lib/zernio-ads";
@@ -1694,9 +1695,14 @@ export const returnAdToStudioAction = growthAction({
 export const setAdCopyAction = growthAction({
   outputSchema: setAdCopyActionOutputSchema,
   description:
-    "Rewrite a drafted ad. For text-first ads supply the full text pool. For creative ads: its headline, primary text, description, and each carousel card's own Meta headline and description. The images are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
+    "Rewrite a drafted ad. For text-first ads supply the full text pool. For creative ads: its headline, primary text, description, call to action, and each carousel card's own Meta headline and description. `name` renames the ad itself (the card title in the studio and the ad name on Meta), which is not the headline. The images are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
   inputSchema: z.object({
     adId: z.string().min(1),
+    name: z.string().trim().min(1).max(200).optional(),
+    callToAction: z
+      .enum(AD_CALL_TO_ACTIONS.map((cta) => cta.value))
+      .optional()
+      .describe("Creative ads only: the Meta button."),
     text: textAdCopySchema.optional(),
     headline: z
       .string()
@@ -1736,6 +1742,8 @@ export const setAdCopyAction = growthAction({
     setAdCopy({
       adId: input.adId,
       orgId: ctx.orgId,
+      name: input.name,
+      callToAction: input.callToAction,
       headline: input.headline,
       body: input.body,
       description: input.description,
@@ -1861,11 +1869,10 @@ export const ideaContextAction = growthAction({
   description:
     "Read one ad's current editable document, version, ordered source-image URLs (including size variants), brand story, voice, market, existing catalog/ad copy and complete listing facts for every represented home. Use before proposing copy sets and before saveIdea. Image URLs are references; inspect them visually before making composition decisions. Write every slide's copy by its copyRules, from the homes' facts, never from the images.",
   inputSchema: z.object({
-    campaignId: z.string().min(1).optional(),
     adId: z.string().min(1),
   }),
   execute: (input, ctx) =>
-    adChatContext({ ...input, organizationId: ctx.orgId }),
+    adChatContext({ adId: input.adId, organizationId: ctx.orgId }),
 });
 
 export const setDeliveryGroupAction = growthAction({

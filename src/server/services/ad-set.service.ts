@@ -1076,6 +1076,9 @@ export async function setCardCopy(input: {
 export async function setAdCopy(input: {
   adId: string;
   orgId: string;
+  /** The ad's own name: the card title in the studio and the Meta ad name. */
+  name?: string;
+  callToAction?: string;
   headline?: string;
   body?: string;
   description?: string;
@@ -1084,12 +1087,17 @@ export async function setAdCopy(input: {
   text?: AdTextContent;
 }) {
   const ad = await requireOwnedAd(input);
+  const name = input.name?.trim() || ad.name;
   if (ad.type === "text") {
-    if (!input.text) throw new Error("Supply the text pool before saving.");
-    const content = textAdCopySchema.parse(input.text);
+    const content = input.text
+      ? textAdCopySchema.parse(input.text)
+      : input.name
+        ? ad.content
+        : null;
+    if (!content) throw new Error("Supply the text pool before saving.");
     const saved = await db
       .update(adTable)
-      .set({ content })
+      .set({ name, content })
       .where(
         and(eq(adTable.id, ad.id), inArray(adTable.status, ["drawn", "ready"])),
       )
@@ -1104,22 +1112,34 @@ export async function setAdCopy(input: {
   const headline = input.headline ?? content.headline;
   const body = input.body ?? content.body;
   const description = input.description ?? content.description;
+  const callToAction = input.callToAction ?? content.callToAction;
   // An idea-studio ad sends the projection of its document, so the words go
   // into the document and are projected again.
   const studio = content.ideaStudio;
   if (studio) {
     const document = {
       ...studio.document,
-      copy: { ...studio.document.copy, headline, body, description },
+      copy: {
+        ...studio.document.copy,
+        headline,
+        body,
+        description,
+        ...(callToAction ? { callToAction } : {}),
+      },
       cards: studio.document.cards.map((card, i) => {
         const next = input.cards?.[i];
         return next ? { ...card, copy: { ...card.copy, ...next } } : card;
       }),
     };
-    await saveDraftChange(
-      ad,
-      projectIdea(ad.brandId, content, { ...studio, document }, ad.placements),
-    );
+    await saveDraftChange(ad, {
+      name,
+      ...projectIdea(
+        ad.brandId,
+        content,
+        { ...studio, document },
+        ad.placements,
+      ),
+    });
     return { adId: ad.id };
   }
   const media = content.media.map((card, i) => {
@@ -1133,11 +1153,13 @@ export async function setAdCopy(input: {
     };
   });
   await saveDraftChange(ad, {
+    name,
     content: {
       ...content,
       headline,
       body,
       description: description?.trim() || undefined,
+      callToAction,
       media,
     },
   });
@@ -1400,6 +1422,8 @@ export async function saveAdSection(
   let content = ad.content;
   let bookingTargetId = ad.bookingTargetId;
   const section = input.section;
+  const name =
+    section.kind === "copy" || section.kind === "text" ? section.name : ad.name;
   if (section.kind === "destination") {
     let linkUrl = section.linkUrl;
     if (
@@ -1474,6 +1498,7 @@ export async function saveAdSection(
   const saved = await db
     .update(adTable)
     .set({
+      name,
       content,
       bookingTargetId,
     })

@@ -15,6 +15,7 @@ import {
 } from "@/server/services/chat-turn.service";
 import { adChatContext } from "@/server/services/ad-chat-context.service";
 import { contactSheet } from "@/server/services/starter-ad-generation.service";
+import { imageMediaType } from "@/server/services/media-analysis.service";
 import { catalogHomeContext } from "@/server/services/catalog-studio.service";
 import { catalogLocation } from "@/lib/catalog-studio";
 import { marketOf } from "@/lib/markets";
@@ -416,7 +417,6 @@ export async function POST(req: Request): Promise<Response> {
     const selectedAd = requestedCampaignContext?.adId
       ? await adChatContext({
           organizationId,
-          campaignId: requestedCampaignContext.campaignId,
           adId: requestedCampaignContext.adId,
         }).catch(() => null)
       : null;
@@ -834,9 +834,10 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const sheets: ModelMessage[] = [];
-    if (activeAd?.images.length && activeCampaignContext?.focus !== "copy") {
-      for (let offset = 0; offset < activeAd.images.length; offset += 16) {
-        const batch = activeAd.images.slice(offset, offset + 16);
+    const stills = activeAd?.images.filter((item) => item.kind === "image");
+    if (activeAd && stills?.length && activeCampaignContext?.focus !== "copy") {
+      for (let offset = 0; offset < stills.length; offset += 16) {
+        const batch = stills.slice(offset, offset + 16);
         const sheet = await contactSheet({
           id: activeAd.ad.id,
           name: activeAd.ad.name,
@@ -851,6 +852,28 @@ export async function POST(req: Request): Promise<Response> {
               text: `Current ad images. Labels map to: ${JSON.stringify(batch.map((item, index) => ({ label: index + 1, cardId: item.cardId, slide: item.slide, size: item.size })))}`,
             },
             { type: "image", image: sheet.image, mediaType: "image/jpeg" },
+          ],
+        });
+      }
+    }
+    if (activeAd?.videos.length && activeCampaignContext?.focus !== "copy") {
+      // The story cut repeats the base footage; one storyboard per slide.
+      for (const video of activeAd.videos.filter((v) => v.size === "base")) {
+        sheets.push({
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                video.source === "storyboard"
+                  ? `Storyboard of the ${video.size} video on slide ${video.slide} (card ${video.cardId}): numbered, timestamped frames in order.`
+                  : `Poster frame of the ${video.size} video on slide ${video.slide} (card ${video.cardId}). No storyboard was cut for this clip, so this one frame is all you can see.`,
+            },
+            ...video.imageUrls.map((url) => ({
+              type: "file" as const,
+              mediaType: imageMediaType(url),
+              data: new URL(url),
+            })),
           ],
         });
       }

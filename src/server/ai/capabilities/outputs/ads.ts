@@ -1437,7 +1437,17 @@ export const ideaContextActionOutputSchema = z.strictObject({
       cardId: z.string(),
       size: z.string(),
       slide: z.number(),
+      kind: z.enum(["image", "video"]),
       source: sourceSchema,
+    }),
+  ),
+  videos: z.array(
+    z.strictObject({
+      cardId: z.string(),
+      size: z.string(),
+      slide: z.number(),
+      source: z.enum(["storyboard", "poster"]),
+      imageUrls: z.array(z.string()),
     }),
   ),
 });

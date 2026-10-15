@@ -137,9 +137,10 @@ GROWTH_MCP_TOKEN=... bun run smoke:mcp:modern
 
 ### Individual ad studio work
 
-`adsRead.ideaContext` accepts `campaignId` and `adId` and returns the current
-editable document/version, ordered image references, brand voice, and listing
-facts for represented houses. Use `adsWrite.saveIdea` to save copy and composition
+`adsRead.ideaContext` takes an `adId`, with or without a campaign, and returns
+the current editable document/version, ordered image references, the stored
+storyboard boards (or poster) of any video, brand voice, and listing facts for
+represented houses. Use `adsWrite.saveIdea` to save copy and composition
 recipes as a draft. External MCP clients must visually inspect the returned image
 references; JSON URLs alone are not image input. The in-app ad card's Work in chat
 action starts a fresh thread and supplies numbered contact sheets as model image

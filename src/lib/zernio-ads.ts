@@ -95,6 +95,19 @@ export const LINKEDIN_PUSH_GOALS = [
 ] as const satisfies readonly AdPushGoal[];
 
 /**
+ * The Meta buttons an operator can pick. Values are Meta call_to_action
+ * types; `metaCallToActionType` maps BOOK_NOW to Meta's BOOK_TRAVEL.
+ */
+export const AD_CALL_TO_ACTIONS = [
+  { value: "BOOK_NOW", label: "Book now" },
+  { value: "LEARN_MORE", label: "Learn more" },
+  { value: "APPLY_NOW", label: "Apply now" },
+  { value: "CONTACT_US", label: "Contact us" },
+  { value: "SHOP_NOW", label: "Shop now" },
+  { value: "SIGN_UP", label: "Sign up" },
+] as const;
+
+/**
  * Zernio requires a call to action on every Meta ad. The ad sells a stay, so
  * the fallback is the booking button, and a Performance client's ads always
  * carry it (Brooke, 2026-09-23).

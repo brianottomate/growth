@@ -3,9 +3,10 @@ import "server-only";
 import { performanceCopyNotes } from "./performance-copy-notes.service";
 import { listingCopyContext } from "./listing-copy-context.service";
 import { marketOf } from "@/lib/markets";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
-import { adTable, brandTable } from "@/server/db/schema";
+import { adTable, brandTable, mediaAssetTable } from "@/server/db/schema";
+import { videoEvidence } from "./media-analysis.service";
 import { ideaDocumentFromAd, sameIdeaSource } from "@/lib/ad-idea-studio";
 import { requireOwnedCampaign, starterIdeaHomes } from "./ads-draft.service";
 import { listAllBrandHomes } from "./homes.service";
@@ -24,18 +25,12 @@ import { COPY_VARIATION_GUIDANCE } from "@/lib/copy-variation";
 /** Current single-ad context shared by chat and MCP. No creative writes. */
 export async function adChatContext(input: {
   organizationId: string;
-  campaignId?: string;
   adId: string;
 }): Promise<IdeaContextResult> {
   const ad = await db.query.adTable.findFirst({
     where: eq(adTable.id, input.adId),
   });
-  if (
-    !ad ||
-    !("media" in ad.content) ||
-    (input.campaignId && ad.campaignId !== input.campaignId)
-  )
-    throw new Error("Creative ad not found");
+  if (!ad || !("media" in ad.content)) throw new Error("Creative ad not found");
   const fullBrand = await db.query.brandTable.findFirst({
     where: and(
       eq(brandTable.id, ad.brandId),
@@ -62,12 +57,58 @@ export async function adChatContext(input: {
     brandListings(brand),
     brandWebsiteId(brand.id),
   ]);
+  const videoSources = ad.content.media.flatMap((m) =>
+    m.type === "video" ? [m, ...(m.story ? [m.story] : [])] : [],
+  );
+  const kind = (source: { url: string }) =>
+    videoSources.some((video) => video.url === source.url)
+      ? ("video" as const)
+      : ("image" as const);
   const images = document.cards.flatMap((card, index) => [
-    { cardId: card.id, slide: index + 1, size: "base", source: card.source },
+    {
+      cardId: card.id,
+      slide: index + 1,
+      size: "base",
+      kind: kind(card.source),
+      source: card.source,
+    },
     ...Object.entries(card.sourceOverrides ?? {}).flatMap(([size, source]) =>
-      source ? [{ cardId: card.id, slide: index + 1, size, source }] : [],
+      source
+        ? [
+            {
+              cardId: card.id,
+              slide: index + 1,
+              size,
+              kind: kind(source),
+              source,
+            },
+          ]
+        : [],
     ),
   ]);
+  const videoAssets = await db.query.mediaAssetTable.findMany({
+    where: inArray(
+      mediaAssetTable.id,
+      videoSources.flatMap((video) => (video.assetId ? [video.assetId] : [])),
+    ),
+    columns: { id: true, storyboard: true, thumbnailUrl: true },
+  });
+  // A model cannot watch a video, so it reads the storyboard cut at upload.
+  const videos = images.flatMap((item) => {
+    if (item.kind !== "video") return [];
+    const asset = videoAssets.find((a) => a.id === item.source.assetId);
+    const evidence = asset ? videoEvidence(asset) : null;
+    return evidence
+      ? [
+          {
+            cardId: item.cardId,
+            slide: item.slide,
+            size: item.size,
+            ...evidence,
+          },
+        ]
+      : [];
+  });
   const represented = galleries.filter(
     (home) =>
       home.id === ad.homeId ||
@@ -125,6 +166,7 @@ export async function adChatContext(input: {
       document,
     },
     images,
+    videos,
     homes: facts,
     copyRules: [
       await performanceCopyNotes(brand.id, input.organizationId),

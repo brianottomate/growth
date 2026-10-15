@@ -67,14 +67,7 @@ import {
   previewReviewStatus,
 } from "@/components/review/ReviewPreview";
 import type { AdReview } from "@/lib/ad-review";
-
-const CALL_TO_ACTION_OPTIONS = [
-  { value: "BOOK_NOW", label: "Book now" },
-  { value: "LEARN_MORE", label: "Learn more" },
-  { value: "CONTACT_US", label: "Contact us" },
-  { value: "SHOP_NOW", label: "Shop now" },
-  { value: "SIGN_UP", label: "Sign up" },
-] as const;
+import { AD_CALL_TO_ACTIONS } from "@/lib/zernio-ads";
 
 export type StudioAd = {
   id: string;
@@ -824,7 +817,7 @@ export function AdCard({
                   </SelectTrigger>
                   <SelectContent>
                     {document.copy.callToAction &&
-                      !CALL_TO_ACTION_OPTIONS.some(
+                      !AD_CALL_TO_ACTIONS.some(
                         (option) => option.value === document.copy.callToAction,
                       ) && (
                         <SelectItem value={document.copy.callToAction} disabled>
@@ -834,7 +827,7 @@ export function AdCard({
                           (current)
                         </SelectItem>
                       )}
-                    {CALL_TO_ACTION_OPTIONS.map((option) => (
+                    {AD_CALL_TO_ACTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>

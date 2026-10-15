@@ -34,6 +34,10 @@ import type { AdContent, MediaItem } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
 import { VideoAdPreview } from "./VideoAdPreview";
 import { CopyAdLinkButton } from "./CopyAdLinkButton";
+import {
+  AD_CALL_TO_ACTIONS,
+  META_DEFAULT_CALL_TO_ACTION,
+} from "@/lib/zernio-ads";
 
 export type PreparedAd = {
   id: string;
@@ -44,13 +48,6 @@ export type PreparedAd = {
   bookingTargetId?: string | null;
   review: AdReview;
 };
-const ctas = [
-  ["BOOK_NOW", "Book now"],
-  ["LEARN_MORE", "Learn more"],
-  ["CONTACT_US", "Contact us"],
-  ["SHOP_NOW", "Shop now"],
-  ["SIGN_UP", "Sign up"],
-] as const;
 function aspect(file?: { width?: number; height?: number }) {
   if (!file?.width || !file.height) return "Aspect ratio unavailable";
   return (
@@ -93,6 +90,7 @@ export function PreparedAdCard({
     null,
   );
   const [draft, setDraft] = useState(ad.content);
+  const [name, setName] = useState(ad.name);
   const [targetId, setTargetId] = useState(ad.bookingTargetId ?? null);
   const [picking, setPicking] = useState<"base" | "story" | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -158,10 +156,12 @@ export function PreparedAdCard({
   );
   const open = (section: NonNullable<typeof editor>) => {
     setDraft(structuredClone(ad.content));
+    setName(ad.name);
     setTargetId(ad.bookingTargetId ?? null);
     setEditor(section);
   };
   const dirty =
+    name !== ad.name ||
     JSON.stringify(draft) !== JSON.stringify(ad.content) ||
     targetId !== (ad.bookingTargetId ?? null);
   const validCopy = draftText
@@ -196,6 +196,7 @@ export function PreparedAdCard({
           : draftText
             ? {
                 kind: "text" as const,
+                name,
                 copy: {
                   headlines: draftText.headlines
                     .map((s) => s.trim())
@@ -207,6 +208,7 @@ export function PreparedAdCard({
               }
             : {
                 kind: "copy" as const,
+                name,
                 headline: draftVideo?.headline ?? "",
                 body: draftVideo?.body ?? "",
                 description: draftVideo?.description ?? "",
@@ -222,7 +224,7 @@ export function PreparedAdCard({
         disabled={
           busy ||
           !dirty ||
-          (editor === "copy" && !validCopy) ||
+          (editor === "copy" && (!validCopy || !name.trim())) ||
           (editor === "destination" && !validDestination)
         }
         loading={save.isPending}
@@ -391,6 +393,15 @@ export function PreparedAdCard({
             </div>
             {editor === "copy" ? (
               <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                <div className="space-y-2">
+                  <Label htmlFor={`${ad.id}-name`}>Ad name</Label>
+                  <Input
+                    id={`${ad.id}-name`}
+                    maxLength={200}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
                 {draftText ? (
                   <>
                     {textFields("headlines", 15, 30)}
@@ -553,30 +564,28 @@ export function PreparedAdCard({
                   <div className="space-y-2">
                     <Label>Call to action</Label>
                     <Select
-                      value={draftVideo.callToAction || "none"}
-                      onValueChange={(value) =>
-                        setDraft({
-                          ...draftVideo,
-                          callToAction: value === "none" ? undefined : value,
-                        })
+                      value={
+                        draftVideo.callToAction || META_DEFAULT_CALL_TO_ACTION
+                      }
+                      onValueChange={(callToAction) =>
+                        setDraft({ ...draftVideo, callToAction })
                       }
                     >
                       <SelectTrigger aria-label="Call to action">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No button</SelectItem>
                         {draftVideo.callToAction &&
-                          !ctas.some(
-                            ([v]) => v === draftVideo.callToAction,
+                          !AD_CALL_TO_ACTIONS.some(
+                            (cta) => cta.value === draftVideo.callToAction,
                           ) && (
                             <SelectItem value={draftVideo.callToAction}>
                               {draftVideo.callToAction}
                             </SelectItem>
                           )}
-                        {ctas.map(([v, label]) => (
-                          <SelectItem key={v} value={v}>
-                            {label}
+                        {AD_CALL_TO_ACTIONS.map((cta) => (
+                          <SelectItem key={cta.value} value={cta.value}>
+                            {cta.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -614,9 +623,11 @@ export function PreparedAdCard({
                     <p className="mb-1 text-xs text-muted-foreground">
                       Call to action
                     </p>
-                    {ctas.find(([v]) => v === video.callToAction)?.[1] ??
-                      video.callToAction ??
-                      "No button"}
+                    {AD_CALL_TO_ACTIONS.find(
+                      (cta) =>
+                        cta.value ===
+                        (video.callToAction || META_DEFAULT_CALL_TO_ACTION),
+                    )?.label ?? video.callToAction}
                   </div>
                 )}
               </div>
