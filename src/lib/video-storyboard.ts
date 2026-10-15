@@ -43,8 +43,9 @@ type CapturedFrame = {
 };
 
 import {
-  MAX_STORYBOARD_BOARDS as MAX_BOARDS,
+  formatStoryboardTimestamp,
   MAX_STORYBOARD_DURATION_MS as MAX_DURATION_MS,
+  storyboardPlan,
 } from "@/lib/storyboard-limits";
 
 function waitForVideoMetadata(video: HTMLVideoElement) {
@@ -101,25 +102,6 @@ function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
   });
 }
 
-function storyboardPlan(durationMs: number) {
-  const seconds = Math.max(1, Math.ceil(durationMs / 1_000));
-  const gridSize = seconds <= 90 ? 3 : seconds <= 160 ? 4 : 5;
-  const capacity = gridSize * gridSize * MAX_BOARDS;
-  const sampleIntervalMs = Math.max(1_000, Math.ceil(durationMs / capacity));
-  const frameCount = Math.min(
-    capacity,
-    Math.max(1, Math.ceil(durationMs / sampleIntervalMs)),
-  );
-  return { gridSize, sampleIntervalMs, frameCount };
-}
-
-function formatTimestamp(timestampMs: number) {
-  const totalSeconds = timestampMs / 1_000;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds - minutes * 60;
-  return `${minutes}:${seconds.toFixed(seconds % 1 ? 1 : 0).padStart(2, "0")}`;
-}
-
 export async function renderVideoStoryboard(
   sourceUrl: string,
   onProgress?: (progress: StoryboardProgress) => void,
@@ -141,7 +123,8 @@ export async function renderVideoStoryboard(
     MAX_DURATION_MS,
     Math.max(1_000, Math.floor(video.duration * 1_000)),
   );
-  const { gridSize, sampleIntervalMs, frameCount } = storyboardPlan(durationMs);
+  const { gridSize, sampleIntervalMs, frameCount, timestampsMs } =
+    storyboardPlan(durationMs);
   const sourceWidth = video.videoWidth || 720;
   const sourceHeight = video.videoHeight || 1_280;
   const scale = Math.min(1, 480 / Math.max(sourceWidth, sourceHeight));
@@ -157,10 +140,7 @@ export async function renderVideoStoryboard(
   const captured: CapturedFrame[] = [];
   try {
     for (let index = 0; index < frameCount; index++) {
-      const timestampMs = Math.min(
-        durationMs - 50,
-        Math.round(index * sampleIntervalMs + sampleIntervalMs / 2),
-      );
+      const timestampMs = timestampsMs[index]!;
       await seekVideo(video, Math.max(0, timestampMs / 1_000));
       captureContext.drawImage(video, 0, 0, cellWidth, cellHeight);
       const blob = await canvasBlob(capture, "image/jpeg", 0.84);
@@ -211,7 +191,7 @@ export async function renderVideoStoryboard(
         context.font = `600 ${Math.max(14, Math.round(labelHeight * 0.52))}px ui-monospace, monospace`;
         context.textBaseline = "middle";
         context.fillText(
-          `${globalIndex + 1} · ${formatTimestamp(frame.timestampMs)}`,
+          `${globalIndex + 1} · ${formatStoryboardTimestamp(frame.timestampMs)}`,
           x + 8,
           y + cellHeight - labelHeight / 2,
         );

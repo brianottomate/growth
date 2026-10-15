@@ -105,11 +105,12 @@ export type VideoTranscriptWord = {
 /**
  * Sampled frames of a library video, laid out on numbered storyboard boards.
  *
- * Only a browser can decode video, and the one moment a browser reliably holds
- * the file is upload. So the boards are cut then and stored beside the clip,
- * which lets analysis run later from anywhere — the library, chat, MCP — with
- * no browser in the loop. Board images live at keys derived from the video's
- * own key (`R2.buildStoryboardKey`), so the server never trusts a client URL.
+ * A browser upload cuts the boards on the spot; any video that arrives without
+ * them gets them from the server when its renditions are cut
+ * (`video-storyboard.service`), on the same plan. Stored beside the clip, they
+ * let analysis run later from anywhere — the library, chat, MCP. Board images
+ * live at keys derived from the video's own key (`R2.buildStoryboardKey`), so
+ * the server never trusts a client URL.
  */
 export type MediaStoryboard = {
   durationMs: number;

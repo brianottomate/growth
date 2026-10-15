@@ -10,12 +10,9 @@ export { MAX_STORYBOARD_BOARDS } from "@/lib/storyboard-limits";
 /**
  * Cut the storyboard for a video file the browser is holding.
  *
- * Only a browser can decode video, and upload is the one moment it reliably
- * has the file, so the boards are made here and stored beside the clip. That
- * is what lets analysis run later from the library, chat, or MCP with no
- * browser in the loop. Best-effort: an undecodable codec or a slow machine
- * yields null, and the upload proceeds without a storyboard rather than
- * failing over one.
+ * The browser already holds the file at upload, so it cuts the boards there.
+ * Best-effort: an undecodable codec or a slow machine yields null, the upload
+ * proceeds, and the server cuts the storyboard with the renditions instead.
  */
 export async function captureVideoStoryboard(
   file: File,

@@ -10,6 +10,7 @@ import ffmpegStatic from "ffmpeg-static";
 import { db } from "@/server/db";
 import { mediaAssetTable } from "@/server/db/schema";
 import { R2 } from "@/server/clients/r2.client";
+import { cutVideoStoryboard } from "./video-storyboard.service";
 import {
   parseFfmpegProbe,
   posterArgs,
@@ -51,6 +52,30 @@ async function probe(source: string) {
   const probed = parseFfmpegProbe(stderr);
   if (!probed) throw new Error("ffmpeg could not read this video");
   return probed;
+}
+
+/**
+ * Cut and store a video's storyboard from `source` (the asset's URL, or a
+ * local rendition the caller just encoded). Replaces any earlier one.
+ */
+export async function storyboardVideoAsset(
+  asset: { id: string; r2Key: string },
+  source: string,
+) {
+  const probed = await probe(source);
+  const storyboard = await cutVideoStoryboard({
+    ffmpeg: run,
+    source,
+    videoKey: asset.r2Key,
+    durationMs: probed.durationMs,
+    width: probed.width,
+    height: probed.height,
+  });
+  await db
+    .update(mediaAssetTable)
+    .set({ storyboard })
+    .where(eq(mediaAssetTable.id, asset.id));
+  return storyboard;
 }
 
 async function writeRenditions(mediaId: string, renditions: VideoRenditions) {
@@ -202,6 +227,15 @@ export async function renderVideoRenditions(
       })
       .where(eq(mediaAssetTable.id, mediaId));
     await writeRenditions(mediaId, renditions);
+    // Uploads from a browser arrive with a storyboard; everything else gets
+    // one here, from the delivery file already on disk.
+    if (!asset.storyboard)
+      await storyboardVideoAsset(
+        { id: mediaId, r2Key: asset.r2Key },
+        deliveryPath,
+      ).catch((error) =>
+        console.error(`[renditions] storyboard for ${mediaId} failed`, error),
+      );
     return renditions;
   } catch (error) {
     const failed: VideoRenditions = {
