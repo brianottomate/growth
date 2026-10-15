@@ -6,6 +6,7 @@ import {
   isZernioConfigured,
   listZernioAccounts,
   listZernioAdAccounts,
+  type ZernioAdAccount,
 } from "@/server/clients/zernio.client";
 import {
   sameAdAccountId,
@@ -99,6 +100,9 @@ export async function loadPerformanceConnections(
       : null,
   ]);
   const selected = new Set(brandIds);
+  // Several clients can explicitly share one destination. Share the read only
+  // within this load; never cache billing readiness across page loads/handoffs.
+  const destinationReads = new Map<string, Promise<ZernioAdAccount[]>>();
   const entries = await Promise.all(
     brands
       .filter((brand) => selected.has(brand.id))
@@ -137,7 +141,7 @@ export async function loadPerformanceConnections(
                 destination.adAccountId,
               ),
           );
-        const meta = !accounts
+        let meta: PerformanceConnectionSummary["meta"] = !accounts
           ? "unknown"
           : connection && !usable
             ? "reconnect"
@@ -157,13 +161,23 @@ export async function loadPerformanceConnections(
           // Read only the explicit, brand-allowlisted destination through its owner.
           if (!usable || !allowedAccount) return "unknown";
           try {
-            const rows = await listZernioAdAccounts({
-              accountId: destination.connectionAccountId,
-              adAccountId: destination.adAccountId,
-            });
+            const key = JSON.stringify([
+              destination.connectionAccountId,
+              destination.adAccountId.replace(/^act_/, ""),
+            ]);
+            let read = destinationReads.get(key);
+            if (!read) {
+              read = listZernioAdAccounts({
+                accountId: destination.connectionAccountId,
+                adAccountId: destination.adAccountId,
+              });
+              destinationReads.set(key, read);
+            }
+            const rows = await read;
             const account = rows.find((row) =>
               sameAdAccountId("meta", row.id, destination.adAccountId),
             );
+            if (account?.selectable === false) meta = "blocked";
             return account ? metaAdBillingStatus(account) : "unknown";
           } catch (error) {
             console.error("Performance ad billing unavailable", {

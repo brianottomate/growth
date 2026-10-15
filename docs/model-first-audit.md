@@ -388,3 +388,7 @@ states override funding presence. Cards and stage handoffs share this view;
 client-owned setup requires confirmed payment-method presence. This verifies
 presence only, not whether Meta will accept a charge. No billing details or
 editable readiness flags are stored.
+Provider-declared unselectable accounts also block the Meta readiness line and
+setup summary, independently of funding presence. Clients sharing an explicit
+destination share its provider read within one load to avoid duplicate quota
+usage; a later page load or handoff reads billing again.

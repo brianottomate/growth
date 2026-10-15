@@ -2,7 +2,7 @@ import type { MetaAdBillingStatus } from "@/lib/meta-ad-billing";
 
 export type PerformanceConnectionSummary = {
   profile: "connected" | "missing";
-  meta: "ready" | "incomplete" | "reconnect" | "unknown";
+  meta: "ready" | "incomplete" | "reconnect" | "unknown" | "blocked";
   billing: MetaAdBillingStatus;
   route: string;
   clientSetupComplete: boolean;
@@ -27,7 +27,7 @@ export function performanceConnectionLines(
     },
     {
       label: "Meta Ads",
-      value: `${{ ready: "Ready", incomplete: "Setup incomplete", reconnect: "Needs reconnection", unknown: "Status unavailable" }[value.meta]} · ${value.route}`,
+      value: `${{ ready: "Ready", incomplete: "Setup incomplete", reconnect: "Needs reconnection", unknown: "Status unavailable", blocked: "Account cannot run ads · Review Meta account status" }[value.meta]} · ${value.route}`,
       ready: value.meta === "ready",
     },
     {
@@ -36,7 +36,7 @@ export function performanceConnectionLines(
         present: "Payment method present",
         missing: "Payment method missing · Add in Meta billing",
         payment_issue: "Payment issue · Review Meta billing",
-        unknown: "Unverified · Check Meta billing access",
+        unknown: "Unverified · Check ad-account admin/billing access in Meta",
         not_selected: "Select an ad account",
       }[value.billing],
       ready: value.billing === "present",

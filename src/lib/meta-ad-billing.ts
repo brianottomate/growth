@@ -13,10 +13,11 @@ export function metaAdBillingStatus(account: {
   accountStatus?: number | string | null;
   disableReason?: number;
 }): Exclude<MetaAdBillingStatus, "not_selected"> {
+  const status = Number(account.accountStatus);
   if (
-    account.accountStatus === 3 ||
-    account.accountStatus === 8 ||
-    account.accountStatus === 9 ||
+    status === 3 ||
+    status === 8 ||
+    status === 9 ||
     account.disableReason === 3
   )
     return "payment_issue";

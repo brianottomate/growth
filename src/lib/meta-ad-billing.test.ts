@@ -11,7 +11,7 @@ test("billing presence requires explicit provider evidence", () => {
 });
 
 test("payment problems override payment method presence", () => {
-  for (const accountStatus of [3, 8, 9]) {
+  for (const accountStatus of [3, 8, 9, "3", "8", "9"]) {
     expect(metaAdBillingStatus({ billingStatus: "ok", accountStatus })).toBe(
       "payment_issue",
     );
