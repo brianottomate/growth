@@ -56,9 +56,18 @@ are fixed, so the definition alone decides who is in it.
 One email reaches an address at most once across all its sends: prepare the
 same issue against the 100 sample, then the 1,000, then everyone, and each wave
 skips the people an earlier wave reached (`already_sent`). A published issue
-can take further waves. This per-recipient check belongs to Postmark's batch
-endpoint; once the Bulk API is enabled, a wave becomes one bulk request over a
-range of sample ranks and the per-recipient rows can go.
+can take further waves.
+
+Sends use Postmark's Bulk API (enabled account-wide 2026-10-14; broadcast
+streams only). Each page of up to 10,000 guests is one bulk request: the email
+once as a Postmark template, where every `{{field|fallback}}` occurrence
+becomes its own key that Growth resolves per guest, plus each guest's address
+and metadata. Postmark paces the release. A malformed address rejects the
+whole request (422); suppressed addresses are accepted and counted on its side.
+The ledger writes each address before the request and marks it `sent` with
+`bulk:<id>` once Postmark accepts, so a resumed send never mails anyone twice;
+delivery and bounces come back through Postmark's webhooks. Postmark templates
+refuse `<link>` stylesheets, so the web font moves into an `@import`.
 
 Uploaded lists carry no WanderOS opt-outs. The brand's Postmark broadcast stream
 holds their unsubscribes, bounces and complaints, and the dispatcher records

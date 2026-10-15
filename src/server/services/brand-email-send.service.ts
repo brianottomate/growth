@@ -13,12 +13,12 @@ import {
   messageSendSummary,
   type MessageSendSnapshot,
 } from "@/lib/email-delivery";
-import { fillFields } from "@/lib/email-personalization";
+import { compilePostmarkTemplate } from "@/lib/email-personalization";
 import { websiteEmailOptOuts } from "./email-opt-outs.service";
 import {
   postmarkServerToken,
   sendPostmarkBatch,
-  type PostmarkOutgoingMessage,
+  sendPostmarkBulk,
 } from "@/server/clients/postmark.client";
 import { db, withTransaction } from "@/server/db";
 import {
@@ -45,7 +45,8 @@ import {
 // owner or admin). Sending rechecks everything that can change after approval.
 
 const UNSUBSCRIBE = "{{{ pm:unsubscribe }}}";
-const PAGE_SIZE = 500;
+/** Recipients per page and per Postmark bulk request; far under its 50 MB cap. */
+const PAGE_SIZE = 10_000;
 /** A `sending` row untouched this long belongs to a run that died. */
 const STALE_LEASE_MS = 15 * 60_000;
 
@@ -237,6 +238,18 @@ export async function prepareBrandSend(
   return messageSendSummary(created);
 }
 
+/**
+ * Postmark templates refuse <link> stylesheets. The renderer's only one is
+ * the web font, so it moves into an @import, which the same mail apps load.
+ */
+export function bulkSafeHtml(html: string) {
+  return html.replace(
+    /<link\b[^>]*href="([^"]+)"[^>]*rel="stylesheet"[^>]*\/?>/g,
+    (_tag, href: string) =>
+      `<style>@import url("${href.replace(/&amp;/g, "&")}");</style>`,
+  );
+}
+
 /** Every link in the email must open before a guest sees it. */
 async function brokenLinks(html: string) {
   const links = [
@@ -281,14 +294,15 @@ async function failSend(id: string, message: string) {
 
 /**
  * Send an approved Postmark send, or resume one that failed part way (approve
- * it again) or whose run died in `sending`. The per-guest ledger means a
- * resumed send only reaches guests it has not already claimed.
- * Before the first guest: the email must still be the approved revision and
- * every link must open. Per page of guests: WanderOS opt-outs are dropped
- * (uploaded lists have none; the brand's Postmark stream holds their
- * unsubscribes), so is anyone an earlier send of this email already reached,
- * each address is written to the ledger before Postmark is called, and
- * Postmark's own suppressions come back as skipped rather than failed.
+ * it again) or whose run died in `sending`. Pages of up to 10,000 guests each
+ * go out as one Postmark bulk request: the email once as a template plus each
+ * guest's fields, released at Postmark's pace. Before the first guest the
+ * email must still be the approved revision and every link must open. Per
+ * page: WanderOS opt-outs and anyone an earlier send of this email reached are
+ * dropped, and each address is written to the ledger before Postmark is
+ * called, so a resumed send never mails it twice. Postmark's own suppressions
+ * (bounces, complaints, its unsubscribes) are filtered on its side and show up
+ * in its delivery events, not here.
  */
 export async function dispatchBrandSend(input: {
   messageSendId: string;
@@ -379,6 +393,11 @@ export async function dispatchBrandSend(input: {
     }
     const token = await postmarkServerToken(audience.serverId);
     const sender = snapshot.sender;
+    const template = compilePostmarkTemplate({
+      subject: snapshot.email.subject,
+      html: bulkSafeHtml(snapshot.preview.html),
+      text: snapshot.preview.text,
+    });
 
     const sendPage = async (recipients: EmailAudienceRecipient[]) => {
       const emails = [
@@ -462,47 +481,41 @@ export async function dispatchBrandSend(input: {
       const byEmail = new Map<string, EmailAudienceRecipient>(
         eligible.map((recipient) => [recipient.email, recipient]),
       );
-      const messages: PostmarkOutgoingMessage[] = fresh.map((row) => {
-        const guest = byEmail.get(row.email)!;
-        const fields = { email: guest.email, first_name: guest.first_name };
-        return {
-          From: fromHeader(sender),
-          To: guest.email,
-          ...(sender.replyTo ? { ReplyTo: sender.replyTo } : {}),
-          Subject: fillFields(snapshot.email.subject, fields, { html: false }),
-          HtmlBody: fillFields(snapshot.preview.html, fields, { html: true }),
-          TextBody: fillFields(snapshot.preview.text, fields, { html: false }),
-          MessageStream: audience.messageStream,
-          Tag: spot.id,
-          TrackOpens: true,
-          TrackLinks: "HtmlAndText",
+      if (!fresh.length) return;
+      // One bulk request for the page: the email once, as a Postmark template,
+      // and each guest's fields. Postmark paces the release; its suppressed
+      // addresses are accepted and counted as failed on its side.
+      const bulk = await sendPostmarkBulk(token, {
+        From: fromHeader(sender),
+        ...(sender.replyTo ? { ReplyTo: sender.replyTo } : {}),
+        Subject: template.subject,
+        HtmlBody: template.html,
+        TextBody: template.text,
+        MessageStream: audience.messageStream,
+        Tag: spot.id,
+        TrackOpens: true,
+        TrackLinks: "HtmlAndText",
+        Messages: fresh.map((row) => ({
+          To: row.email,
+          TemplateModel: template.modelFor(byEmail.get(row.email)!),
           Metadata: { message_send_id: claimed.id, platform_post_id: spot.id },
-        };
+        })),
       });
-      const results = await sendPostmarkBatch(token, messages);
-      await Promise.all(
-        fresh.map((row, index) => {
-          const result = results[index];
-          const ok = result?.ErrorCode === 0;
-          // 406: Postmark suppressed the address (bounce, complaint, unsubscribe).
-          const status = ok
-            ? ("sent" as const)
-            : result?.ErrorCode === 406
-              ? ("skipped" as const)
-              : ("failed" as const);
-          return db
-            .update(messageSendRecipientTable)
-            .set({
-              status,
-              providerMessageId: result?.MessageID ?? null,
-              reason: ok
-                ? null
-                : (result?.Message ?? "No result from Postmark"),
-              sentAt: ok ? new Date() : null,
-            })
-            .where(eq(messageSendRecipientTable.id, row.id));
-        }),
-      );
+      // "sent" means handed to Postmark in this bulk request; delivery,
+      // bounces and suppressions arrive through its webhooks.
+      await db
+        .update(messageSendRecipientTable)
+        .set({
+          status: "sent",
+          providerMessageId: `bulk:${bulk.Id}`,
+          sentAt: new Date(),
+        })
+        .where(
+          inArray(
+            messageSendRecipientTable.id,
+            fresh.map((row) => row.id),
+          ),
+        );
     };
 
     // "done" means a run sent the last page and died before marking it sent.

@@ -66,8 +66,8 @@ export async function filterEmailAudienceBatch(
   recipients: EmailAudienceRecipient[],
   checkCurrentEligibility: (emails: string[]) => Promise<Map<string, boolean>>,
 ) {
-  if (recipients.length > 500)
-    throw new Error("Audience batches are limited to 500 recipients.");
+  if (recipients.length > 10_000)
+    throw new Error("Audience batches are limited to 10,000 recipients.");
   const unique = new Map<string, EmailAudienceRecipient>();
   for (const input of recipients) {
     const recipient = emailAudienceRecipientSchema.parse(input);

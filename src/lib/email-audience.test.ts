@@ -102,7 +102,7 @@ describe("current send eligibility", () => {
     const oversized = filterEmailAudienceBatch(
       Array.from(
         {
-          length: 501,
+          length: 10_001,
         },
         () => row("a@example.com"),
       ),
@@ -112,7 +112,7 @@ describe("current send eligibility", () => {
       await oversized.catch((e: unknown) =>
         e instanceof Error ? e.message : "",
       ),
-    ).toContain("500");
+    ).toContain("10,000");
   });
   test("CSV escapes quotes, embedded line breaks and spreadsheet formulas", () => {
     const csv = emailAudienceCsvRow({

@@ -62,13 +62,39 @@ export function fillFields(
   });
 }
 
-/** The same fields in Postmark's template syntax, for a bulk send. */
-export function toPostmarkTemplate(text: string) {
-  return text.replace(FIELD, (_match, name: string, fallback?: string) =>
-    fallback?.trim()
-      ? `{{#${name}}}{{${name}}}{{/${name}}}{{^${name}}}${fallback.trim()}{{/${name}}}`
-      : `{{${name}}}`,
-  );
+/**
+ * One email as a Postmark bulk template: each field occurrence becomes its
+ * own key (`f0`, `f1`, ...) and `modelFor` resolves value-or-fallback per
+ * guest, so the template needs no sections. HTML escapes the value (`{{f0}}`);
+ * the subject and text take it raw (`{{{f0}}}`).
+ */
+export function compilePostmarkTemplate(parts: {
+  subject: string;
+  html: string;
+  text: string;
+}) {
+  const fields: { name: string; fallback: string }[] = [];
+  const compile = (content: string, raw: boolean) =>
+    content.replace(FIELD, (_match, name: string, fallback?: string) => {
+      const key = `f${fields.length}`;
+      fields.push({ name, fallback: fallback?.trim() ?? "" });
+      return raw ? `{{{${key}}}}` : `{{${key}}}`;
+    });
+  return {
+    subject: compile(parts.subject, true),
+    html: compile(parts.html, false),
+    text: compile(parts.text, true),
+    modelFor(recipient: EmailRecipient) {
+      return Object.fromEntries(
+        fields.map(({ name, fallback }, index) => {
+          const value = Object.hasOwn(EMAIL_FIELDS, name)
+            ? recipient[name as EmailField]?.trim()
+            : undefined;
+          return [`f${index}`, value || fallback];
+        }),
+      );
+    },
+  };
 }
 
 /**

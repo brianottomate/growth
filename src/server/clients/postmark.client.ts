@@ -289,6 +289,67 @@ export type PostmarkSendResult = {
   To?: string;
 };
 
+export type PostmarkBulkRequest = {
+  From: string;
+  ReplyTo?: string;
+  /** Subject and bodies are one Mustachio template for every recipient. */
+  Subject: string;
+  HtmlBody: string;
+  TextBody: string;
+  MessageStream: string;
+  Tag?: string;
+  TrackOpens?: boolean;
+  TrackLinks?: PostmarkOutgoingMessage["TrackLinks"];
+  Messages: {
+    To: string;
+    TemplateModel?: Record<string, string | null>;
+    Metadata?: Record<string, string>;
+    Headers?: { Name: string; Value: string }[];
+  }[];
+};
+
+export type PostmarkBulkStatus = {
+  Id: string;
+  SubmittedAt: string;
+  Status: "Accepted" | "Processing" | "Completed" | "Cancelled";
+  TotalMessages: number;
+  PercentageCompleted: number;
+  ReleasedCount: number;
+  FailedCount: number;
+};
+
+/**
+ * One broadcast to many recipients; Postmark paces the release itself. The
+ * request is all or nothing: one malformed address rejects it (422), while
+ * suppressed recipients are accepted and land in FailedCount. Broadcast
+ * streams only.
+ */
+export async function sendPostmarkBulk(
+  serverToken: string,
+  request: PostmarkBulkRequest,
+) {
+  const response = await fetch(new URL("/email/bulk", API_BASE), {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Postmark-Server-Token": serverToken,
+    },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Postmark POST /email/bulk → ${response.status}: ${body}`);
+  }
+  return (await response.json()) as PostmarkBulkStatus;
+}
+
+export function getPostmarkBulkStatus(serverToken: string, bulkId: string) {
+  return postmarkGet<PostmarkBulkStatus>(`/email/bulk/${bulkId}`, {
+    serverToken,
+  });
+}
+
 /**
  * Up to 500 messages in one call. Postmark answers with one result per
  * message, in order; a suppressed or inactive recipient comes back with a
