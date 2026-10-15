@@ -5,12 +5,17 @@ import { adAccountTable, brandTable } from "@/server/db/schema";
 import {
   isZernioConfigured,
   listZernioAccounts,
+  listZernioAdAccounts,
 } from "@/server/clients/zernio.client";
 import {
   sameAdAccountId,
   zernioConnectionMatchesPlatform,
 } from "@/lib/zernio-ads";
 import type { PerformanceConnectionSummary } from "@/lib/performance-connections";
+import {
+  metaAdBillingStatus,
+  type MetaAdBillingStatus,
+} from "@/lib/meta-ad-billing";
 
 async function sitePixels(website: string | null, websiteId: string | null) {
   if (!website || !websiteId) return { ids: null, customerId: null };
@@ -147,13 +152,41 @@ export async function loadPerformanceConnections(
             ]?.pixelId ??
             null)
           : null;
-        const site = await sitePixels(brand.website, brand.wanderOsWebsiteId);
+        const billingRead = async (): Promise<MetaAdBillingStatus> => {
+          if (!destination) return "not_selected";
+          // Read only the explicit, brand-allowlisted destination through its owner.
+          if (!usable || !allowedAccount) return "unknown";
+          try {
+            const rows = await listZernioAdAccounts({
+              accountId: destination.connectionAccountId,
+              adAccountId: destination.adAccountId,
+            });
+            const account = rows.find((row) =>
+              sameAdAccountId("meta", row.id, destination.adAccountId),
+            );
+            return account ? metaAdBillingStatus(account) : "unknown";
+          } catch (error) {
+            console.error("Performance ad billing unavailable", {
+              brandId: brand.id,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+            return "unknown";
+          }
+        };
+        const [site, billing] = await Promise.all([
+          sitePixels(brand.website, brand.wanderOsWebsiteId),
+          billingRead(),
+        ]);
         const summary: PerformanceConnectionSummary = {
           profile: brand.zernioProfileId ? "connected" : "missing",
           meta,
+          billing,
           route: `${shared ? `Via ${owner?.name ?? "unavailable manager"}` : "Client connection"} · ${allowedAccount ? (allowedAccount.isShared ? "Shared ad account" : "Own ad account") : "Ad account not selected"}`,
           clientSetupComplete: Boolean(
-            brand.zernioProfileId && !shared && meta === "ready",
+            brand.zernioProfileId &&
+            !shared &&
+            meta === "ready" &&
+            billing === "present",
           ),
           pixelId,
           sitePixelIds: site.ids,

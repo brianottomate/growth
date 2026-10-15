@@ -379,3 +379,12 @@ never replayed. The existing workflow activity view exposes failures.
 Public intake slugs remain readable without exposing private connection or DNS
 credentials. Shared onboarding links now prefer the brand token; only token-based
 prefill includes the private Growth Connect and active email/DNS links.
+
+Ad billing readiness derives from Zernio's Meta-only billingStatus and payment
+account states for the explicit allowlisted destination. Missing billing and
+unreadable billing are distinct; an active connection never implies a payment
+method exists. Unsettled, pending settlement, grace period and payment-risk
+states override funding presence. Cards and stage handoffs share this view;
+client-owned setup requires confirmed payment-method presence. This verifies
+presence only, not whether Meta will accept a charge. No billing details or
+editable readiness flags are stored.

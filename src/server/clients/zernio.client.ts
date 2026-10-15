@@ -900,6 +900,10 @@ export type ZernioAdsTreeCampaign = {
 
 export type ZernioAdAccount = {
   id: string;
+  /** Meta-only billing visibility; presence does not guarantee payment succeeds. */
+  billingStatus?: "ok" | "missing" | "unknown";
+  accountStatus?: number | string | null;
+  disableReason?: number;
   name?: string;
   currency?: string;
   status?: string;
