@@ -206,7 +206,7 @@ export function growthResultSummary(
       thumbnail: text(b.logo) || undefined,
     }));
     summary.href = "/app/brands";
-    summary.linkLabel = "View brands";
+    summary.linkLabel = "View all brands";
     if (!brands.length) summary.description = "No brands returned.";
     if (brands.length > 3)
       summary.note = `Showing 3 of ${brands.length} returned brands.`;

@@ -18,7 +18,10 @@ import {
   type MetaAdBillingStatus,
 } from "@/lib/meta-ad-billing";
 
-async function sitePixels(website: string | null, websiteId: string | null) {
+export async function sitePixels(
+  website: string | null,
+  websiteId: string | null,
+) {
   if (!website || !websiteId) return { ids: null, customerId: null };
   try {
     const [page, config] = await Promise.all([

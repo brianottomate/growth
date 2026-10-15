@@ -18,6 +18,7 @@ import {
   type ZernioConnectPlatform,
 } from "@/server/clients/zernio.client";
 import { connectBrandToZernioProfile } from "@/server/services/zernio-brand.service";
+import { completeMetaConnectSetup } from "./meta-connect-setup.service";
 
 // ---- BRAND CONNECT: the client-facing onboarding link ----------------
 //
@@ -310,7 +311,10 @@ export async function getBrandConnectStatus(brandId: string) {
 }
 
 /** Pull the profile's accounts into channel rows after a client connects. */
-export async function syncBrandConnect(brandId: string) {
+export async function syncBrandConnect(
+  brandId: string,
+  completeMetaSetup = false,
+) {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
     columns: { id: true, name: true, zernioProfileId: true, metaPageId: true },
@@ -318,6 +322,7 @@ export async function syncBrandConnect(brandId: string) {
   if (!brand?.zernioProfileId) return;
   const moved = await selectBrandPageOnConnections(brand);
   await connectBrandToZernioProfile(brand.id, brand.zernioProfileId);
+  if (completeMetaSetup) await completeMetaConnectSetup(brand.id);
   return { pageSelected: moved };
 }
 

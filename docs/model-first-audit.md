@@ -407,3 +407,24 @@ requiring an event inbox. Existing workflow authentication is reused. Current
 name-based marketing tags support possible attribution; exact scoped campaign
 or sent-message identifiers can confirm a matching touch. There is no automatic
 backfill, lifecycle send or report publication in this change.
+
+### Meta connection completion (2026-10-15)
+
+Meta OAuth completion now owns the follow-through from a granted client profile
+to an explicit destination and tracking defaults. A saved account choice or a
+sole reachable account can be selected; a multi-account grant, deny record or
+another brand's account becomes a CSM review task. Discovery is not reporting
+permission. The allowlist entry is checked before pixel reads/writes. The
+provider-selected Page is carried into Growth without a separate manual copy.
+Billing remains a live provider fact, with missing/unknown states creating a
+follow-up rather than a cached "confirmed" field.
+
+Existing saved/site pixels are reused when available; a single available pixel
+is selected, multiple pixels require review, and an empty successful list can
+create one. A durable workflow receipt is committed before a non-idempotent
+pixel create; an ambiguous/failed/previous attempt is never replayed. A later
+successful provider list can recover an already-created pixel. The pixel ID is
+recorded in the destination's existing tracking defaults. Installation remains
+a CSM task assigned from the client's csLeadId, including the site and pixel
+IDs. Stable task keys prevent repeated callbacks duplicating the handoff without
+overwriting operator edits or completion. No site setting is changed automatically.

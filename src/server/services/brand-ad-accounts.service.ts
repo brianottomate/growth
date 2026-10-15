@@ -1,4 +1,5 @@
 import { adsConnectionProfile } from "./ads-connection-profile";
+import { completeMetaConnectSetup } from "./meta-connect-setup.service";
 import "server-only";
 
 import { and, eq, inArray, or } from "drizzle-orm";
@@ -18,8 +19,10 @@ import {
 //
 // When a client completes the Meta/Google OAuth on /connect/[token], their
 // token can reach every ad account they manage — other businesses included.
-// Nothing is ingested until an operator explicitly allows an account here
-// (ad_account is default-deny; see ad-account-allowlist.service.ts). This
+// Nothing is ingested until an operator explicitly allows an account here,
+// or meta-connect-setup records the sole account on a client's own grant.
+// Ambiguous grants and existing deny/foreign-owner decisions stay default-deny.
+// (See ad-account-allowlist.service.ts.) This
 // service is the brand-page surface for that decision: enumerate what the
 // connection can see, record an allow or an explicit deny.
 //
@@ -254,6 +257,22 @@ export async function setBrandAdAccountAllowed(input: {
     ownedElsewhere && input.isAllowed ? " (shared)" : ""
   } from the brand page by ${input.decidedBy}`;
 
+  const completeSetup = async () => {
+    if (input.isAllowed && !ownedElsewhere && input.platform === "facebook") {
+      const brand = await db.query.brandTable.findFirst({
+        where: eq(brandTable.id, input.brandId),
+        columns: { performanceSettings: true },
+      });
+      if (brand?.performanceSettings?.adsConnectionBrandId) return;
+      await completeMetaConnectSetup(input.brandId).catch((error: unknown) => {
+        console.error("Meta follow-through needs review", {
+          brandId: input.brandId,
+          error,
+        });
+      });
+    }
+  };
+
   const existing = own ?? unbranded;
   if (existing) {
     await db
@@ -266,6 +285,7 @@ export async function setBrandAdAccountAllowed(input: {
         note,
       })
       .where(eq(adAccountTable.id, existing.id));
+    await completeSetup();
     return { updated: true, shared: ownedElsewhere };
   }
 
@@ -279,5 +299,6 @@ export async function setBrandAdAccountAllowed(input: {
     isShared: ownedElsewhere,
     note,
   });
+  await completeSetup();
   return { updated: false, shared: ownedElsewhere };
 }

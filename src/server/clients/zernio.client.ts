@@ -2215,7 +2215,32 @@ export async function listZernioPixels(accountId: string, adAccountId: string) {
   }>(
     `/accounts/${encodeURIComponent(accountId)}/tracking-tags?adAccountId=${encodeURIComponent(adAccountId)}`,
   );
-  return (result.tags ?? []).map(({ id, name }) => ({ id, name }));
+  if (!Array.isArray(result.tags))
+    throw new Error("Zernio returned no tracking-tag list");
+  return result.tags.map(({ id, name }) => ({ id, name }));
+}
+
+/** Meta only. NOT idempotent: persist an attempt before calling; never retry.
+ * https://docs.zernio.com/guides/pixels
+ */
+export async function createZernioMetaPixel(input: {
+  connectionAccountId: string;
+  adAccountId: string;
+  name: string;
+}) {
+  const result = await zernioFetch<{ tag?: { id: string; name: string } }>(
+    `/accounts/${encodeURIComponent(input.connectionAccountId)}/tracking-tags`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        adAccountId: input.adAccountId,
+        name: input.name,
+      }),
+    },
+  );
+  if (!result.tag?.id)
+    throw new Error("Meta pixel creation returned no pixel ID");
+  return result.tag;
 }
 
 /** Cleanup of a newly created audience only. Official DELETE /ads/audiences/{id}. */

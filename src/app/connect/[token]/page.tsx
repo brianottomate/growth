@@ -68,7 +68,7 @@ export default async function ConnectPage({
   const query = await searchParams;
   if (query.connected) {
     try {
-      await syncBrandConnect(brand.id);
+      await syncBrandConnect(brand.id, query.connected === "meta-ads");
     } catch (error) {
       console.error("brand connect sync failed", error);
     }
