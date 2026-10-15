@@ -1,4 +1,5 @@
 import { websiteEmailOptOuts } from "@/server/services/email-opt-outs.service";
+import { isOptedOut, personalUnsubscribe } from "@/server/email/unsubscribe";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray } from "drizzle-orm";
@@ -47,6 +48,7 @@ export async function executeLifecycleDelivery(
   ) {
     const [scope] = await db
       .select({
+        brandId: brandTable.id,
         websiteId: brandTable.wanderOsWebsiteId,
         email: recipients.email,
         snapshot: revisions.snapshot,
@@ -69,10 +71,12 @@ export async function executeLifecycleDelivery(
     // Like blast test sends, an operator-requested direct test does not enroll
     // a guest in marketing. Only the immutable, recipient-bound test revision
     // can skip the customer-list lookup; local and Postmark suppression remain.
-    if (scope?.websiteId && !isTestJourney(scope.snapshot, scope.email))
-      externallySuppressed = (await websiteEmailOptOuts(scope.websiteId)).has(
-        scope.email,
-      );
+    if (scope && !isTestJourney(scope.snapshot, scope.email))
+      externallySuppressed =
+        (await isOptedOut(scope.brandId, scope.email)) ||
+        (scope.websiteId
+          ? (await websiteEmailOptOuts(scope.websiteId)).has(scope.email)
+          : false);
   }
   const claim = await withTransaction(async (tx) => {
     const [run] = await tx
@@ -239,13 +243,16 @@ export async function executeLifecycleDelivery(
     let payload = delivery.payload;
     if (!payload) {
       try {
-        payload = renderLifecycleEmail({
-          snapshot: revision.snapshot,
-          step,
-          attributes,
-          email: recipient.email,
-          deliveryId: delivery.id,
-        });
+        payload = {
+          ...renderLifecycleEmail({
+            snapshot: revision.snapshot,
+            step,
+            attributes,
+            email: recipient.email,
+            deliveryId: delivery.id,
+          }),
+          unsubscribe: personalUnsubscribe(recipient.brandId, recipient.email),
+        };
       } catch (error) {
         return needsReview(
           error instanceof Error ? error.message : "Email rendering failed",

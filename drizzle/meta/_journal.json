@@ -218,6 +218,13 @@
       "when": 1792025779502,
       "tag": "0029_brand_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792084702102,
+      "tag": "0030_email_opt_out",
+      "breakpoints": true
     }
   ]
 }

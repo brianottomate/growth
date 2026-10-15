@@ -27,6 +27,13 @@ export const SAMPLE_RECIPIENT: EmailRecipient = {
   last_home: "Lakota Park Villa 211",
 };
 
+/**
+ * Where a rendered email's unsubscribe link goes: Postmark's own syntax. On a
+ * Postmark-managed broadcast stream Postmark fills it; on a stream that leaves
+ * unsubscribes to Growth, the send swaps in the guest's signed link.
+ */
+export const UNSUBSCRIBE_PLACEHOLDER = "{{{ pm:unsubscribe }}}";
+
 const FIELD = /\{\{\s*([a-z_]+)\s*(?:\|([^}]*))?\}\}/g;
 
 function escapeHtml(value: string) {

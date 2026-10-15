@@ -1,3 +1,4 @@
+import { UNSUBSCRIBE_PLACEHOLDER } from "@/lib/email-personalization";
 import { documentForPlatform } from "@/server/services/creative-document.service";
 import { requireOwnedEmailSpot } from "@/server/services/email-document.service";
 import { renderDesignSystemNewsletter } from "@/server/email/newsletter-renderer-core";
@@ -84,7 +85,7 @@ export async function previewJourney(
           logo: spot.brand.brandIdentity?.logo ?? spot.brand.logo,
           sender: spot.brand.emailSender,
           legal: spot.brand.legalIdentity,
-          unsubscribeUrl: "{{{ pm:unsubscribe }}}",
+          unsubscribeUrl: UNSUBSCRIBE_PLACEHOLDER,
         });
         renderedHtml = rendered.html;
         renderedText = rendered.text;

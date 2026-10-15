@@ -55,3 +55,24 @@ export const emailListMemberTable = emailSchema.table(
     index("email_list_member_rank_idx").on(t.listId, t.sampleRank, t.email),
   ],
 );
+
+/**
+ * Who stopped a brand's marketing email, recorded by Growth's own
+ * unsubscribe link and one-click header (the brand's Postmark broadcast
+ * stream leaves unsubscribes to us). Every Growth send skips these.
+ */
+export const emailOptOutTable = emailSchema.table(
+  "opt_out",
+  (t) => ({
+    brandId: t
+      .text()
+      .notNull()
+      .references(() => brandTable.id, { onDelete: "cascade" }),
+    /** Lowercased and trimmed. */
+    email: t.text().notNull(),
+    /** "link" (the footer page), "one_click" (List-Unsubscribe-Post), or an import. */
+    source: t.text().notNull(),
+    createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
+  }),
+  (t) => [primaryKey({ columns: [t.brandId, t.email] })],
+);

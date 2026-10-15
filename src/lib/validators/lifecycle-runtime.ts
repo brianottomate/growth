@@ -99,4 +99,7 @@ export interface LifecycleEmailPayload {
   text: string;
   html: string;
   delivery: NonNullable<LifecycleExecutionSnapshot["delivery"]>;
+  /** This recipient's own unsubscribe link and one-click headers, used when
+   * the stream leaves unsubscribes to Growth. */
+  unsubscribe?: { url: string; headers: { Name: string; Value: string }[] };
 }

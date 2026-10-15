@@ -6,6 +6,10 @@ import {
 } from "@/server/clients/postmark.client";
 import { env } from "@/env";
 import type { LifecycleEmailPayload } from "@/lib/validators/lifecycle-runtime";
+import {
+  growthHandlesUnsubscribes,
+  withUnsubscribeUrl,
+} from "@/server/email/unsubscribe";
 
 export function lifecycleReadiness() {
   const missing = Object.entries({
@@ -93,14 +97,20 @@ export async function sendLifecycleEmail(
 ) {
   requireLifecycleRuntime();
   const token = await postmarkServerToken(payload.delivery.serverId);
+  const own =
+    payload.unsubscribe &&
+    (await growthHandlesUnsubscribes(token, payload.delivery.messageStream))
+      ? payload.unsubscribe
+      : null;
   const [result] = await sendPostmarkBatch(token, [
     {
       From: payload.from,
       To: payload.to,
       Subject: payload.subject,
       ...(payload.replyTo ? { ReplyTo: payload.replyTo } : {}),
-      HtmlBody: payload.html,
-      TextBody: payload.text,
+      HtmlBody: own ? withUnsubscribeUrl(payload.html, own.url) : payload.html,
+      TextBody: own ? withUnsubscribeUrl(payload.text, own.url) : payload.text,
+      ...(own ? { Headers: own.headers } : {}),
       MessageStream: payload.delivery.messageStream,
       Tag: test ? "growth-test" : "growth-lifecycle",
       TrackOpens: false,

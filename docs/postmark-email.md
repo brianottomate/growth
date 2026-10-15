@@ -84,6 +84,16 @@ lifecycle flows stay in WanderOS.
   `platform_post.scheduled_at`) is being built on a separate branch. It passes
   `{{{ pm:unsubscribe }}}` as the unsubscribe URL.
 
+## Decided since (2026-10-14)
+
+One Postmark server per Performance client (option C). Postmark enabled the Bulk
+API on the account and "manage unsubscribes yourself" on the broadcast streams of
+the Wander, Winter Park Escapes and Chalets servers; a new broadcast stream needs
+the setting enabled separately. Growth adds its own unsubscribe link and
+one-click headers and keeps opt-outs in `email.opt_out` (see
+[email-audiences.md](email-audiences.md)). WanderOS announcements on the Wander
+server already add their own headers and use `SaasGuestEmailOptOut`.
+
 ## Open questions for the call
 
 1. **Per-brand servers:** do we create them, created by whom (monolith on site

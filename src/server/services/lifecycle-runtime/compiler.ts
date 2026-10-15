@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   fillFields,
+  UNSUBSCRIBE_PLACEHOLDER,
   unknownFields,
   leftoverTemplateSyntax,
 } from "@/lib/email-personalization";
@@ -153,7 +154,7 @@ export function compileJourney(
       `${step.subject} ${step.renderedHtml} ${step.renderedText}`,
       sample,
       { html: false },
-    ).replaceAll("{{{ pm:unsubscribe }}}", "");
+    ).replaceAll(UNSUBSCRIBE_PLACEHOLDER, "");
     if (leftoverTemplateSyntax(rendered))
       errors.push(
         `${step.name}: unsupported template syntax remains in the rendered email.`,
@@ -205,7 +206,7 @@ export function renderLifecycleEmail(input: {
   if (
     !html ||
     leftoverTemplateSyntax(
-      [subject, html, text].join("\n").replaceAll("{{{ pm:unsubscribe }}}", ""),
+      [subject, html, text].join("\n").replaceAll(UNSUBSCRIBE_PLACEHOLDER, ""),
     )
   )
     throw new Error("Unresolved template syntax in the reviewed email.");

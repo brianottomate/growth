@@ -13,7 +13,16 @@ import {
   messageSendSummary,
   type MessageSendSnapshot,
 } from "@/lib/email-delivery";
-import { compilePostmarkTemplate } from "@/lib/email-personalization";
+import {
+  compilePostmarkTemplate,
+  UNSUBSCRIBE_PLACEHOLDER,
+} from "@/lib/email-personalization";
+import {
+  brandOptOuts,
+  growthHandlesUnsubscribes,
+  personalUnsubscribe,
+  withUnsubscribeUrl,
+} from "@/server/email/unsubscribe";
 import { websiteEmailOptOuts } from "./email-opt-outs.service";
 import {
   postmarkServerToken,
@@ -44,7 +53,6 @@ import {
 // and the audience), approve (a person signs off), send (on demand, by an
 // owner or admin). Sending rechecks everything that can change after approval.
 
-const UNSUBSCRIBE = "{{{ pm:unsubscribe }}}";
 /** Recipients per page and per Postmark bulk request; far under its 50 MB cap. */
 const PAGE_SIZE = 10_000;
 /** A `sending` row untouched this long belongs to a run that died. */
@@ -76,7 +84,7 @@ async function renderForBrand(
     logo: spot.brand.brandIdentity?.logo ?? spot.brand.logo,
     sender: spot.brand.emailSender,
     legal: spot.brand.legalIdentity,
-    unsubscribeUrl: UNSUBSCRIBE,
+    unsubscribeUrl: UNSUBSCRIBE_PLACEHOLDER,
     recipient,
   });
 }
@@ -119,14 +127,24 @@ export async function sendBrandTestEmail(
   const sender = senderOf(spot);
   const delivery = spot.brand.emailDelivery!;
   const token = await postmarkServerToken(delivery.serverId);
+  // A real link where Growth handles unsubscribes: following it unsubscribes
+  // the tester from this brand.
+  const own = (await growthHandlesUnsubscribes(token, delivery.messageStream))
+    ? personalUnsubscribe(spot.brandId, user.email)
+    : null;
   const [result] = await sendPostmarkBatch(token, [
     {
       From: fromHeader(sender),
       To: user.email,
       ...(sender.replyTo ? { ReplyTo: sender.replyTo } : {}),
       Subject: `[Test] ${current.subject}`,
-      HtmlBody: rendered.html,
-      TextBody: rendered.text,
+      HtmlBody: own
+        ? withUnsubscribeUrl(rendered.html, own.url)
+        : rendered.html,
+      TextBody: own
+        ? withUnsubscribeUrl(rendered.text, own.url)
+        : rendered.text,
+      ...(own ? { Headers: own.headers } : {}),
       MessageStream: delivery.messageStream,
       Tag: "growth-test",
       TrackOpens: true,
@@ -393,11 +411,26 @@ export async function dispatchBrandSend(input: {
     }
     const token = await postmarkServerToken(audience.serverId);
     const sender = snapshot.sender;
-    const template = compilePostmarkTemplate({
+    const ownUnsubscribe = await growthHandlesUnsubscribes(
+      token,
+      audience.messageStream,
+    );
+    const compiled = compilePostmarkTemplate({
       subject: snapshot.email.subject,
       html: bulkSafeHtml(snapshot.preview.html),
       text: snapshot.preview.text,
     });
+    // Postmark fills its placeholder on a Postmark-managed stream; otherwise
+    // each guest's own link goes in through the template model.
+    const unsubscribeKey = (content: string) =>
+      ownUnsubscribe
+        ? content.replaceAll(UNSUBSCRIBE_PLACEHOLDER, "{{{unsubscribe_url}}}")
+        : content;
+    const template = {
+      ...compiled,
+      html: unsubscribeKey(compiled.html),
+      text: unsubscribeKey(compiled.text),
+    };
 
     const sendPage = async (recipients: EmailAudienceRecipient[]) => {
       const emails = [
@@ -405,6 +438,10 @@ export async function dispatchBrandSend(input: {
           recipients.map((recipient) => recipient.email.trim().toLowerCase()),
         ),
       ];
+      // Growth's own unsubscribes for this brand, read fresh for every page.
+      const unsubscribed = await brandOptOuts(spot.brandId, emails);
+      const isOptedOut = (email: string) =>
+        optedOut.has(email) || unsubscribed.has(email);
       // Waves of one email (100, then 1,000, then everyone) overlap by design.
       const reached = new Set(
         emails.length
@@ -439,12 +476,12 @@ export async function dispatchBrandSend(input: {
           new Map(
             batch.map((email) => [
               email,
-              !optedOut.has(email) && !reached.has(email),
+              !isOptedOut(email) && !reached.has(email),
             ]),
           ),
       );
       const skipped = emails.flatMap((email) =>
-        optedOut.has(email)
+        isOptedOut(email)
           ? [{ email, reason: "opted_out" }]
           : reached.has(email)
             ? [{ email, reason: "already_sent" }]
@@ -482,6 +519,15 @@ export async function dispatchBrandSend(input: {
         eligible.map((recipient) => [recipient.email, recipient]),
       );
       if (!fresh.length) return;
+      const guestUnsubscribe = (email: string) => {
+        const model = template.modelFor(byEmail.get(email)!);
+        if (!ownUnsubscribe) return { TemplateModel: model };
+        const own = personalUnsubscribe(spot.brandId, email);
+        return {
+          TemplateModel: { ...model, unsubscribe_url: own.url },
+          Headers: own.headers,
+        };
+      };
       // One bulk request for the page: the email once, as a Postmark template,
       // and each guest's fields. Postmark paces the release; its suppressed
       // addresses are accepted and counted as failed on its side.
@@ -497,7 +543,7 @@ export async function dispatchBrandSend(input: {
         TrackLinks: "HtmlAndText",
         Messages: fresh.map((row) => ({
           To: row.email,
-          TemplateModel: template.modelFor(byEmail.get(row.email)!),
+          ...guestUnsubscribe(row.email),
           Metadata: { message_send_id: claimed.id, platform_post_id: spot.id },
         })),
       });

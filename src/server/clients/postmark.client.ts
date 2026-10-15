@@ -280,6 +280,7 @@ export type PostmarkOutgoingMessage = {
   TrackOpens?: boolean;
   TrackLinks?: "None" | "HtmlAndText" | "HtmlOnly" | "TextOnly";
   Metadata?: Record<string, string>;
+  Headers?: { Name: string; Value: string }[];
 };
 
 export type PostmarkSendResult = {
@@ -342,6 +343,20 @@ export async function sendPostmarkBulk(
     throw new Error(`Postmark POST /email/bulk → ${response.status}: ${body}`);
   }
   return (await response.json()) as PostmarkBulkStatus;
+}
+
+/** A server's message stream, including who handles its unsubscribes. */
+export function getPostmarkMessageStream(
+  serverToken: string,
+  streamId: string,
+) {
+  return postmarkGet<{
+    ID: string;
+    MessageStreamType: string;
+    SubscriptionManagementConfiguration?: {
+      UnsubscribeHandlingType?: "None" | "Postmark" | "Custom";
+    };
+  }>(`/message-streams/${streamId}`, { serverToken });
 }
 
 export function getPostmarkBulkStatus(serverToken: string, bulkId: string) {

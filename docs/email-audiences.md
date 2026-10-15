@@ -69,6 +69,18 @@ The ledger writes each address before the request and marks it `sent` with
 delivery and bounces come back through Postmark's webhooks. Postmark templates
 refuse `<link>` stylesheets, so the web font moves into an `@import`.
 
+Who handles unsubscribes is each brand's Postmark broadcast stream setting,
+read from Postmark at send time (cached five minutes). On `Postmark` (every
+stream today) Postmark fills `{{{ pm:unsubscribe }}}`, adds the
+`List-Unsubscribe` headers and suppresses unsubscribers. On `Custom` (allowed
+for the account since 2026-10-14; one API call per stream to switch) Growth
+does it: each guest gets a signed link to `/u/<token>`, a page with an
+Unsubscribe button, plus `List-Unsubscribe` and
+`List-Unsubscribe-Post: List-Unsubscribe=One-Click` pointing at
+`/api/email/unsubscribe/<token>`. Both record `email.opt_out` (brand, email),
+which every blast page and sequence step skips whatever the stream setting.
+Postmark keeps suppressing hard bounces and spam complaints either way.
+
 Uploaded lists carry no WanderOS opt-outs. The brand's Postmark broadcast stream
 holds their unsubscribes, bounces and complaints, and the dispatcher records
 those as skipped.
