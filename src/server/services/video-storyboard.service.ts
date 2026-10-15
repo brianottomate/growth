@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp, { type OverlayOptions } from "sharp";
@@ -12,6 +12,12 @@ import {
 } from "@/lib/storyboard-limits";
 import { R2 } from "@/server/clients/r2.client";
 import type { MediaStoryboard, VideoAnalysisFrame } from "@/server/db/schema";
+
+const exists = (path: string) =>
+  access(path).then(
+    () => true,
+    () => false,
+  );
 
 /** Seeks run side by side; each is its own ffmpeg process. */
 const FRAME_CONCURRENCY = 6;
@@ -106,15 +112,25 @@ export async function cutVideoStoryboard(input: {
         while (next < timestampsMs.length) {
           const index = next++;
           const path = join(dir, `${index}.jpg`);
-          const cut = await input.ffmpeg([
-            ...["-nostdin", "-hide_banner", "-loglevel", "error", "-y"],
-            ...["-ss", (timestampsMs[index]! / 1_000).toFixed(3)],
-            ...["-i", input.source, "-frames:v", "1"],
-            ...["-vf", `scale=${cellWidth}:${cellHeight}`, "-q:v", "3", path],
-          ]);
-          if (cut.code !== 0)
+          const grab = (atMs: number) =>
+            input.ffmpeg([
+              ...["-nostdin", "-hide_banner", "-loglevel", "error", "-y"],
+              ...["-ss", (atMs / 1_000).toFixed(3)],
+              ...["-i", input.source, "-frames:v", "1"],
+              ...["-vf", `scale=${cellWidth}:${cellHeight}`, "-q:v", "3", path],
+            ]);
+          let cut = await grab(timestampsMs[index]!);
+          // The probe's duration is the container's. When the audio runs on
+          // past the picture, the last midpoint lands after the final video
+          // frame and ffmpeg writes nothing; that frame's slice still starts
+          // inside the picture.
+          if (cut.code === 0 && !(await exists(path))) {
+            timestampsMs[index] = index * sampleIntervalMs;
+            cut = await grab(timestampsMs[index]);
+          }
+          if (cut.code !== 0 || !(await exists(path)))
             throw new Error(
-              `Storyboard frame ${index + 1} failed: ${cut.stderr.trim().slice(-300)}`,
+              `Storyboard frame ${index + 1} failed: ${cut.stderr.trim().slice(-300) || "no picture at that time"}`,
             );
           frames[index] = await readFile(path);
         }

@@ -22,9 +22,11 @@ export function storyboardPlan(durationMs: number) {
   const gridSize = seconds <= 90 ? 3 : seconds <= 160 ? 4 : 5;
   const capacity = gridSize * gridSize * MAX_STORYBOARD_BOARDS;
   const sampleIntervalMs = Math.max(1_000, Math.ceil(durationMs / capacity));
+  // Rounded, not ceiled: a tail shorter than half an interval is a sliver
+  // past the last picture more often than a moment worth a frame.
   const frameCount = Math.min(
     capacity,
-    Math.max(1, Math.ceil(durationMs / sampleIntervalMs)),
+    Math.max(1, Math.round(durationMs / sampleIntervalMs)),
   );
   // Mid-interval, so a frame stands for its whole slice of the clip.
   const timestampsMs = Array.from({ length: frameCount }, (_, index) =>
