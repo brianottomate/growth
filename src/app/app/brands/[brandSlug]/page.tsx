@@ -140,7 +140,7 @@ export default async function BrandPage({
   const campaignName = new Map(spotCampaigns.map((row) => [row.id, row.name]));
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
+    <div className="space-y-6">
       <header className="space-y-1">
         <div className="flex items-center gap-2 text-sm">
           <Link

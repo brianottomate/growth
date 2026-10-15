@@ -38,7 +38,7 @@ export default async function BrandNewslettersPage({
   if (!brand) notFound();
 
   return (
-    <div className="px-6 pt-6">
+    <div>
       <NewslettersView
         brands={[brand]}
         brand={brand}

@@ -32,6 +32,7 @@ import {
 } from "@/components/channel-logos";
 import type { FollowerSnapshot } from "@/server/db/channel-schema";
 import { AD_PLATFORM_VALUES } from "@/lib/ad-platforms";
+import { ShowMore } from "./ShowMore";
 import type { SuggestionLite } from "./SuggestedChannels";
 
 export type ChannelLite = {
@@ -132,7 +133,8 @@ const isDiscovered = (c: ChannelLite) =>
   c.connectionStatus !== "connected";
 
 /**
- * Channels as one grid, one tile per network. A blue dot marks a discovered,
+ * Channels in two grids, social and ads, one tile per network, the first five
+ * of each shown until expanded. A blue dot marks a discovered,
  * unconfirmed profile; green text marks a connected ad account. Pending
  * discovery suggestions sit in the same grid as dashed tiles with accept /
  * reject, so the human confirmation step happens where the channels live.
@@ -286,6 +288,146 @@ export function BrandChannels({
     .filter((c) => c.kind === "social")
     .reduce((sum, c) => sum + (c.followerCount ?? 0), 0);
   const discoveredCount = channels.filter(isDiscovered).length;
+
+  const channelTile = (c: ChannelLite) => {
+    const posts = postCountByPlatform[c.platform] ?? 0;
+    const discovered = isDiscovered(c);
+    const connected = c.connectionStatus === "connected";
+    const label = platformLabel(c.platform);
+    const handle = c.handle && c.handle !== label ? c.handle : null;
+    return (
+      <div
+        key={c.id}
+        className="group flex items-center gap-2.5 rounded-xl border bg-background/40 px-3 py-2.5 transition-colors hover:border-foreground/20"
+      >
+        <ChannelLogo platform={c.platform} className="size-5" />
+        <button
+          type="button"
+          onClick={() => openEdit(c)}
+          className="min-w-0 flex-1 text-left"
+          title="Edit channel"
+        >
+          <span className="flex items-center gap-1.5 text-[13px] font-medium">
+            {label}
+            {discovered && (
+              <span
+                className="size-1.5 rounded-full bg-sky-400"
+                title="Discovered on the web; not yet confirmed by a connection or a pull"
+              />
+            )}
+          </span>
+          <span className="block truncate text-[11px] text-muted-foreground">
+            {c.kind === "ad" ? (
+              <>
+                <span
+                  className={
+                    connected
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : undefined
+                  }
+                >
+                  {connected ? "connected" : "not connected"}
+                </span>
+                {handle && ` · ${handle}`}
+              </>
+            ) : (
+              [
+                handle,
+                c.followerCount != null && compactFmt.format(c.followerCount),
+                posts > 0 && `${posts} ${posts === 1 ? "post" : "posts"}`,
+              ]
+                .filter(Boolean)
+                .join(" · ") || (connected ? "connected" : "no details yet")
+            )}
+          </span>
+        </button>
+        {(c.profileUrl ?? c.manageUrl) && (
+          <a
+            href={(c.profileUrl ?? c.manageUrl)!}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={c.profileUrl ? "Open page" : "Open manage page"}
+            className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+        )}
+      </div>
+    );
+  };
+
+  const suggestionTile = (s: SuggestionLite) => {
+    const rowBusy = suggBusyId === s.id;
+    return (
+      <div
+        key={s.id}
+        className="flex items-center gap-2.5 rounded-xl border border-dashed border-sky-400/40 bg-sky-400/5 px-3 py-2.5"
+      >
+        <ChannelLogo platform={s.platform} className="size-5" />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 text-[13px] font-medium">
+            {platformLabel(s.platform)}
+            <span className="size-1.5 rounded-full bg-sky-400" />
+          </span>
+          <span className="block truncate text-[11px] text-muted-foreground">
+            {s.profileUrl ? (
+              <a
+                href={s.profileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground"
+                title="Open to confirm"
+              >
+                @{s.handle}
+              </a>
+            ) : (
+              `@${s.handle}`
+            )}
+            {s.confidence != null && ` · ${Math.round(s.confidence * 100)}%`}
+            {s.verified === true &&
+              s.followerCount != null &&
+              ` · ${compactFmt.format(s.followerCount)}`}
+          </span>
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          tone="muted-danger"
+          className="size-6 shrink-0"
+          title="Reject"
+          disabled={rowBusy}
+          onClick={() => rejectM.mutate({ id: s.id })}
+        >
+          <X className="size-3.5" />
+        </Button>
+        <Button
+          size="icon"
+          className="size-6 shrink-0"
+          title="Accept — create channel"
+          loading={rowBusy && acceptM.isPending}
+          disabled={rowBusy}
+          onClick={() => acceptM.mutate({ id: s.id })}
+        >
+          <Check className="size-3.5" />
+        </Button>
+      </div>
+    );
+  };
+
+  // Social covers every organic channel, owned newsletter and blog included.
+  const groups = [
+    {
+      label: "Social",
+      items: [
+        ...sorted.filter((c) => c.kind !== "ad").map(channelTile),
+        ...suggestions.map(suggestionTile),
+      ],
+    },
+    {
+      label: "Ads",
+      items: sorted.filter((c) => c.kind === "ad").map(channelTile),
+    },
+  ].filter((group) => group.items.length > 0);
   const total = channels.length + suggestions.length;
 
   return (
@@ -322,135 +464,18 @@ export function BrandChannels({
           or add one by hand.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2 @5xl:grid-cols-4">
-          {sorted.map((c) => {
-            const posts = postCountByPlatform[c.platform] ?? 0;
-            const discovered = isDiscovered(c);
-            const connected = c.connectionStatus === "connected";
-            const label = platformLabel(c.platform);
-            const handle = c.handle && c.handle !== label ? c.handle : null;
-            return (
-              <div
-                key={c.id}
-                className="group flex items-center gap-2.5 rounded-xl border bg-background/40 px-3 py-2.5 transition-colors hover:border-foreground/20"
-              >
-                <ChannelLogo platform={c.platform} className="size-5" />
-                <button
-                  type="button"
-                  onClick={() => openEdit(c)}
-                  className="min-w-0 flex-1 text-left"
-                  title="Edit channel"
-                >
-                  <span className="flex items-center gap-1.5 text-[13px] font-medium">
-                    {label}
-                    {discovered && (
-                      <span
-                        className="size-1.5 rounded-full bg-sky-400"
-                        title="Discovered on the web; not yet confirmed by a connection or a pull"
-                      />
-                    )}
-                  </span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {c.kind === "ad" ? (
-                      <>
-                        <span
-                          className={
-                            connected
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : undefined
-                          }
-                        >
-                          {connected ? "connected" : "not connected"}
-                        </span>
-                        {handle && ` · ${handle}`}
-                      </>
-                    ) : (
-                      [
-                        handle,
-                        c.followerCount != null &&
-                          compactFmt.format(c.followerCount),
-                        posts > 0 &&
-                          `${posts} ${posts === 1 ? "post" : "posts"}`,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") ||
-                      (connected ? "connected" : "no details yet")
-                    )}
-                  </span>
-                </button>
-                {(c.profileUrl ?? c.manageUrl) && (
-                  <a
-                    href={(c.profileUrl ?? c.manageUrl)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={c.profileUrl ? "Open page" : "Open manage page"}
-                    className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
-                  >
-                    <ExternalLink className="size-3.5" />
-                  </a>
-                )}
-              </div>
-            );
-          })}
-
-          {suggestions.map((s) => {
-            const rowBusy = suggBusyId === s.id;
-            return (
-              <div
-                key={s.id}
-                className="flex items-center gap-2.5 rounded-xl border border-dashed border-sky-400/40 bg-sky-400/5 px-3 py-2.5"
-              >
-                <ChannelLogo platform={s.platform} className="size-5" />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 text-[13px] font-medium">
-                    {platformLabel(s.platform)}
-                    <span className="size-1.5 rounded-full bg-sky-400" />
-                  </span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {s.profileUrl ? (
-                      <a
-                        href={s.profileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-foreground"
-                        title="Open to confirm"
-                      >
-                        @{s.handle}
-                      </a>
-                    ) : (
-                      `@${s.handle}`
-                    )}
-                    {s.confidence != null &&
-                      ` · ${Math.round(s.confidence * 100)}%`}
-                    {s.verified === true &&
-                      s.followerCount != null &&
-                      ` · ${compactFmt.format(s.followerCount)}`}
-                  </span>
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  tone="muted-danger"
-                  className="size-6 shrink-0"
-                  title="Reject"
-                  disabled={rowBusy}
-                  onClick={() => rejectM.mutate({ id: s.id })}
-                >
-                  <X className="size-3.5" />
-                </Button>
-                <Button
-                  size="icon"
-                  className="size-6 shrink-0"
-                  title="Accept — create channel"
-                  loading={rowBusy && acceptM.isPending}
-                  disabled={rowBusy}
-                  onClick={() => acceptM.mutate({ id: s.id })}
-                >
-                  <Check className="size-3.5" />
-                </Button>
-              </div>
-            );
-          })}
+        <div className="flex flex-col gap-3">
+          {groups.map((group) => (
+            <div key={group.label} className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-medium text-muted-foreground">
+                {group.label} · {group.items.length}
+              </span>
+              <ShowMore
+                items={group.items}
+                className="grid grid-cols-1 gap-2 @xl:grid-cols-2 @5xl:grid-cols-4"
+              />
+            </div>
+          ))}
         </div>
       )}
 

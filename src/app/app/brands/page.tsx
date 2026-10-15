@@ -34,7 +34,6 @@ import {
   BrandCard,
   type BrandReadiness,
   type MediaLite,
-  type PersonaLite,
   type PillarLite,
 } from "./BrandCard";
 import { NewBrandButton } from "./NewBrandButton";
@@ -314,7 +313,7 @@ export default async function BrandsPage() {
   }
 
   // Strategy band: pillars (defaults + custom rows) with post counts, and the
-  // first persona per brand. Both read the same tables the detail page uses.
+  // brand's personas. Both read the same tables the detail page uses.
   const pillarLists = await Promise.all(
     brands.map((b) => listBrandPillars({ brandId: b.id, brandSlug: b.slug })),
   );
@@ -359,6 +358,7 @@ export default async function BrandsPage() {
         ),
         orderBy: (t, { asc }) => asc(t.createdAt),
         columns: {
+          id: true,
           brandId: true,
           name: true,
           description: true,
@@ -366,18 +366,12 @@ export default async function BrandsPage() {
         },
       })
     : [];
-  const personaByBrand = new Map<string, PersonaLite>();
-  for (const p of personas) {
-    const existing = personaByBrand.get(p.brandId);
-    if (existing) existing.count += 1;
-    else
-      personaByBrand.set(p.brandId, {
-        name: p.name,
-        description: p.description,
-        ageRanges: p.ageRanges ?? null,
-        count: 1,
-      });
-  }
+  const personasByBrand = new Map<string, typeof personas>();
+  for (const p of personas)
+    personasByBrand.set(p.brandId, [
+      ...(personasByBrand.get(p.brandId) ?? []),
+      p,
+    ]);
 
   // Media zone: library size, the six newest usable assets, and which of them
   // are in a live ad right now. Ranked in SQL so one large library cannot
@@ -570,7 +564,7 @@ export default async function BrandsPage() {
       postCountByPlatform={postCountsForBrand(brand.id)}
       readiness={readinessByBrand.get(brand.id) ?? null}
       pillars={pillarsByBrand.get(brand.id) ?? []}
-      persona={personaByBrand.get(brand.id) ?? null}
+      personas={personasByBrand.get(brand.id) ?? []}
       media={mediaFor(brand.id)}
     />
   );

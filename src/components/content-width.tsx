@@ -12,6 +12,7 @@ type ContentWidth = "contained" | "full";
 // Longest prefix wins. Anything unlisted is contained.
 const DEFAULTS: Array<[prefix: string, width: ContentWidth]> = [
   ["/app/performance", "contained"],
+  ["/app/brands", "contained"],
 ];
 
 const STORAGE_KEY = "growth.content-width";

@@ -194,7 +194,7 @@ export function PreviewsClient({
       : null;
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-10 p-6">
+    <div className="space-y-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

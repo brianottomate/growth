@@ -52,13 +52,14 @@ export default async function PerformanceBrandNewslettersPage({
   const setup = sender?.emailSender?.marketingDomain;
   const basePath = `/app/performance/clients/${slug}/newsletters`;
   const activeTab = [
+    "blasts",
     "newsletters",
     "sequences",
     "audiences",
     "settings",
   ].includes(tab ?? "")
     ? tab
-    : "blasts";
+    : "newsletters";
   const audiences = (
     <EmailAudiencesClient
       key={brand.id}
@@ -99,8 +100,8 @@ export default async function PerformanceBrandNewslettersPage({
       >
         {(
           [
-            ["blasts", "Broadcasts"],
             ["newsletters", "Newsletters"],
+            ["blasts", "Broadcasts"],
             ["sequences", "Sequences"],
             ["audiences", "Audiences"],
             ["settings", "Settings"],
@@ -108,7 +109,7 @@ export default async function PerformanceBrandNewslettersPage({
         ).map(([key, label]) => (
           <Link
             key={key}
-            href={key === "blasts" ? basePath : `${basePath}?tab=${key}`}
+            href={key === "newsletters" ? basePath : `${basePath}?tab=${key}`}
             aria-current={activeTab === key ? "page" : undefined}
             className={`rounded-md px-4 py-2 text-sm font-medium ${activeTab === key ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50"}`}
           >

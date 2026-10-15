@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { brandTable } from "@/server/db/schema";
 import { BrandChannels, type ChannelLite } from "./BrandChannels";
 import { BrandMenu } from "./BrandMenu";
+import { ShowMore } from "./ShowMore";
 import type { SuggestionLite } from "./SuggestedChannels";
 import { TrackedBrands, type TrackedLite } from "./TrackedBrands";
 
@@ -30,10 +31,10 @@ export type PillarLite = {
 };
 
 export type PersonaLite = {
+  id: string;
   name: string;
   description: string | null;
   ageRanges: string[] | null;
-  count: number;
 };
 
 export type MediaLite = {
@@ -63,7 +64,7 @@ export function BrandCard({
   readiness,
   postCountByPlatform,
   pillars,
-  persona,
+  personas,
   media,
 }: {
   brand: typeof brandTable.$inferSelect;
@@ -73,7 +74,7 @@ export function BrandCard({
   readiness: BrandReadiness | null;
   postCountByPlatform: Record<string, number>;
   pillars: PillarLite[];
-  persona: PersonaLite | null;
+  personas: PersonaLite[];
   media: MediaLite;
 }) {
   const detailHref = brand.slug ? `/app/brands/${brand.slug}` : null;
@@ -202,8 +203,9 @@ export function BrandCard({
             )}
           </div>
           {pillars.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {pillars.map((p) => (
+            <ShowMore
+              className="flex flex-wrap gap-1.5"
+              items={pillars.map((p) => (
                 <span
                   key={p.slug}
                   className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
@@ -220,7 +222,7 @@ export function BrandCard({
                   )}
                 </span>
               ))}
-            </div>
+            />
           ) : (
             <p className="text-xs text-muted-foreground">
               No pillars yet — the baseline drafts them once posts are in.
@@ -230,29 +232,37 @@ export function BrandCard({
         <div className="min-w-0">
           <div className="mb-2 flex items-center justify-between">
             <span className={LABEL}>
-              Persona{persona && persona.count > 1 && `s · ${persona.count}`}
+              Personas{personas.length > 0 && ` · ${personas.length}`}
             </span>
-            {persona && persona.count > 1 && (
+            {personas.length > 0 && (
               <Link href="/app/personas" className={QUIET_LINK}>
                 All ↗
               </Link>
             )}
           </div>
-          {persona ? (
-            <p className="line-clamp-2 text-[13px] leading-snug">
-              <span className="font-semibold">
-                {persona.name}
-                {persona.ageRanges?.length
-                  ? `, ${persona.ageRanges.join(" · ")}`
-                  : ""}
-              </span>
-              {persona.description && (
-                <span className="text-muted-foreground">
-                  {" "}
-                  — {persona.description}
-                </span>
-              )}
-            </p>
+          {personas.length > 0 ? (
+            <ShowMore
+              className="flex flex-col gap-1.5"
+              items={personas.map((persona) => (
+                <p
+                  key={persona.id}
+                  className="line-clamp-2 text-[13px] leading-snug"
+                >
+                  <span className="font-semibold">
+                    {persona.name}
+                    {persona.ageRanges?.length
+                      ? `, ${persona.ageRanges.join(" · ")}`
+                      : ""}
+                  </span>
+                  {persona.description && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      — {persona.description}
+                    </span>
+                  )}
+                </p>
+              ))}
+            />
           ) : (
             <p className="text-xs text-muted-foreground">
               No personas yet — who the brand talks to, drafted from the

@@ -147,7 +147,7 @@ export function InspirationWorkspace({
     </div>
   );
   return (
-    <div className="@container mx-auto w-full space-y-6 p-6">
+    <div className="@container w-full space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">{brandName}</p>

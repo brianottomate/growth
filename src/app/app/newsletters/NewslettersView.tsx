@@ -92,6 +92,8 @@ export async function NewslettersView({
     view?: "list" | "wall" | "read";
   }) => {
     const params = new URLSearchParams();
+    if (!seriesId && basePath.startsWith("/app/performance/clients/"))
+      params.set("tab", "blasts");
     if (input?.kind) params.set("kind", input.kind);
     if (input?.view) params.set("view", input.view);
     const query = params.toString();

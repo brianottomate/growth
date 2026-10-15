@@ -129,13 +129,7 @@ export async function PlatformCampaignView({
   );
 
   return (
-    <div
-      className={
-        workspace === "performance"
-          ? "space-y-4"
-          : "mx-auto w-full max-w-5xl space-y-4 p-6"
-      }
-    >
+    <div className="space-y-4">
       <header className="space-y-3 rounded-xl border bg-background p-4">
         {workspace !== "performance" && (
           <>

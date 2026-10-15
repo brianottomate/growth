@@ -26,7 +26,7 @@ export default async function HomeGroupsPage({
   });
   if (!brand) notFound();
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Homes & booking targets</h1>
       <p className="text-sm text-muted-foreground">
         Reusable home groups for {brand.name}. Featured homes is your default

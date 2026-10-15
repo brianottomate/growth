@@ -46,7 +46,7 @@ export default async function BrandPerformanceChecklistPage({
   if (!brand) notFound();
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div>
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link href="/app/brands" className="hover:text-foreground">
           Brands
