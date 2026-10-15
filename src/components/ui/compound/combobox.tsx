@@ -32,6 +32,8 @@ interface ComboboxProps {
   searchPlaceholder?: string;
   emptyText?: string;
   disabled?: boolean;
+  size?: "sm" | "default";
+  align?: "start" | "center" | "end";
   className?: string;
   triggerClassName?: string;
   contentClassName?: string;
@@ -46,6 +48,8 @@ export function Combobox({
   searchPlaceholder = "Search...",
   emptyText = "No results found.",
   disabled = false,
+  size = "default",
+  align = "start",
   className,
   triggerClassName,
   contentClassName,
@@ -62,6 +66,7 @@ export function Combobox({
           <PopoverTrigger asChild>
             <Button
               variant="outline"
+              size={size}
               role="combobox"
               aria-label={ariaLabel}
               aria-expanded={open}
@@ -90,8 +95,11 @@ export function Combobox({
           </PopoverTrigger>
           <PopoverContent
             className={cn("p-0", contentClassName)}
-            style={{ width: "var(--radix-popper-anchor-width)" }}
-            align="start"
+            style={{
+              width: "max(var(--radix-popper-anchor-width), 16rem)",
+              maxWidth: "var(--radix-popover-content-available-width)",
+            }}
+            align={align}
           >
             <OptionsList
               options={options}
@@ -113,6 +121,7 @@ export function Combobox({
         <DrawerTrigger asChild>
           <Button
             variant="outline"
+            size={size}
             aria-label={ariaLabel}
             className={cn("w-full justify-between", triggerClassName)}
             disabled={disabled}
@@ -183,9 +192,9 @@ function OptionsList({
               key={option.value}
               value={option.value}
               keywords={option.keywords}
-              onSelect={(currentValue) => {
+              onSelect={() => {
                 onValueChange?.(
-                  currentValue === selectedValue ? "" : currentValue,
+                  option.value === selectedValue ? "" : option.value,
                 );
                 setOpen(false);
               }}

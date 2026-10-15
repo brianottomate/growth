@@ -32,7 +32,7 @@ import {
 // campaign / lifecycle / amplification tables and attaches to a cycle via
 // their nullable performanceCycleId FK (see db/performance-schema.ts).
 
-export type PerformanceActor = { orgId: string };
+export type PerformanceActor = { orgId: string; userId?: string };
 
 export class PerformanceError extends Error {
   constructor(

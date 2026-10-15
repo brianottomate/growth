@@ -87,10 +87,20 @@ the cookie-authenticated calls must not carry it.
 
 ## Gotchas
 
-- Cookie name is `better-auth.session_token` in dev; on previews (HTTPS) it is
+- Cookie name is `better-auth.session_token` in ordinary local development; on previews (HTTPS) it is
   `__Secure-better-auth.session_token` with the `Secure` attribute. Value
   format: `encodeURIComponent("<token>.<base64 HMAC>")` — use `cookieValue`
   from the JSON verbatim.
 - Sessions last 7 days and are real rows in the shared Neon DB.
+- Local database experiments use `growth-experiment-<database fingerprint>` as
+  their cookie prefix. This fixes a confirmed collision where signing in on
+  another localhost port replaced the cookie with a token present only in a
+  different session database. The fingerprint identifies the database endpoint
+  and database name, normalizing pooled/direct Neon hosts; it contains no
+  credentials. The same database still shares cookies across app ports and
+  worktrees. Ordinary local development and deployed environments retain their
+  existing Better Auth cookie names. Use the returned `cookieName` rather than
+  hardcoding it. An experiment needs one new login after this change; existing
+  shared cookies are left untouched.
 - The session-create database hook runs (org scoping + analytics), same as a
   normal sign-in.

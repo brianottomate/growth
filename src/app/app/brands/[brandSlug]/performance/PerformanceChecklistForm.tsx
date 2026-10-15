@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Copy } from "lucide-react";
 
@@ -9,8 +9,6 @@ import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 import {
   CHECKLIST_SECTIONS,
-  checklistProgress,
-  STATUS_LABEL,
   type ChecklistField,
   type ChecklistItemMeta,
   type ChecklistValue,
@@ -57,7 +55,7 @@ export function PerformanceChecklistForm({
         setValues(res.values ?? {});
         setMeta(res.meta ?? {});
         setDirty(new Set());
-        toast.success("Checklist saved");
+        toast.success("Tracker saved");
       },
       onError: (error: { message: string }) => toast.error(error.message),
     }),
@@ -75,21 +73,9 @@ export function PerformanceChecklistForm({
     save.mutate({ id: brandId, patch });
   };
 
-  const progress = useMemo(() => checklistProgress({ values }), [values]);
-  const pct = progress.total ? (progress.done / progress.total) * 100 : 0;
-
   return (
     <div className="mt-6 space-y-6">
       <div className="flex items-center gap-3">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-foreground/60"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {progress.done}/{progress.total} done
-        </span>
         <Button
           size="sm"
           shape="round"
@@ -176,21 +162,6 @@ function Field({
 }) {
   const input =
     "h-8 rounded-lg border bg-muted/40 px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
-
-  if (field.kind === "status") {
-    return (
-      <select
-        value={typeof value === "string" ? value : ""}
-        onChange={(e) => onChange(e.target.value || null)}
-        className={`${input} w-36`}
-      >
-        <option value="">—</option>
-        <option value="yes">{STATUS_LABEL.yes}</option>
-        <option value="in_progress">{STATUS_LABEL.in_progress}</option>
-        <option value="no">{STATUS_LABEL.no}</option>
-      </select>
-    );
-  }
 
   if (field.kind === "money" || field.kind === "number") {
     return (

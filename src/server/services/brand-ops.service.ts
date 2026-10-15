@@ -5,7 +5,8 @@ import type { BrandIdentity } from "@/server/db/brand-schema";
 
 import { and, eq, sql } from "drizzle-orm";
 
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
+import { initializeBrandTasks } from "./brand-task.service";
 import {
   adAccountTable,
   adTable,
@@ -93,47 +94,52 @@ export async function createOwnedBrand(input: {
   });
   if (slugTaken) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
 
-  const [brand] = await db
-    .insert(brandTable)
-    .values({
-      id: createId("brand"),
-      organizationId: input.organizationId,
-      ownerId: input.ownerId,
-      type: input.brandType ?? "company",
-      relationship: input.relationship ?? "internal",
-      leadDomain: input.leadDomain ?? null,
-      name: input.name,
-      slug,
-      website,
-      // Owned brands are connectable from birth; the Zernio profile is
-      // created lazily on the client's first Connect click.
-      connectToken: newConnectToken(),
-      ...(input.enrichment?.tagline && { tagline: input.enrichment.tagline }),
-      ...(input.enrichment?.description && {
-        description: input.enrichment.description,
-      }),
-      ...(input.enrichment?.logo && { logo: input.enrichment.logo }),
-      ...(input.enrichment?.websiteMeta && {
-        websiteMeta: input.enrichment.websiteMeta,
-      }),
-      ...(input.enrichment?.brandIdentity && {
-        brandIdentity: input.enrichment.brandIdentity,
-      }),
-    })
-    .returning();
+  const brand = await withTransaction(async (tx) => {
+    const [created] = await tx
+      .insert(brandTable)
+      .values({
+        id: createId("brand"),
+        organizationId: input.organizationId,
+        ownerId: input.ownerId,
+        type: input.brandType ?? "company",
+        relationship: input.relationship ?? "internal",
+        leadDomain: input.leadDomain ?? null,
+        name: input.name,
+        slug,
+        website,
+        // Owned brands are connectable from birth; the Zernio profile is
+        // created lazily on the client's first Connect click.
+        connectToken: newConnectToken(),
+        ...(input.enrichment?.tagline && { tagline: input.enrichment.tagline }),
+        ...(input.enrichment?.description && {
+          description: input.enrichment.description,
+        }),
+        ...(input.enrichment?.logo && { logo: input.enrichment.logo }),
+        ...(input.enrichment?.websiteMeta && {
+          websiteMeta: input.enrichment.websiteMeta,
+        }),
+        ...(input.enrichment?.brandIdentity && {
+          brandIdentity: input.enrichment.brandIdentity,
+        }),
+      })
+      .returning();
+    if (created!.relationship === "client")
+      await initializeBrandTasks(created!.id, input.ownerId, tx);
+    return created!;
+  });
   // Detect the booking platform at creation, independent of enrichment.
   if (website) {
-    const state = await recheckBrandWebsite(brand!.id).catch((error) => {
-      console.error("WanderOS probe failed", brand!.id, error);
+    const state = await recheckBrandWebsite(brand.id).catch((error) => {
+      console.error("WanderOS probe failed", brand.id, error);
       return null;
     });
     if (state) {
-      brand!.wanderOsWebsiteId = state.websiteId;
-      brand!.wanderOsEnabled = state.enabled;
-      brand!.wanderOsCheckedAt = state.checkedAt;
+      brand.wanderOsWebsiteId = state.websiteId;
+      brand.wanderOsEnabled = state.enabled;
+      brand.wanderOsCheckedAt = state.checkedAt;
     }
   }
-  return brand!;
+  return brand;
 }
 
 /**

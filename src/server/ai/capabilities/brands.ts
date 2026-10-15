@@ -412,7 +412,10 @@ export const setBrandRelationshipAction = growthAction({
   }),
   examples: [{ brandId: "brand_winterpark", relationship: "prospect" }],
   execute: async (input, ctx) => {
-    const brand = await setBrandRelationship({ orgId: ctx.orgId }, input);
+    const brand = await setBrandRelationship(
+      { orgId: ctx.orgId, userId: ctx.userId ?? undefined },
+      input,
+    );
     return { brandId: brand.id, relationship: brand.relationship };
   },
 });

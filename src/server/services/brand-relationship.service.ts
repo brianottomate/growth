@@ -3,7 +3,8 @@ import { generateBillingCycles } from "./billing-cycles.service";
 
 import { and, eq, isNull } from "drizzle-orm";
 
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
+import { initializeBrandTasks } from "./brand-task.service";
 import {
   brandTable,
   leadDomainTable,
@@ -44,6 +45,25 @@ async function requireBrand(actor: PerformanceActor, brandId: string) {
   });
   if (!brand) throw new PerformanceError("NOT_FOUND", "Brand not found");
   return brand;
+}
+
+/** A client transition and its initial tasks commit together. */
+async function saveRelationship(
+  brand: Pick<Brand, "id" | "relationship">,
+  changes: Partial<typeof brandTable.$inferInsert>,
+  createdByUserId: string | null = null,
+) {
+  return withTransaction(async (tx) => {
+    const [updated] = await tx
+      .update(brandTable)
+      .set(changes)
+      .where(eq(brandTable.id, brand.id))
+      .returning();
+    if (!updated) throw new PerformanceError("NOT_FOUND", "Brand not found");
+    if (brand.relationship !== "client" && updated.relationship === "client")
+      await initializeBrandTasks(brand.id, createdByUserId, tx);
+    return updated;
+  });
 }
 
 /**
@@ -115,9 +135,9 @@ export async function setBrandStages(
         : isClosedStage(business)
           ? brand.relationship
           : "prospect";
-  const [updated] = await db
-    .update(brandTable)
-    .set({
+  return saveRelationship(
+    brand,
+    {
       relationship,
       ...(business && business !== brand.businessStage
         ? { businessStage: business, businessStageAt: now }
@@ -125,10 +145,9 @@ export async function setBrandStages(
       ...(input.delivery && input.delivery !== brand.deliveryStage
         ? { deliveryStage: input.delivery, deliveryStageAt: now }
         : {}),
-    })
-    .where(eq(brandTable.id, brand.id))
-    .returning();
-  return updated!;
+    },
+    actor.userId ?? null,
+  );
 }
 
 /**
@@ -148,16 +167,13 @@ export async function advanceBusinessStage(
   if (current && isClosedStage(current)) return;
   const next = laterStage(BUSINESS_STAGES, current, stage);
   if (next === current) return;
-  await db
-    .update(brandTable)
-    .set({
-      businessStage: next,
-      businessStageAt: new Date(),
-      ...(brand.relationship === "prospect" && isClientStage(next)
-        ? { relationship: "client" as const }
-        : {}),
-    })
-    .where(eq(brandTable.id, brand.id));
+  await saveRelationship(brand, {
+    businessStage: next,
+    businessStageAt: new Date(),
+    ...(brand.relationship === "prospect" && isClientStage(next)
+      ? { relationship: "client" as const }
+      : {}),
+  });
 }
 
 /** Same for delivery. Closed brands keep whatever delivery stage they ended on. */
@@ -184,19 +200,19 @@ export async function setBrandRelationship(
   actor: PerformanceActor,
   input: { brandId: string; relationship: BrandRelationship },
 ): Promise<Brand> {
-  await requireBrand(actor, input.brandId);
-  const [brand] = await db
-    .update(brandTable)
-    .set({ relationship: input.relationship })
-    .where(eq(brandTable.id, input.brandId))
-    .returning();
+  const current = await requireBrand(actor, input.brandId);
+  const brand = await saveRelationship(
+    current,
+    { relationship: input.relationship },
+    actor.userId ?? null,
+  );
   // A brand that becomes a prospect starts its journey; one that becomes a
   // client without a stage is at least past the intake line.
   if (input.relationship === "prospect")
-    await advanceBusinessStage(brand!.id, "prospect");
+    await advanceBusinessStage(brand.id, "prospect");
   if (input.relationship === "client")
-    await advanceBusinessStage(brand!.id, "signed");
-  return brand!;
+    await advanceBusinessStage(brand.id, "signed");
+  return brand;
 }
 
 /**
@@ -217,10 +233,11 @@ export async function promoteBrandToClient(
   const brand = await requireBrand(actor, input.brandId);
   const signedAt = input.signedAt ?? new Date();
 
-  await db
-    .update(brandTable)
-    .set({ relationship: "client" })
-    .where(eq(brandTable.id, brand.id));
+  await saveRelationship(
+    brand,
+    { relationship: "client" },
+    actor.userId ?? null,
+  );
   await advanceBusinessStage(brand.id, "signed");
 
   const existing = await db.query.performanceAccountTable.findFirst({

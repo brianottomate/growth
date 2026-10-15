@@ -90,8 +90,12 @@ import { requireOwnedBrand } from "./brand-access";
 
 import { growthAction, GrowthActionError } from "./types";
 
-const actorFrom = (ctx: { orgId: string }): PerformanceActor => ({
+const actorFrom = (ctx: {
+  orgId: string;
+  userId?: string | null;
+}): PerformanceActor => ({
   orgId: ctx.orgId,
+  userId: ctx.userId ?? undefined,
 });
 
 export const listPerformanceAccountsAction = growthAction({

@@ -43,6 +43,7 @@ import { seriesRouter } from "@/server/api/routers/series.router";
 import { spendRouter } from "@/server/api/routers/spend.router";
 import { studioRouter } from "@/server/api/routers/studio.router";
 import { twitterRouter } from "@/server/api/routers/twitter.router";
+import { brandTaskRouter } from "@/server/api/routers/brand-task.router";
 import { websiteRouter } from "@/server/api/routers/website.router";
 import { zernioRouter } from "@/server/api/routers/zernio.router";
 
@@ -63,6 +64,7 @@ export const appRouter = {
   amplifier: amplifierRouter,
   persona: personaRouter,
   brand: brandRouter,
+  brandTask: brandTaskRouter,
   blog: blogRouter,
   cadence: cadenceRouter,
   catalog: catalogRouter,

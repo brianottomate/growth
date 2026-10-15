@@ -211,6 +211,13 @@
       "when": 1791927645745,
       "tag": "0028_email_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792025779502,
+      "tag": "0029_brand_tasks",
+      "breakpoints": true
     }
   ]
 }

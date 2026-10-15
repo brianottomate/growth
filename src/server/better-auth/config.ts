@@ -14,6 +14,7 @@ import {
 import { nextCookies } from "better-auth/next-js";
 import { and, eq } from "drizzle-orm";
 import { wanderOAuthPolicy } from "./wander-oauth";
+import { experimentCookiePrefix } from "./experiment-cookie-prefix";
 import { getWanderMembership } from "@/server/wander-workspace";
 
 import { env } from "@/env";
@@ -103,6 +104,16 @@ export const auth = betterAuth({
     },
   }),
   secret: env.BETTER_AUTH_SECRET,
+  // An experiment explicitly selects a separate session database. Scope its
+  // cookies to that store so another localhost server cannot replace its token.
+  // Ordinary local servers keep the shared Better Auth cookie prefix.
+  advanced: {
+    cookiePrefix: experimentCookiePrefix({
+      nodeEnv: env.NODE_ENV,
+      experimentBranch: env.DB_EXPERIMENT_BRANCH,
+      databaseUrl: env.DATABASE_URL,
+    }),
+  },
   emailAndPassword: {
     enabled: true,
     // TEMPORARY (internal tool): skip email verification so teammates can sign

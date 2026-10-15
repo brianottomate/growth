@@ -17,11 +17,11 @@ import { Check, ListChecks } from "lucide-react";
 import { cn } from "@/components/ui/lib/utils";
 
 import {
-  Accordion,
-  AccordionContent,
+  AccordionRoot as Accordion,
+  AccordionPanel as AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
+} from "@wandercom/design-system-web/ui/accordion";
 import type { ReadinessChecklist as Checklist } from "@/lib/performance-readiness";
 import {
   ReadinessProgress,
@@ -52,13 +52,9 @@ export function ReadinessChecklist({
     }),
   );
   return (
-    <Accordion
-      type="single"
-      collapsible
-      defaultValue={defaultOpen ? "checklist" : undefined}
-    >
-      <AccordionItem value="checklist" border="none">
-        <AccordionTrigger appearance="compact" className="items-center">
+    <Accordion defaultValue={defaultOpen ? ["checklist"] : []}>
+      <AccordionItem value="checklist">
+        <AccordionTrigger className="items-center">
           <span className="flex flex-1 items-baseline justify-between gap-3">
             <span className="flex items-center gap-2 text-base font-semibold">
               <ListChecks
@@ -77,7 +73,7 @@ export function ReadinessChecklist({
         </div>
         <AccordionContent className="space-y-4 pb-4">
           <Accordion
-            type="multiple"
+            multiple
             defaultValue={checklist.groups
               .filter((group) => group.done < group.total)
               .map((group) => group.id)}
@@ -102,11 +98,8 @@ export function ReadinessChecklist({
               ];
               return (
                 <AccordionItem key={group.id} value={group.id}>
-                  <div className="grid grid-cols-[minmax(0,1fr)_16px] items-center gap-x-3 @lg:grid-cols-[minmax(0,1fr)_auto_16px] [&>h3]:col-span-full [&>h3]:row-start-1 [&>h3]:grid [&>h3]:grid-cols-subgrid">
-                    <AccordionTrigger
-                      appearance="compact"
-                      className="col-span-full grid min-w-0 grid-cols-subgrid items-center [&>svg]:col-start-2 @lg:[&>svg]:col-start-3"
-                    >
+                  <div className="grid grid-cols-[minmax(0,1fr)_20px] items-center gap-x-3 @lg:grid-cols-[minmax(0,1fr)_auto_20px] [&>h3]:col-span-full [&>h3]:row-start-1 [&>h3]:grid [&>h3]:grid-cols-subgrid">
+                    <AccordionTrigger className="col-span-full grid min-w-0 grid-cols-subgrid items-center [&>svg]:col-start-2 @lg:[&>svg]:col-start-3">
                       <span className="flex items-baseline gap-2">
                         <span className="text-sm font-medium">
                           {readinessGroupLabel(group.id, group.label)}

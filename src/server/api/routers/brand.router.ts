@@ -527,7 +527,11 @@ export const brandRouter = {
       const by = ctx.session.user.id;
       const byName = ctx.session.user.name ?? null;
       for (const [key, value] of Object.entries(input.patch)) {
-        if (!CHECKLIST_FIELD_KIND[key]) continue; // ignore unknown keys
+        if (!CHECKLIST_FIELD_KIND[key])
+          throw new ORPCError("BAD_REQUEST", {
+            message:
+              "Operational checklist items have moved to Client tasks. Refresh this page.",
+          });
         if (value === null || value === "") {
           delete values[key];
           delete meta[key];

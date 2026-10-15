@@ -10,6 +10,8 @@ import {
   brandPitchUrl,
 } from "@/server/services/brand-connect.service";
 
+import { BrandTasks } from "@/components/brand-tasks";
+
 import { PerformanceChecklistForm } from "./PerformanceChecklistForm";
 
 // Static Wander agency Leadsie grant, one link for all clients (mirrors ClientConnectCard).
@@ -60,11 +62,14 @@ export default async function BrandPerformanceChecklistPage({
         <span className="font-medium text-foreground">Performance</span>
       </div>
       <h1 className="mt-3 text-2xl font-semibold tracking-tight">
-        {brand.name} · Performance checklist
+        {brand.name} · Performance
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Where this client stands. Filled by hand; each item records who set it.
+        Client tasks and the commercial tracker.
       </p>
+      <div className="mt-6">
+        <BrandTasks brandId={brand.id} />
+      </div>
       <PerformanceChecklistForm
         brandId={brand.id}
         initial={brand.performanceChecklist ?? null}

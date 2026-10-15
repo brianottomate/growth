@@ -171,7 +171,7 @@ export const performanceRouter = {
       }),
     )
     .handler(async ({ context: ctx, input }) => {
-      const actor = { orgId: ctx.workspace.orgId };
+      const actor = ctx.workspace;
       // "Paid" on the brand means the fee cleared, so it lands on the cycle too.
       if (input.business === "paid") {
         await markCycleLinePaid(actor, {

@@ -17,6 +17,8 @@ import {
   readinessLinks,
 } from "@/server/services/performance-readiness.service";
 
+import { BrandTasks } from "@/components/brand-tasks";
+
 import { ReadinessChecklist } from "../../ReadinessChecklist";
 import { PerformanceClientCard } from "../../PerformanceClientCard";
 import { performanceCardFromBrand } from "@/lib/performance-card";
@@ -153,6 +155,8 @@ export default async function PerformanceBrandPage({
           />
         </section>
       ) : null}
+
+      <BrandTasks brandId={brand.id} />
 
       <SubmissionSection
         brand={brand}

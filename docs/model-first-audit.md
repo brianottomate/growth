@@ -321,3 +321,35 @@ phrases and picks a visual icon. Evidence notes have been removed as requested.
 The initial migration audit found 22 old-format profiles. A subsequent audit found 26 non-null profiles: 4 compact, 6 old profiles accepted by the temporary reader, and 16 unreadable profiles with an additional icon on the old needs/criteria/objections shape. Those 16 affected Downtime Vacation, Zion Stays, Hollyhock Suites, Seasons 4, Porchlit Properties and Chalets Hocking Hills. The operator requested deleting all personas; all 29 records (including null profiles) were purged and persona references were cleared by database foreign keys. The compatibility parser was removed. Migration 0024 remains immutable historical SQL; its test verifies the migration without relying on a runtime compatibility parser.
 
 The same strict-format audit inspected all 51 brands and 34 campaign audiences. No story text or campaign audience failed its current schema; those records were retained. Story is plain text, not an old structured variant. Audience geography already uses its current schema. No legacy format reader was found in either owning path.
+
+## Brand operational tasks (2026-10-14)
+
+The Performance tracker stored fixed operational statuses inside
+`brand.performanceChecklist.values`. It had last-editor stamps but no independent
+item identity, creator, assignee, deadline, ordering or client-specific additions.
+Those statuses now belong to `brand_task`; the old status editor and writer keys
+are retired. Commercial tracker values and the separate onboarding milestones
+keep their existing owners. Historical JSON is retained as an archive, not a task
+read fallback.
+
+The only new table is `brand_task`. Category values and default task definitions
+live in `src/lib/brand-task.ts`; tags are a normalized string array with suggested
+values, open to additional operator-entered strings. Task people reference users;
+organization membership supplies assignment eligibility through the same check as
+brand staffing. Template instances have a unique brand/template key, including
+removed rows, so repeated client initialization cannot overwrite edits or revive
+removed items. Reads never initialize or reconcile tasks.
+
+The migration initializes existing clients and brands with saved legacy task
+statuses, preserving completion and last-editor attribution where known. Migration
+creators remain unknown rather than treating the last editor as the creator.
+A production-derived disposable branch audit found 14 active clients and no saved
+legacy tracker values. Migration rehearsal produced 154 default tasks. New client
+relationships and their tasks commit together. Templates are copied values;
+ordinary client edits do not propagate later template changes.
+
+Client tasks appear on the client Overview and brand Performance page. They support
+inline titles, status, category, one assignee, date-only deadlines, notes, tags,
+ordering, removal with Undo, and open/mine/overdue/tag filtering. Completing a task
+never changes billing, access verification, or provider delivery state. The legacy
+launch-checklist API still owns onboarding milestones; it does not manage tasks.

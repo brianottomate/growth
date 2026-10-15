@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, eq, isNull } from "drizzle-orm";
 
-import { db } from "@/server/db";
+import { db, type Database, type TransactionClient } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { PerformanceError } from "./performance.service";
 
@@ -11,6 +11,23 @@ import { PerformanceError } from "./performance.service";
 // brand's organization can hold either.
 
 export type BrandStaffRole = "lead" | "cs";
+
+export async function assertOrganizationStaffUser(
+  orgId: string,
+  userId: string | null,
+  client: Database | TransactionClient = db,
+) {
+  if (!userId) return;
+  const membership = await client.query.memberTable.findFirst({
+    where: and(
+      eq(memberTable.organizationId, orgId),
+      eq(memberTable.userId, userId),
+    ),
+    columns: { id: true },
+  });
+  if (!membership)
+    throw new PerformanceError("BAD_REQUEST", "Not in this organization");
+}
 
 /** The organization's people, for the pickers. */
 export async function loadStaffRoster(orgId: string) {
@@ -27,17 +44,7 @@ export async function setBrandStaff(
   orgId: string,
   input: { brandId: string; role: BrandStaffRole; userId: string | null },
 ) {
-  if (input.userId) {
-    const membership = await db.query.memberTable.findFirst({
-      where: and(
-        eq(memberTable.organizationId, orgId),
-        eq(memberTable.userId, input.userId),
-      ),
-      columns: { id: true },
-    });
-    if (!membership)
-      throw new PerformanceError("BAD_REQUEST", "Not in this organization");
-  }
+  await assertOrganizationStaffUser(orgId, input.userId);
   const [updated] = await db
     .update(brandTable)
     .set(

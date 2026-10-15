@@ -12,7 +12,11 @@ const inputStyleVariants = cva("", {
       error: "border-destructive focus-visible:ring-destructive",
       success: "border-green-600 focus-visible:ring-green-600",
     },
-    appearance: { swatch: "p-0.5" },
+    appearance: {
+      swatch: "p-0.5",
+      inline:
+        "border-transparent px-1 shadow-none hover:bg-muted/50 focus-visible:border-input dark:bg-transparent",
+    },
   },
 });
 

@@ -1,10 +1,10 @@
 // The MANUAL performance checklist: one place an operator records where a
 // client stands, whether or not they filed the intake. Each field carries who
 // last set it and when, like a comment, so the desk can see who moved what.
-// Explicit launch milestones live alongside tracker fields in `launch`.
+// Operational work lives in brand_task; older status values here are archival.
+// Explicit onboarding milestones live alongside tracker fields in `launch`.
 // Neither is inferred from asset or provider state. Client-safe.
 
-export type ChecklistStatus = "yes" | "no" | "in_progress";
 export type ChecklistValue = string | number | null;
 
 /** Who last set a field, and when. Server-stamped from the session, never trusted from the client. */
@@ -22,12 +22,7 @@ export type PerformanceChecklist = {
   meta?: Record<string, ChecklistItemMeta>;
 };
 
-export type ChecklistFieldKind =
-  | "text"
-  | "money"
-  | "number"
-  | "date"
-  | "status";
+export type ChecklistFieldKind = "text" | "money" | "number" | "date";
 
 export type ChecklistField = {
   key: string;
@@ -51,35 +46,6 @@ export const CHECKLIST_SECTIONS: {
     ],
   },
   {
-    title: "Onboarding & Setup",
-    fields: [
-      {
-        key: "metaConnected",
-        label: "Facebook / Meta connection",
-        kind: "status",
-      },
-      { key: "googleAdsAccount", label: "Google Ads account", kind: "status" },
-      { key: "googleBilling", label: "Google billing", kind: "status" },
-      { key: "catalogCreative", label: "Catalog ad creative", kind: "status" },
-      {
-        key: "carouselCreative",
-        label: "Carousel ad creative",
-        kind: "status",
-      },
-      { key: "heroCreative", label: "Hero ad creative", kind: "status" },
-      { key: "adCopy", label: "Ad copy", kind: "status" },
-      { key: "adsLive", label: "Ads live", kind: "status" },
-    ],
-  },
-  {
-    title: "Marketing",
-    fields: [
-      { key: "newsletter", label: "Wander newsletter", kind: "status" },
-      { key: "influencer", label: "Influencer", kind: "status" },
-      { key: "socialPosts", label: "Social media posts", kind: "status" },
-    ],
-  },
-  {
     title: "Results",
     fields: [
       { key: "cpb", label: "Cost per booking (CPB)", kind: "money" },
@@ -94,22 +60,3 @@ export const CHECKLIST_FIELDS: ChecklistField[] = CHECKLIST_SECTIONS.flatMap(
 
 export const CHECKLIST_FIELD_KIND: Record<string, ChecklistFieldKind> =
   Object.fromEntries(CHECKLIST_FIELDS.map((f) => [f.key, f.kind]));
-
-/** Status items count toward the completion bar; a "yes" is done. */
-export const CHECKLIST_STATUS_KEYS = CHECKLIST_FIELDS.filter(
-  (f) => f.kind === "status",
-).map((f) => f.key);
-
-export function checklistProgress(checklist: PerformanceChecklist | null) {
-  const values = checklist?.values ?? {};
-  const done = CHECKLIST_STATUS_KEYS.filter(
-    (key) => values[key] === "yes",
-  ).length;
-  return { done, total: CHECKLIST_STATUS_KEYS.length };
-}
-
-export const STATUS_LABEL: Record<ChecklistStatus, string> = {
-  yes: "Yes",
-  in_progress: "In progress",
-  no: "No",
-};
