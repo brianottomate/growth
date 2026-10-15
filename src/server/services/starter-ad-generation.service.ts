@@ -57,6 +57,7 @@ const PROVIDER = "starter-ads";
 type Input = z.infer<typeof starterGenerationSchema> & {
   organizationId: string;
   userId?: string;
+  parentRunId?: string;
 };
 
 export async function startStarterGeneration(input: Input) {
@@ -82,6 +83,7 @@ export async function startStarterGeneration(input: Input) {
     organizationId: input.organizationId,
     brandId: brand.id,
     createdBy: input.userId,
+    parentRunId: input.parentRunId,
     campaignId: campaign?.id,
     workflowType: "starter-ads",
     model: MODEL,

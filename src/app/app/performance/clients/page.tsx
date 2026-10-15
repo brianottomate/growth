@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { workspaceActor } from "@/server/workspace-actor";
 import { loadPerformanceDesk } from "@/server/services/performance-desk.service";
+import { loadPerformanceConnections } from "@/server/services/performance-connections.service";
 import { performanceCardFromBrand } from "@/lib/performance-card";
 import { PipelineBoard } from "../PipelineBoard";
 import { PerformancePageHeader } from "../PageHeader";
@@ -19,9 +20,18 @@ export default async function PerformanceClientsPage() {
   const actor = await workspaceActor();
   if (!actor) redirect("/signin");
   const desk = await loadPerformanceDesk(actor.orgId);
-  const readiness = await loadBrandReadiness(desk.brands);
+  const [readiness, connections] = await Promise.all([
+    loadBrandReadiness(desk.brands),
+    loadPerformanceConnections(
+      actor.orgId,
+      desk.brands.map((brand) => brand.id),
+    ),
+  ]);
   const cards = desk.brands.map((brand) => {
-    const card = performanceCardFromBrand(brand);
+    const card = performanceCardFromBrand({
+      ...brand,
+      connections: connections.get(brand.id),
+    });
     const observed = readiness.get(brand.id);
     return {
       ...card,

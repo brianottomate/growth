@@ -353,3 +353,29 @@ inline titles, status, category, one assignee, date-only deadlines, notes, tags,
 ordering, removal with Undo, and open/mine/overdue/tag filtering. Completing a task
 never changes billing, access verification, or provider delivery state. The legacy
 launch-checklist API still owns onboarding milestones; it does not manage tasks.
+
+### Performance onboarding and stage handoffs (2026-10-15)
+
+WanderOS import owns the initial preparation sequence: inventory, Featured homes,
+destinations, missing personas, Ad Studio drafts, one standalone broadcast and
+catalog preparation. A broadcast is a content post with one newsletter platform
+post and no series. Existing persona and creative entities remain authoritative;
+a workflow records their IDs and completion, rather than creating shadow copies.
+Older completed imports advertise missing preparation steps and resume those only,
+preserving completed catalog work and operator-corrected photos.
+
+Connection cards derive profile ownership, explicit shared connection ownership,
+allowlisted Meta destinations, tracking defaults (including manager inheritance)
+and published WanderOS pixel configuration. No editable readiness booleans are
+added. Unknown provider/site health stays unknown. Published pixel configuration
+is installation evidence, not proof of event delivery to Meta.
+
+Creative and Delivery entries enqueue a workflow receipt in the same transaction
+as the stage write. A row lock makes the before/after comparison authoritative;
+reorders and repeated saves do not create new handoffs, while re-entry does.
+Only queued notifications can be recovered automatically; an ambiguous send is
+never replayed. The existing workflow activity view exposes failures.
+
+Public intake slugs remain readable without exposing private connection or DNS
+credentials. Shared onboarding links now prefer the brand token; only token-based
+prefill includes the private Growth Connect and active email/DNS links.

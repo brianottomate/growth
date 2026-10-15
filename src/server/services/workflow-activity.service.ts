@@ -14,6 +14,12 @@ const names: Record<
   string,
   { title: string; destination: string; path: string; unit: string }
 > = {
+  "performance-stage-notification": {
+    title: "Slack stage handoff",
+    destination: "Client",
+    path: "",
+    unit: "messages",
+  },
   "platform-push": {
     title: "Pushing campaign",
     destination: "Campaign",

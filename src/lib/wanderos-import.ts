@@ -4,12 +4,18 @@ export const WANDEROS_IMPORT_STEPS = [
   "homes",
   "featured",
   "destinations",
+  "personas",
+  "ads",
+  "broadcast",
   "catalog",
 ] as const;
 export const WANDEROS_IMPORT_LABELS = {
   homes: "Import homes",
   featured: "Select Featured homes",
   destinations: "Create destinations",
+  personas: "Prepare personas",
+  ads: "Draft starter ads",
+  broadcast: "Draft first broadcast",
   catalog: "Prepare catalog",
 };
 export const wanderOsImportStepSchema = z.object({

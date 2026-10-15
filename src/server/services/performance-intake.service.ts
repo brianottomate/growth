@@ -1,4 +1,5 @@
 import { validIntakeUrl } from "./performance-settings.service";
+import { privatePerformanceLinks } from "@/lib/performance-client-links";
 import {
   STANDARD_PITCH_DEFAULTS,
   publicPitchSettings,
@@ -327,6 +328,8 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
     tagline: true,
     connectTokenIssuedByName: true,
     connectTokenIssuedByEmail: true,
+    connectToken: true,
+    emailSender: true,
     organizationId: true,
     // The favicon here is the only square mark we hold for most brands.
     websiteMeta: true,
@@ -410,6 +413,11 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
       .filter((url): url is string => Boolean(url)),
     repName: brand.connectTokenIssuedByName?.split(" ")[0] ?? null,
     repEmail: brand.connectTokenIssuedByEmail,
+    links: privatePerformanceLinks(
+      byToken,
+      brand.connectToken,
+      brand.emailSender?.marketingDomain,
+    ),
   };
 }
 

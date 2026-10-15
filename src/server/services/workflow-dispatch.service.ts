@@ -1,4 +1,5 @@
 import "server-only";
+import { runPerformanceStageNotification } from "./performance-stage-notification.service";
 import { and, asc, eq, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db";
@@ -29,6 +30,10 @@ export async function recoverQueuedWorkflows() {
   await Promise.all(
     rows.map(async (run) => {
       try {
+        if (run.workflowType === "performance-stage-notification") {
+          await runPerformanceStageNotification(run.id);
+          return;
+        }
         if (!run.createdBy) throw new Error("The operator no longer exists");
         const brand = await catalogBrand(run.createdBy, run.brandId);
         if (brand.organizationId !== run.organizationId)

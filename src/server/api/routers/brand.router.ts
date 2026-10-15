@@ -967,11 +967,10 @@ export const brandRouter = {
       const brand = await assertBrandManageable(ctx, input.brandId);
       return {
         url: brand.connectToken ? brandConnectUrl(brand.connectToken) : null,
-        // Slug reads better in a link a rep sends, and resolves the same.
-        intakeUrl: brand.slug
-          ? brandIntakeUrl(brand.slug)
-          : brand.connectToken
-            ? brandIntakeUrl(brand.connectToken)
+        intakeUrl: brand.connectToken
+          ? brandIntakeUrl(brand.connectToken)
+          : brand.slug
+            ? brandIntakeUrl(brand.slug)
             : null,
         // Slug only: the pitch goes out before anything is signed and gets
         // read out loud, and the page shows nothing a token would protect.

@@ -47,6 +47,7 @@ import {
   writeCatalogAdCopyActionOutputSchema,
 } from "./outputs/catalog";
 import { growthAction } from "./types";
+import { requireOwnedBrand } from "./brand-access";
 
 import { wanderOsImportRunSchema } from "@/lib/wanderos-import";
 import {
@@ -73,27 +74,62 @@ export const importWanderOsAction = growthAction({
     run: wanderOsImportRunSchema,
   }),
   description:
-    "Requires enriched brand identity, saved brand story and creative mark before starting. Import WanderOS in the background: import homes, select up to five Featured homes while keeping existing selections, create destinations if none exist, and prepare initial catalog photo/copy plus AI-generated shared post copy when unset. Saved post copy is preserved. Follow wanderOsImportStatus for progress. Retry resumes unfinished steps. Does not approve or export cards.",
+    "Onboard a WanderOS brand after identity, story and creative mark are saved: import homes, select Featured homes, create destinations and missing personas, draft starter ads in Ad Studio, draft one standalone email broadcast, and prepare the catalog. Existing selections, personas and drafts are preserved. Starts immediately; call adsRead.wanderOsImportStatus with waitSeconds:20 to follow progress. Retry resumes unfinished steps. Nothing is approved, scheduled, sent, pushed or exported.",
   examples: [{ brandId: "brd_01" }],
   execute: async (input, ctx) => {
+    await requireOwnedBrand(input.brandId, ctx);
     const actor = { ...input, userId: ctx.userId };
     const result = await startWanderOsImport(actor);
-    if (result.started) after(() => runWanderOsImport(result.run.id, actor));
+    if (result.started) {
+      // Start before the chat stream ends so a status tool can wait in this turn.
+      const work = runWanderOsImport(result.run.id, actor).catch(
+        (error: unknown) => {
+          console.error(
+            "WanderOS worker could not start; queued recovery will retry",
+            {
+              runId: result.run.id,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Unknown startup failure",
+            },
+          );
+        },
+      );
+      after(() => work);
+    }
     return result;
   },
 });
 export const wanderOsImportStatusAction = growthAction({
-  inputSchema: brandInput,
+  inputSchema: brandInput.extend({
+    waitSeconds: z.number().int().min(0).max(20).optional(),
+  }),
   outputSchema: z.object({
     run: wanderOsImportRunSchema.nullable(),
     missingFoundations: z.array(z.string()),
     setupHref: z.string(),
+    needsPreparation: z.boolean(),
   }),
   description:
-    "Read missing brand setup prerequisites and the latest WanderOS import progress for homes, Featured selection, destinations and catalog preparation.",
+    "Read WanderOS onboarding progress, including personas, Ad Studio drafts and the first broadcast. If needsPreparation is true, call importWanderOs to add new preparation steps to an older completed import without repeating its completed work. Set waitSeconds:20 to wait for a terminal result; repeat while queued/running. Continue when succeeded. Failed steps retain saved work and report the reason.",
   examples: [{ brandId: "brd_01" }],
-  execute: (input, ctx) =>
-    wanderOsImportStatus({ ...input, userId: ctx.userId }),
+  execute: async (input, ctx) => {
+    await requireOwnedBrand(input.brandId, ctx);
+    const until = Date.now() + (input.waitSeconds ?? 0) * 1000;
+    let result = await wanderOsImportStatus({ ...input, userId: ctx.userId });
+    while (
+      result.run &&
+      ["queued", "running"].includes(result.run.status) &&
+      Date.now() < until
+    ) {
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, Math.min(2000, until - Date.now())),
+      );
+      result = await wanderOsImportStatus({ ...input, userId: ctx.userId });
+    }
+    return result;
+  },
 });
 
 export const catalogStateAction = growthAction({

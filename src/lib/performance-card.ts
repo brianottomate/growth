@@ -1,4 +1,5 @@
 import type { PerformanceSettings } from "@/server/db/brand-schema";
+import type { PerformanceConnectionSummary } from "./performance-connections";
 import { pipelineStage, type PipelineStage } from "./performance-pipeline";
 import type { PerformanceCardState } from "./performance-card-state";
 import type { ReadinessChecklist, ReadinessFix } from "./performance-readiness";
@@ -16,6 +17,7 @@ export type PipelineBillingCycle = {
 };
 
 export type PerformancePipelineCard = {
+  connections?: PerformanceConnectionSummary;
   id: string;
   name: string;
   logo: string | null;
@@ -53,6 +55,7 @@ type StaffMember = { id: string; name: string | null; image: string | null };
 
 /** Recorded workflow state is never filled from campaigns, cycles, or the old delivery stage. */
 export function performanceCardFromBrand(brand: {
+  connections?: PerformanceConnectionSummary;
   id: string;
   name: string;
   slug: string | null;
@@ -71,6 +74,7 @@ export function performanceCardFromBrand(brand: {
   const selectedPeriod = brand.settings?.cardState?.billingPeriod ?? period;
   const selectedCycle = cycles.find((cycle) => cycle.period === selectedPeriod);
   return {
+    connections: brand.connections,
     id: brand.id,
     name: brand.name,
     logo: brand.logo,

@@ -1,4 +1,6 @@
 import { readPaymentSettings } from "./performance-payment-state";
+import { queuePerformanceStageNotification } from "./performance-stage-notification.service";
+import { pipelineStage } from "@/lib/performance-pipeline";
 import "server-only";
 import { manualBillingPatchSchema } from "@/lib/manual-billing";
 import { currentPeriod } from "@/lib/performance-billing";
@@ -98,14 +100,34 @@ async function writeSettings(
   input: SettingsInput,
   client: Database | TransactionClient,
 ) {
-  const brand = await client.query.brandTable.findFirst({
-    where: and(
-      eq(brandTable.id, input.brandId),
-      eq(brandTable.organizationId, input.orgId),
-      isNull(brandTable.deletedAt),
-    ),
-    columns: { id: true, performanceSettings: true },
-  });
+  const brand =
+    input.patch.pipelineStage !== undefined
+      ? (
+          await client
+            .select({
+              id: brandTable.id,
+              relationship: brandTable.relationship,
+              performanceSettings: brandTable.performanceSettings,
+            })
+            .from(brandTable)
+            .where(
+              and(
+                eq(brandTable.id, input.brandId),
+                eq(brandTable.organizationId, input.orgId),
+                isNull(brandTable.deletedAt),
+              ),
+            )
+            .limit(1)
+            .for("update")
+        )[0]
+      : await client.query.brandTable.findFirst({
+          where: and(
+            eq(brandTable.id, input.brandId),
+            eq(brandTable.organizationId, input.orgId),
+            isNull(brandTable.deletedAt),
+          ),
+          columns: { id: true, relationship: true, performanceSettings: true },
+        });
   if (!brand) throw new PerformanceSettingsError(404, "Brand not found");
 
   const current = brand.performanceSettings ?? {};
@@ -211,6 +233,22 @@ async function writeSettings(
     )
     .returning();
   if (!saved.length) throw new PerformanceSettingsError(404, "Brand not found");
+  if (changed.includes("pipelineStage")) {
+    await queuePerformanceStageNotification(client, {
+      brandId: brand.id,
+      orgId: input.orgId,
+      userId: editor?.id ?? null,
+      by: next.updatedBy ?? null,
+      from: pipelineStage({
+        relationship: brand.relationship,
+        pipelineStage: current.pipelineStage,
+      }),
+      to: pipelineStage({
+        relationship: brand.relationship,
+        pipelineStage: next.pipelineStage,
+      }),
+    });
+  }
   return {
     settings: await readPaymentSettings(
       brand.id,

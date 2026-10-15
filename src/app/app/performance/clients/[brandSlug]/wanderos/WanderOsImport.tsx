@@ -64,9 +64,11 @@ export function ImportWanderOsButton({ brandId }: { brandId: string }) {
     >
       {busy
         ? "Importing WanderOS…"
-        : progress.data?.run?.status === "failed"
-          ? "Retry import"
-          : "Import WanderOS"}
+        : progress.data?.needsPreparation
+          ? "Prepare first drafts"
+          : progress.data?.run?.status === "failed"
+            ? "Retry import"
+            : "Import WanderOS"}
     </Button>
   );
 }

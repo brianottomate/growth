@@ -1,26 +1,19 @@
 import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
-import Link from "next/link";
-import { Mail } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-
-import { EmptyState } from "@/components/ui/empty-state";
 import { optionalDmarcRecords } from "@/lib/email-dmarc";
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
 import { brandIntakeUrl } from "@/server/services/brand-connect.service";
 import { getEmailDmarcStatus } from "@/server/services/email-dmarc.service";
 import { getBrandEmailDns } from "@/server/services/email-dns.service";
-import { emailDnsLinkActive } from "@/server/services/email-dns-link";
+import { privatePerformanceLinks } from "@/lib/performance-client-links";
 
-import { WorkspaceCard } from "../../../WorkspaceCard";
 import { OnboardingEmail } from "./OnboardingEmail";
 
 /** Clients always get production links, whichever deployment renders this. */
-const GROWTH_PROD_URL = "https://growth-red.vercel.app";
 
-/** Copy-ready welcome email; only for brands that already send through Postmark. */
+/** Copy-ready onboarding at every setup stage; DNS records are optional. */
 export async function OnboardingEmailCard({
   brandId,
   orgId,
@@ -39,60 +32,49 @@ export async function OnboardingEmailCard({
       slug: true,
       connectToken: true,
       emailDelivery: true,
+      emailSender: true,
     },
   });
   if (!brand) return null;
 
-  const blocked = (title: string, href?: string) => (
-    <WorkspaceCard title="Onboarding email" icon={Mail}>
-      <EmptyState
-        compact
-        icon={Mail}
-        title={title}
-        actions={
-          href ? (
-            <Button asChild size="sm">
-              <Link href={href}>Open Email tab</Link>
-            </Button>
-          ) : null
-        }
-      />
-    </WorkspaceCard>
+  const dns =
+    brand.emailDelivery?.provider === "postmark"
+      ? await getBrandEmailDns(brandId, orgId).catch(
+          () => "unavailable" as const,
+        )
+      : null;
+  const available = dns && dns !== "unavailable" ? dns : null;
+  const dmarc = available
+    ? await getEmailDmarcStatus(
+        available.setup.rootDomain,
+        available.setup.sendingDomain,
+      )
+    : null;
+  const setup = available?.setup;
+  const handle = brand.connectToken ?? brand.slug;
+  const privateLinks = privatePerformanceLinks(
+    true,
+    brand.connectToken,
+    brand.emailSender?.marketingDomain,
   );
-  if (brand.emailDelivery?.provider !== "postmark")
-    return blocked("No Postmark server yet");
-
-  const dns = await getBrandEmailDns(brandId, orgId).catch(
-    () => "unavailable" as const,
-  );
-  if (dns === "unavailable") return blocked("Postmark records unavailable");
-  if (!dns)
-    return blocked(
-      "No sending domain yet",
-      `/app/performance/clients/${brand.slug ?? brandId}/newsletters`,
-    );
-
-  const { setup, status } = dns;
-  const dmarc = await getEmailDmarcStatus(
-    setup.rootDomain,
-    setup.sendingDomain,
-  );
-  const handle = brand.slug ?? brand.connectToken;
   return (
     <OnboardingEmail
       brandName={brand.name}
-      rootDomain={setup.rootDomain}
-      sendingDomain={setup.sendingDomain}
-      verified={status.verified}
-      records={[...status.records, ...optionalDmarcRecords(dmarc, true)]}
+      rootDomain={setup?.rootDomain ?? ""}
+      sendingDomain={setup?.sendingDomain ?? ""}
+      verified={available?.status.verified ?? false}
+      records={
+        available
+          ? [
+              ...available.status.records,
+              ...(dmarc ? optionalDmarcRecords(dmarc, true) : []),
+            ]
+          : []
+      }
       links={{
         intake: handle ? brandIntakeUrl(handle) : null,
-        connect: brand.connectToken
-          ? `${GROWTH_PROD_URL}/connect/${brand.connectToken}`
-          : null,
-        dns: emailDnsLinkActive(setup)
-          ? `${GROWTH_PROD_URL}/connect/email/${setup.token}`
-          : null,
+        connect: privateLinks.connect,
+        dns: privateLinks.emailDns,
       }}
     />
   );

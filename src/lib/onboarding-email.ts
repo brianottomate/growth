@@ -40,6 +40,7 @@ export type OnboardingEmailInput = {
   sendingDomain: string;
   records: EmailDnsRecord[];
   customerIo: boolean;
+  includeDnsRecords?: boolean;
   links: {
     intake: string | null;
     connect: string | null;
@@ -107,13 +108,20 @@ export function composeOnboardingEmail(input: OnboardingEmailInput) {
           ]),
         ]
       : []),
+    ...(input.includeDnsRecords !== false && records.length
+      ? [
+          "",
+          dnsIntro,
+          "",
+          ...records.flatMap((record, index) => [
+            ...recordLines(record, index),
+            "",
+          ]),
+          scope,
+        ]
+      : []),
     "",
-    dnsIntro,
-    "",
-    ...records.flatMap((record, index) => [...recordLines(record, index), ""]),
-    scope,
-    "",
-    "Reply once they're added and we'll confirm on our end.",
+    "Reply if you need a hand with any of these steps.",
     "",
     "Thanks,",
   ].join("\n");
@@ -131,13 +139,17 @@ export function composeOnboardingEmail(input: OnboardingEmailInput) {
           )
           .join("")}</ol>`
       : "",
-    `<p>${escape(dnsIntro)}</p>`,
-    ...records.map(
-      (record, index) =>
-        `<p ${mono}>${recordLines(record, index).map(escape).join("<br>")}</p>`,
-    ),
-    `<p>${escape(scope)}</p>`,
-    "<p>Reply once they're added and we'll confirm on our end.</p>",
+    ...(input.includeDnsRecords !== false && records.length
+      ? [
+          `<p>${escape(dnsIntro)}</p>`,
+          ...records.map(
+            (record, index) =>
+              `<p ${mono}>${recordLines(record, index).map(escape).join("<br>")}</p>`,
+          ),
+          `<p>${escape(scope)}</p>`,
+        ]
+      : []),
+    "<p>Reply if you need a hand with any of these steps.</p>",
     "<p>Thanks,</p>",
   ].join("");
 

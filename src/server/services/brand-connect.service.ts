@@ -122,8 +122,8 @@ export function brandConnectUrl(token: string): string {
  * of the form. One credential still covers both surfaces, so regenerating
  * revokes this and the connect link together.
  *
- * A brand slug reads better than a token and resolves the same, so it is
- * preferred when the brand has one.
+ * Prefer a private token when sharing onboarding: only token-addressed
+ * forms can expose the client's account and email/DNS setup credentials.
  */
 export function brandIntakeUrl(handle: string): string {
   return `${env.WANDER_COM_BASE_URL}/internal/intake/${handle}`;
@@ -273,6 +273,8 @@ export async function getBrandConnectStatus(brandId: string) {
     where: and(
       eq(channelTable.brandId, brandId),
       eq(channelTable.defaultProvider, "zernio"),
+      eq(channelTable.isActive, true),
+      eq(channelTable.connectionStatus, "connected"),
       // An ad channel has no externalId until ads-sync learns the platform's
       // ad-account id, but it is connected the moment the client authorises.
       isNull(channelTable.deletedAt),

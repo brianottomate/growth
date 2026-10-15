@@ -416,10 +416,10 @@ export async function loadPerformanceDesk(
         website: brand.website,
         relationship: brand.relationship,
         hasMark: Boolean(brand.brandMark),
-        intakeUrl: brand.slug
-          ? brandIntakeUrl(brand.slug)
-          : brand.connectToken
-            ? brandIntakeUrl(brand.connectToken)
+        intakeUrl: brand.connectToken
+          ? brandIntakeUrl(brand.connectToken)
+          : brand.slug
+            ? brandIntakeUrl(brand.slug)
             : null,
         pitchUrl: brand.slug ? brandPitchUrl(brand.slug) : null,
         account: account

@@ -30,7 +30,7 @@ export function NewsletterChatStart({
             ? `Set up ${brandName ?? "this brand"}’s newsletter. Read the brand story, voice, website context, homes and existing content first. Recommend a newsletter name, reader promise, structure and cadence, then create the series and draft its first two distinct editions using verified brand facts, photos and booking links. Use existing work where appropriate. Make a useful proposal rather than starting with a questionnaire. Keep both editions unscheduled and unapproved; do not send anything. Show the suggested direction and links to the drafts so we can shape them.`
             : series
               ? `Help me shape newsletter ${series.name} (series ${series.id}) and plan its next editions. Keep new email slots linked to this series. Talk through the premise and content-calendar timing before creating slots. Do not generate a full email until we select that individual edition.`
-              : "Help me plan a newsletter issue or one-off email broadcast. Talk through the premise, whether it belongs to a series or pillar, and its content-calendar timing before creating an empty slot. Do not generate the full email until we select that individual slot.",
+              : "Help me shape one standalone email broadcast. Read this brand's story, featured homes and existing broadcast drafts first. Use an existing draft when appropriate. Propose a premise, template, homes and CTA, then create or refine that single broadcast once we agree. Keep it unscheduled unless I give a send time. Do not create a newsletter series or sequence, or ask about series or pillars, unless I request one. Do not send anything.",
         })
       }
     >

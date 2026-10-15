@@ -21,7 +21,7 @@ Run this when the operator asks to start a campaign for a client that already ex
 
 ## 3. Starter ideas
 
-The ideas are made from the brand's featured homes. If none are featured, stop and ask the operator to pick them on Setup (or feature the homes the intake named with `performanceWrite.updateHome`, one call per home, when the operator says so). Then ask the operator to press From home group on Ad studio (Featured homes, Generate ads with AI): a static and a carousel per featured home plus a hero carousel, every one unapproved. When they are made, attach them to the campaign with `adsWrite.attachAdSet` and say how many.
+Read the brand's saved Ad Studio drafts first. WanderOS onboarding already prepares a static and carousel per Featured home plus a hero carousel, all unapproved. Reuse those drafts instead of generating another set. If onboarding is missing, use `adsRead.wanderOsImportStatus`, start `adsWrite.importWanderOs`, and follow it with `waitSeconds: 20` until it succeeds or fails. Do not ask the operator to press generation buttons. Attach the saved drafts to the campaign with `adsWrite.attachAdSet` only when requested, and report the count.
 
 ## 4. Hand back
 

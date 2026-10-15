@@ -76,7 +76,7 @@ export const getEmailDraft = growthAction({
 export const createEmailSlot = growthAction({
   outputSchema: createEmailSlotOutputSchema,
   description:
-    "Create one empty newsletter issue or one-off blast as a Growth content-calendar slot after the operator has chosen the premise and timing. This deliberately does not generate the full email; generation happens only for an individually selected slot.",
+    "Create one empty email slot after the operator chooses the premise. A standalone broadcast or blast omits seriesId; only explicit newsletter editions belong to a series. plannedAt is optional: leave drafts unscheduled unless a time was given. This does not generate the full email; draftFromTemplate fills one selected slot.",
   inputSchema: z.object({
     brandId: z.string(),
     title: z.string().trim().min(1).max(160),

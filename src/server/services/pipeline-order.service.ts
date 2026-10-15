@@ -5,6 +5,7 @@ import { brandTable, userTable } from "@/server/db/schema";
 import { pipelineStage, type PipelineStage } from "@/lib/performance-pipeline";
 import { planPipelineOrder } from "@/lib/pipeline-order";
 import { PerformanceError } from "./performance.service";
+import { queuePerformanceStageNotification } from "./performance-stage-notification.service";
 
 export async function movePipelineCard(input: {
   orgId: string;
@@ -91,6 +92,17 @@ export async function movePipelineCard(input: {
           ),
         );
     }
+    await queuePerformanceStageNotification(tx, {
+      brandId: moved.id,
+      orgId: input.orgId,
+      userId: input.userId,
+      by: editor?.name ?? editor?.email ?? input.userId,
+      from: pipelineStage({
+        relationship: moved.relationship,
+        pipelineStage: moved.settings?.pipelineStage,
+      }),
+      to: input.stage,
+    });
     return { stage: input.stage, positions: Object.fromEntries(updates) };
   });
 }

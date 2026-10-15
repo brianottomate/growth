@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PerformanceNote } from "./PerformanceNote";
 import { CardBilling } from "./CardBilling";
 import { CardStaff } from "./CardStaff";
+import { CardConnections } from "./CardConnections";
 import { ReadinessProgress } from "./ReadinessProgress";
 import { statusChips, statusTone } from "./AccountStatus";
 import {
@@ -458,6 +459,7 @@ export function PerformanceClientCard({
           <ReadinessProgress checklist={card.readiness.checklist} compact />
         </section>
       ) : null}
+      <CardConnections connections={card.connections} href={card.href} />
       <CardStaff
         brandId={card.id}
         lead={card.lead ?? null}
@@ -540,6 +542,7 @@ function DenseCard({
         </DropdownMenu>
       </div>
       <CardBilling card={card} dense className="mt-2" />
+      <CardConnections connections={card.connections} href={card.href} />
       <CardStaff
         brandId={card.id}
         lead={card.lead ?? null}

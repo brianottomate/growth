@@ -2,7 +2,7 @@
 id: new-client-setup
 title: "New client from a URL"
 kind: procedure
-summary: "Set up a website as a client, step by step. Create and enrich the brand, set its mark, feature its homes, open a campaign shell, generate starter ideas from the featured homes, stop before any push."
+summary: "Set up a website as a client, step by step. Create and enrich the brand, set its mark, import its homes and prepare personas, starter Ad Studio drafts and one standalone broadcast for human review."
 tags: [ads, performance, onboarding, procedure]
 ---
 
@@ -30,21 +30,14 @@ Read the saved mark with `brandRead.identity`. If a mark already exists, preserv
 If no mark exists, use `brandRead.recommendMark` with the brandId. It renders candidates and returns a recommended recipe, reason and tuning without saving. Say the recommendation in one line. When the operator has asked you to set up the brand or apply the mark, save the returned recipe, reason and tuning with `brandWrite.setMark`; otherwise discuss the recommendation first. Then use `brandRead.identity` with `inspect: true` to check the saved variants.
 
 
-## 4. Photos
+## 4. WanderOS onboarding
 
-1. `mediaLibraryRead.listingPhotos` for the brand. An empty result means the website is not a WanderOS site: say so, and offer `mediaLibraryRead.list` for whatever the library already holds.
-2. Do not import the photos here. The ideas in step 6 draw on each featured home's own gallery.
-3. Feature the homes the operator named with `performanceWrite.updateHome` (`featured: true`), one call per home, using each `homeId` from the listing read. The ideas in step 6 are made from the featured homes, so this step decides what they show. A `homeId` of null means the brand's homes are not ingested yet: ask the operator to press Refresh homes on the Setup page, then read again.
-4. Set the hero with `brandWrite.update` and `heroHomeId`: the home the operator named, or else the featured home with the strongest cover photo, and say in one line which and why. Nothing sets a hero on its own, so a brand without one shows empty previews until this step.
+1. `adsRead.wanderOsImportStatus` with the brandId. Resolve any missing identity, story or mark first.
+2. Call `adsWrite.importWanderOs` when there is no successful import, the latest run failed, or `needsPreparation` is true for an older import. Do not tell the operator to press Refresh homes or Generate ads. The import prepares homes, Featured selections, destinations, missing personas, starter Ad Studio drafts, one standalone broadcast, and catalog copy. It preserves existing selections and drafts. It does not create a newsletter series or sequence.
+3. Follow `adsRead.wanderOsImportStatus` with `waitSeconds: 20` while queued/running. The worker starts immediately and can progress in the same turn. Report a short update when a step finishes. A started receipt is pending work, not completion. If the run outlasts the conversation's execution limit, give its saved workflow link and exact pending step, never imply that it finished.
+4. On failure report the failed step and saved work. A retry resumes completed steps; interrupted ad generation requires reviewing saved drafts before generating again. Do not repeatedly restart an active run.
+5. When succeeded, read `performanceRead.featuredHomes`. Preserve the imported Featured set unless the operator named different homes. Set `brandWrite.update` with `heroHomeId` if absent, using the strongest featured home. Do not replace a saved hero without a request.
 
-## 5. Campaign shell
+## 5. Hand back
 
-`adsWrite.draftCampaign` with the brandSlug, platforms `["meta_ads"]`, landingUrl set to the website, and budget 1000 unless the operator named one. Leave `name` out: the action applies the house naming convention itself.
-
-## 6. Ads
-
-The first set of ads is made in the app, not by a tool: ask the operator to press From home group on Ad studio, choose Featured homes and Generate ads with AI. It makes a static and a carousel per featured home plus a hero carousel, every one unapproved. Do not build the set one shell at a time. When the operator says it is done, attach the drafts to the campaign with `adsWrite.attachAdSet` and their adIds, and say how many there are.
-
-## 7. Hand back
-
-Give the campaign page (`handoff.reviewPath` from `adsWrite.draftCampaign`) and what is left for the operator: review and approve each idea, add an audience if broad is not right, set the platform budget, preview and push. Do not call `adsWrite.push` or `adsWrite.setDelivery` from this playbook.
+Give the client workspace and links to Ad Studio, Email and Catalog. State how many homes and drafts are actually saved. The first broadcast is one unscheduled, unapproved send, with no series or sequence. Humans review and shape these drafts next. A campaign shell, platform budget, approvals, push and delivery are later steps unless explicitly requested. Do not call `adsWrite.push` or `adsWrite.setDelivery` from this playbook.

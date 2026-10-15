@@ -15,6 +15,18 @@ test("an import failure stops setup; retry resumes without importing completed h
       if (failSelection) throw new Error("Selection unavailable");
       return "5 Featured homes selected";
     },
+    personas: async () => {
+      calls.push("personas");
+      return "3 personas";
+    },
+    ads: async () => {
+      calls.push("ads");
+      return "11 drafts";
+    },
+    broadcast: async () => {
+      calls.push("broadcast");
+      return "1 broadcast";
+    },
     catalog: async () => {
       calls.push("catalog");
       return "Cards prepared";
@@ -39,6 +51,9 @@ test("an import failure stops setup; retry resumes without importing completed h
     "error",
     "pending",
     "pending",
+    "pending",
+    "pending",
+    "pending",
   ]);
   expect(steps[1]?.message).toBe("Selection unavailable");
   failSelection = false;
@@ -48,9 +63,15 @@ test("an import failure stops setup; retry resumes without importing completed h
     "featured",
     "featured",
     "destinations",
+    "personas",
+    "ads",
+    "broadcast",
     "catalog",
   ]);
   expect(steps.map((step) => step.status)).toEqual([
+    "ready",
+    "ready",
+    "ready",
     "ready",
     "ready",
     "ready",
@@ -59,6 +80,9 @@ test("an import failure stops setup; retry resumes without importing completed h
   expect(checkpoints).toContainEqual([
     "ready",
     "processing",
+    "pending",
+    "pending",
+    "pending",
     "pending",
     "pending",
   ]);
@@ -79,6 +103,9 @@ test("a completed setup does not repeat selections or destination creation on re
       featured: unexpected,
       destinations: unexpected,
       catalog: unexpected,
+      personas: unexpected,
+      ads: unexpected,
+      broadcast: unexpected,
     },
     async () => {
       throw new Error("Completed workflow should not checkpoint again");
