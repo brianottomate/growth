@@ -33,6 +33,7 @@ import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
 import { WorkInChatButton } from "./WorkInChatButton";
+import { DownloadCampaignAds } from "./DownloadCampaignAds";
 
 /**
  * The campaign, read top to bottom as the work happens: the ads, the photos
@@ -170,6 +171,7 @@ export async function CampaignView({
   // Campaign membership is established when approved ads are assigned.
   const adActions = (
     <div className="flex flex-wrap items-center gap-2">
+      {ads.length > 0 && <DownloadCampaignAds campaignId={campaign.id} />}
       {!anyPushed && (
         <>
           <AddExistingAdsDialog
