@@ -74,13 +74,14 @@ export function composeOnboardingEmail(input: OnboardingEmailInput) {
       : null,
     links?.connect
       ? {
-          label: "Connect your Facebook, Instagram and ad accounts",
+          label: "Connect your Meta and Google Ads accounts",
           url: links.connect,
         }
       : null,
     links?.dns
       ? {
-          label: `Add the email records in one click (or by hand, below)`,
+          label:
+            "Set up your email domain (optional, strongly recommended; use Entri or add the records yourself)",
           url: links.dns,
         }
       : null,

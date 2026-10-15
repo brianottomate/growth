@@ -1,3 +1,6 @@
+import { intakeSetupSummary } from "@/lib/intake-setup-status";
+import { loadPerformanceConnections } from "./performance-connections.service";
+import { getBrandEmailDns } from "./email-dns.service";
 import { validIntakeUrl } from "./performance-settings.service";
 import { privatePerformanceLinks } from "@/lib/performance-client-links";
 import {
@@ -1060,76 +1063,100 @@ export function accessCheckAllowed(
   return now.getTime() - lastCheckAt.getTime() >= ACCESS_CHECK_INTERVAL_MS;
 }
 
-/**
- * The client-facing "did that work?" check, addressed by connect token.
- *
- * Reassurance only. It reports what Zernio can see and records NOTHING about
- * verification, because this route is unauthenticated and a fact we would act
- * on must not be writable by whoever holds a link. `verifyIntakeAccess` under
- * an operator session stays the only thing that stamps `zernioVerifiedAt`.
- *
- * A negative answer is never a hard failure for the client: the grant may
- * simply not have propagated, and blocking someone who did their part is a
- * worse outcome than a stale record we resolve on our side.
+/** Private client-link status check. Reads provider evidence; never stamps
+ * operator verification, prepares assets, or changes account permissions.
  */
 export async function checkAccessByToken(handle: {
   token?: string;
   slug?: string;
-}): Promise<{
-  found: boolean;
-  pageName: string | null;
-  throttled: boolean;
-}> {
-  const { brand: resolved } = await brandForHandle(handle);
+}) {
+  const { brand: resolved, byToken } = await brandForHandle(handle);
+  if (!byToken)
+    throw new PerformanceError("NOT_FOUND", "Use the private intake link");
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, resolved.id),
     columns: {
       id: true,
-      name: true,
       organizationId: true,
+      zernioProfileId: true,
       lastAccessCheckAt: true,
     },
   });
-  if (!brand?.organizationId) {
+  if (!brand?.organizationId)
     throw new PerformanceError("NOT_FOUND", "Unknown intake link");
-  }
   if (!accessCheckAllowed(brand.lastAccessCheckAt)) {
-    return { found: false, pageName: null, throttled: true };
+    return { found: false, pageName: null, throttled: true, setup: null };
   }
   await db
     .update(brandTable)
     .set({ lastAccessCheckAt: new Date() })
     .where(eq(brandTable.id, brand.id));
-
-  if (!isZernioConfigured) {
-    return { found: false, pageName: null, throttled: false };
-  }
-
-  const accounts = await listZernioAccounts();
-  const seen = new Map<string, ZernioFacebookPage>();
-  for (const connection of accounts) {
-    if (!zernioConnectionMatchesPlatform("meta", connection.platform)) continue;
-    const connectionId = connection._id ?? connection.id;
-    if (!connectionId) continue;
-    try {
-      const { pages } = await listZernioFacebookPages({
-        accountId: connectionId,
-        refresh: true,
-      });
-      for (const page of pages) seen.set(page.id, page);
-    } catch {
-      // One unreachable connection must not fail the client's check; another
-      // connection may still see the Page, and a false negative is safe here.
-    }
-  }
-
-  const match = matchBrandPage(brand.name, [...seen.values()]);
-  // Only the Page NAME goes back: the id is an internal handle and this
-  // response is public.
+  const [connections, email, accounts] = await Promise.all([
+    loadPerformanceConnections(brand.organizationId, [brand.id]),
+    getBrandEmailDns(brand.id, brand.organizationId).then(
+      (value) =>
+        value
+          ? value.status.verified
+            ? ("verified" as const)
+            : ("pending" as const)
+          : ("not_prepared" as const),
+      (error: unknown) => {
+        console.error("Intake email DNS check unavailable", error);
+        return "unknown" as const;
+      },
+    ),
+    isZernioConfigured
+      ? listZernioAccounts().catch((error: unknown) => {
+          console.error("Intake connection check unavailable", error);
+          return null;
+        })
+      : null,
+  ]);
+  const summary = connections.get(brand.id);
+  if (!summary) throw new Error("Intake connection summary unavailable");
+  const google = accounts?.filter(
+    (a) =>
+      Boolean(brand.zernioProfileId) &&
+      (typeof a.profileId === "string" ? a.profileId : a.profileId?._id) ===
+        brand.zernioProfileId &&
+      zernioConnectionMatchesPlatform("google", a.platform),
+  );
+  const googleState = !accounts
+    ? "unknown"
+    : !google?.length
+      ? "missing"
+      : google.some(
+            (a) =>
+              a.enabled !== false &&
+              a.isActive !== false &&
+              !["error", "expired", "disconnected"].includes(
+                String(a.platformStatus).toLowerCase(),
+              ),
+          )
+        ? "connected"
+        : "reconnect";
+  const metaAuthorized = Boolean(
+    accounts?.some(
+      (a) =>
+        Boolean(brand.zernioProfileId) &&
+        (typeof a.profileId === "string" ? a.profileId : a.profileId?._id) ===
+          brand.zernioProfileId &&
+        zernioConnectionMatchesPlatform("meta", a.platform) &&
+        a.enabled !== false &&
+        a.isActive !== false &&
+        !["error", "expired", "disconnected"].includes(
+          String(a.platformStatus).toLowerCase(),
+        ),
+    ),
+  );
   return {
-    found: Boolean(match),
-    pageName: match?.name ?? null,
+    found: summary.meta === "ready",
+    pageName: null,
     throttled: false,
+    setup: {
+      checkedAt: new Date().toISOString(),
+      ...intakeSetupSummary(summary, email, googleState, metaAuthorized),
+    },
   };
 }
 

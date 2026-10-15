@@ -440,3 +440,15 @@ webhook retries and replays after completion. No extra notification table or col
 are needed. Reuse the existing claim, failure visibility and queued-run recovery;
 never automatically replay an ambiguous provider send. Notifications project the
 stored booking and re-check its brand/workspace before dispatch.
+
+### Private intake setup checks (2026-10-15)
+
+The private intake token identifies the client; a public brand slug cannot read
+setup evidence. The intake status projection now derives Meta account readiness,
+billing and published-site pixel installation from the existing Performance
+connection summary, Google authorization from the brand's exact Zernio profile,
+and email authentication from the email/DNS service. It replaces workspace-wide
+Page discovery and brand-name matching. Unknown provider evidence stays unknown;
+no editable readiness flag or second verification authority is introduced. The
+check does not select accounts, create pixels, stamp operator verification, or
+send messages. Client responses omit provider IDs, tokens and DNS records.

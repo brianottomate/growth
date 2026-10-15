@@ -13,7 +13,7 @@ const schema = z
   .refine((value) => Boolean(value.token ?? value.slug));
 
 /**
- * Has the client's Leadsie grant reached us yet? POST /api/intake/v1/check
+ * Private-link setup evidence. POST /api/intake/v1/check
  *
  * Reassurance for the client mid-form, and it records nothing about
  * verification: the fact we act on is stamped only by an operator session.
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       found: false,
       pageName: null,
       throttled: false,
+      setup: null,
     });
   }
 }
