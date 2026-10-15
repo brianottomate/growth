@@ -452,3 +452,23 @@ Page discovery and brand-name matching. Unknown provider evidence stays unknown;
 no editable readiness flag or second verification authority is introduced. The
 check does not select accounts, create pixels, stamp operator verification, or
 send messages. Client responses omit provider IDs, tokens and DNS records.
+
+### Client Meta account choice (2026-10-15)
+
+The brand's existing Meta destination remains the authoritative account choice.
+The private Connect link now lets the client select from its own live Zernio
+profile grant. The account registry still denies explicitly blocked accounts
+and accounts owned by another client; the same selection rule validates the
+picker, callback and completion. No name/AI guess or duplicate choice column
+is introduced. Saving continues the existing billing/pixel setup and closes
+the account-choice task; unresolved Page, billing and tracking work stays visible.
+
+Signed initial-ad-sync events route through the uniquely owned profile and a
+durable workflow identified by provider event ID. The worker verifies the live
+connection/profile relationship, preserves a saved client choice against delayed
+events, and accepts a sole provider-scoped account only after live reachability
+and registry checks. Multiple synced accounts never become a blanket allow.
+Recovery dispatches only queued work; existing pixel-create receipts prevent
+replayed asset creation. Callback channel aliases/duplicate query values are
+handled so successful authorization cannot skip completion. Connect distinguishes
+authorization from destination selection and installation readiness.

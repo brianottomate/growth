@@ -11,6 +11,11 @@ import {
 } from "@/server/services/brand-connect.service";
 
 import { ConnectButton } from "./ConnectButton";
+import { MetaAccountSubmit } from "./MetaAccountSubmit";
+import { selectClientMetaAccount } from "./actions";
+import { getMetaConnectChoice } from "@/server/services/meta-connect-setup.service";
+import { loadPerformanceConnections } from "@/server/services/performance-connections.service";
+import { intakeSetupSummary } from "@/lib/intake-setup-status";
 
 export const dynamic = "force-dynamic";
 
@@ -66,9 +71,14 @@ export default async function ConnectPage({
   }
 
   const query = await searchParams;
-  if (query.connected) {
+  if (query.connected && !query.error) {
     try {
-      await syncBrandConnect(brand.id, query.connected === "meta-ads");
+      await syncBrandConnect(
+        brand.id,
+        [query.connected]
+          .flat()
+          .some((value) => value === "meta-ads" || value === "metaads"),
+      );
     } catch (error) {
       console.error("brand connect sync failed", error);
     }
@@ -81,7 +91,41 @@ export default async function ConnectPage({
   const status = (await getBrandConnectStatus(brand.id)).filter(
     (row) => row.offered,
   );
-  const allDone = status.every((row) => row.connected);
+  const metaConnected = status.some(
+    (row) => row.key === "meta-ads" && row.connected,
+  );
+  let metaChoice: Awaited<ReturnType<typeof getMetaConnectChoice>> = null;
+  let metaUnavailable = false;
+  let setupChecks: ReturnType<typeof intakeSetupSummary>["checks"] = [];
+  if (metaConnected) {
+    try {
+      metaChoice = await getMetaConnectChoice(brand.id);
+      if (!metaChoice) metaUnavailable = true;
+      const summary = (
+        await loadPerformanceConnections(brand.organizationId!, [brand.id])
+      ).get(brand.id);
+      if (summary)
+        setupChecks = intakeSetupSummary(
+          summary,
+          "unknown",
+          "unknown",
+          true,
+        ).checks.filter((check) =>
+          ["meta", "billing", "pixel"].includes(check.key),
+        );
+    } catch (error) {
+      console.error("Connect account choice unavailable", {
+        brandId: brand.id,
+        error,
+      });
+      metaUnavailable = true;
+    }
+  }
+  const allDone =
+    status.every((row) => row.connected) &&
+    Boolean(metaChoice?.selectedId) &&
+    setupChecks.length > 0 &&
+    setupChecks.every((check) => check.state === "ready");
   const contactName = brand.connectTokenIssuedByName?.split(" ")[0] || null;
   const contactEmail = brand.connectTokenIssuedByEmail;
 
@@ -157,6 +201,12 @@ export default async function ConnectPage({
             Connect your accounts
           </h1>
 
+          {query.error && (
+            <p role="alert" className="mt-4 text-sm">
+              The account connection did not finish. Try connecting again or ask
+              your Wander contact for help.
+            </p>
+          )}
           <div className="mt-6 divide-y divide-white/5 rounded-xl border border-border">
             {status.map((row) => (
               <div
@@ -187,6 +237,116 @@ export default async function ConnectPage({
             ))}
           </div>
 
+          {metaConnected && (
+            <section
+              className="mt-6 rounded-xl border border-border p-4"
+              aria-label="Meta ad account selection"
+            >
+              <h2 className="text-base font-semibold">
+                Which ad account should Wander use?
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Choose the account that should run {brand.name}&apos;s ads and
+                pay Meta. Your login may have access to accounts for other
+                businesses.
+              </p>
+              {metaUnavailable ? (
+                <p className="mt-4 text-sm">
+                  We could not load your ad accounts. Refresh this page to try
+                  again, or contact your Wander team.
+                </p>
+              ) : metaChoice?.accounts.length ? (
+                <form
+                  action={selectClientMetaAccount}
+                  className="mt-4 space-y-4"
+                >
+                  <input type="hidden" name="token" value={token} />
+                  <fieldset className="space-y-3">
+                    <legend className="sr-only">
+                      Choose your Meta ad account
+                    </legend>
+                    {metaChoice.accounts.map((account) => (
+                      <label
+                        key={account.id}
+                        className="flex cursor-pointer gap-3 rounded-lg border border-border p-3"
+                      >
+                        <input
+                          type="radio"
+                          name="adAccountId"
+                          value={account.id}
+                          required
+                          disabled={!account.selectable}
+                          defaultChecked={account.id === metaChoice?.selectedId}
+                          className="mt-1"
+                        />
+                        <span className="min-w-0 text-sm">
+                          <span className="block font-medium">
+                            {account.name}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {[
+                              account.businessName,
+                              account.id,
+                              account.currency,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                          {account.reason && (
+                            <span className="mt-1 block text-xs">
+                              {account.reason}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  <MetaAccountSubmit />
+                  {metaChoice.selectedId && (
+                    <p className="text-sm">
+                      Your selected ad account is saved. You can update it here
+                      if needed.
+                    </p>
+                  )}
+                </form>
+              ) : (
+                <p className="mt-4 text-sm">
+                  No available ad accounts were found. Ask your business
+                  administrator to grant access to the correct account, then
+                  reconnect Meta.
+                </p>
+              )}
+              {query.selection === "review" && (
+                <p role="status" className="mt-4 text-sm">
+                  Setup could not finish automatically. Review the status below
+                  or contact your Wander team; your account may still need Page,
+                  billing or tracking setup.
+                </p>
+              )}
+              {setupChecks.length > 0 && (
+                <ul className="mt-5 space-y-3" aria-label="Meta setup checks">
+                  {setupChecks.map((check) => (
+                    <li key={check.key} className="text-sm">
+                      <p className="font-medium">
+                        {check.label}:{" "}
+                        {check.state === "ready"
+                          ? "Ready"
+                          : check.state === "unknown"
+                            ? "Not verified"
+                            : check.state === "action_required"
+                              ? "Action needed"
+                              : "Setup pending"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {check.detail}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
             {[
               "No password shared",
@@ -202,8 +362,8 @@ export default async function ConnectPage({
 
           <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
             {allDone
-              ? `All set. ${contactName ?? "Your Wander contact"} takes it from here.`
-              : "Takes about two minutes. Stuck on one? Skip it and get in touch."}
+              ? `Your advertising accounts are connected and the listed Meta setup checks are ready. ${contactName ?? "Your Wander contact"} will review your launch.`
+              : "Connected means access was approved. Choose your Meta ad account above and review any remaining setup. Stuck? Get in touch."}
             {contactEmail && (
               <>
                 {" "}

@@ -48,3 +48,20 @@ export function verifyZernioWebhookSignature(
     received.length === expected.length && timingSafeEqual(received, expected)
   );
 }
+
+/** Initial sync is evidence of discovery, not blanket permission for every account. */
+export const zernioAdsSyncSchema = z.object({
+  id: z.string().min(1),
+  event: z.literal("account.ads.initial_sync_completed"),
+  account: z.object({
+    accountId: z.string().min(1),
+    profileId: z.string().min(1),
+    platform: z.string(),
+    platformAdAccountId: z.string().optional(),
+    platformAdAccountIds: z.array(z.string()).optional(),
+  }),
+  sync: z.object({
+    status: z.enum(["success", "failure"]),
+    errorCategory: z.string().optional(),
+  }),
+});

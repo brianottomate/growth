@@ -18,7 +18,11 @@ import {
   type ZernioConnectPlatform,
 } from "@/server/clients/zernio.client";
 import { connectBrandToZernioProfile } from "@/server/services/zernio-brand.service";
-import { completeMetaConnectSetup } from "./meta-connect-setup.service";
+import {
+  completeMetaConnectSetup,
+  loadMetaConnectAccounts,
+} from "./meta-connect-setup.service";
+import { selectMetaSetupAccount } from "@/lib/meta-setup-selection";
 
 // ---- BRAND CONNECT: the client-facing onboarding link ----------------
 //
@@ -382,4 +386,20 @@ async function selectBrandPageOnConnections(brand: {
     }
   }
   return moved;
+}
+
+/** The private link authorizes only choices reachable through this brand's grant. */
+export async function selectMetaAccountByConnectToken(
+  token: string,
+  adAccountId: string,
+) {
+  const brand = await getBrandByConnectToken(token);
+  if (!brand) throw new Error("This connection link is no longer active");
+  const context = await loadMetaConnectAccounts(brand.id);
+  const account =
+    context &&
+    selectMetaSetupAccount(context.accounts, adAccountId, context.blockedIds);
+  if (!account || account.selectable === false)
+    throw new Error("Account unavailable");
+  return completeMetaConnectSetup(brand.id, { clientAdAccountId: account.id });
 }

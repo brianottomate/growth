@@ -3,13 +3,20 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { env } from "@/env";
 import {
   isZernioDeliveryEvent,
+  zernioAdsSyncSchema,
   parseZernioWebhook,
   verifyZernioWebhookSignature,
 } from "@/lib/zernio-webhook";
 import { reconcileZernioPostDelivery } from "@/server/services/content-publishing.service";
 import { activatePublishedSourcePost } from "@/server/services/source-publication-activation.service";
 
+import {
+  queueMetaConnectWebhook,
+  runMetaConnectWebhook,
+} from "@/server/services/meta-connect-webhook.service";
+
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   if (!env.ZERNIO_WEBHOOK_SECRET) {
@@ -33,6 +40,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   if (payload.event === "webhook.test") {
     return NextResponse.json({ accepted: true, eventId: payload.id });
+  }
+  if (payload.event === "account.ads.initial_sync_completed") {
+    const parsed = zernioAdsSyncSchema.safeParse(payload);
+    if (!parsed.success)
+      return NextResponse.json(
+        { error: "Invalid ads sync event" },
+        { status: 400 },
+      );
+    const runId = await queueMetaConnectWebhook(parsed.data);
+    if (runId) after(() => runMetaConnectWebhook(runId));
+    return NextResponse.json(
+      { accepted: true, eventId: payload.id },
+      { status: 202 },
+    );
   }
   if (!isZernioDeliveryEvent(payload.event)) {
     return NextResponse.json({ accepted: true, ignored: true });

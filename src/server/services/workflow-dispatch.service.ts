@@ -1,4 +1,5 @@
 import "server-only";
+import { runMetaConnectWebhook } from "./meta-connect-webhook.service";
 import { runPerformanceBookingNotification } from "./performance-booking-notification.service";
 import { runPerformanceStageNotification } from "./performance-stage-notification.service";
 import { and, asc, eq, isNull, lt } from "drizzle-orm";
@@ -31,6 +32,10 @@ export async function recoverQueuedWorkflows() {
   await Promise.all(
     rows.map(async (run) => {
       try {
+        if (run.workflowType === "meta-connect-confirmation") {
+          await runMetaConnectWebhook(run.id);
+          return;
+        }
         if (run.workflowType === "performance-booking-notification") {
           await runPerformanceBookingNotification(run.id);
           return;

@@ -14,6 +14,12 @@ const names: Record<
   string,
   { title: string; destination: string; path: string; unit: string }
 > = {
+  "meta-connect-confirmation": {
+    title: "Confirming Meta connection",
+    destination: "Settings",
+    path: "settings",
+    unit: "connections",
+  },
   "performance-booking-notification": {
     title: "Slack booking alert",
     destination: "Client",

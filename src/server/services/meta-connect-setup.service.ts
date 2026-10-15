@@ -20,6 +20,95 @@ import { metaAdBillingStatus } from "@/lib/meta-ad-billing";
 import { sameAdAccountId } from "@/lib/zernio-ads";
 import { sitePixels } from "./performance-connections.service";
 
+/** The brand profile owns the grant; discovery never changes account permission. */
+export async function loadMetaConnectAccounts(brandId: string) {
+  const brand = await db.query.brandTable.findFirst({
+    where: and(eq(brandTable.id, brandId), isNull(brandTable.deletedAt)),
+  });
+  if (!brand?.organizationId || !brand.zernioProfileId) return null;
+  const profileAccounts = (await listZernioAccounts()).filter(
+    (a) =>
+      (typeof a.profileId === "string" ? a.profileId : a.profileId?._id) ===
+      brand.zernioProfileId,
+  );
+  const connections = profileAccounts.filter(
+    (a) =>
+      a.platform === "metaads" &&
+      a.enabled !== false &&
+      a.isActive !== false &&
+      !["error", "expired", "disconnected"].includes(
+        String(a.platformStatus).toLowerCase(),
+      ),
+  );
+  if (connections.length !== 1) return null;
+  const connection = connections[0]!;
+  const connectionAccountId = connection._id ?? connection.id;
+  if (!connectionAccountId) throw new Error("Meta connection has no ID");
+  const [accounts, registry] = await Promise.all([
+    listZernioAdAccounts({ accountId: connectionAccountId, limit: 1000 }),
+    db.query.adAccountTable.findMany({
+      where: eq(adAccountTable.platform, "facebook"),
+    }),
+  ]);
+  const blockedIds = registry
+    .filter((a) => !a.isAllowed || (a.brandId !== brandId && !a.isShared))
+    .map((a) => a.externalId);
+  const chosenAccounts = registry.filter(
+    (a) =>
+      a.brandId === brandId &&
+      a.isAllowed &&
+      !a.isShared &&
+      accounts.some((candidate) =>
+        sameAdAccountId("meta", candidate.id, a.externalId),
+      ),
+  );
+  const selectedId =
+    brand.performanceSettings?.metaAdsDestination?.adAccountId ??
+    (chosenAccounts.length === 1 ? chosenAccounts[0]!.externalId : undefined);
+  return {
+    brand,
+    profileAccounts,
+    connection,
+    connectionAccountId,
+    accounts,
+    blockedIds,
+    selectedId,
+  };
+}
+
+/** Only the private Connect page receives this limited projection of its grant. */
+export async function getMetaConnectChoice(brandId: string) {
+  const context = await loadMetaConnectAccounts(brandId);
+  if (!context) return null;
+  const selected = context.selectedId
+    ? selectMetaSetupAccount(
+        context.accounts,
+        context.selectedId,
+        context.blockedIds,
+      )
+    : null;
+  return {
+    selectedId: selected?.id ?? null,
+    accounts: context.accounts
+      .filter(
+        (a) =>
+          !context.blockedIds.some((id) => sameAdAccountId("meta", id, a.id)),
+      )
+      .map((a) => ({
+        id: a.id,
+        name: a.name ?? a.id,
+        businessName:
+          typeof a.businessName === "string" ? a.businessName : null,
+        currency: a.currency ?? null,
+        selectable: a.selectable !== false,
+        reason:
+          a.selectable === false
+            ? "This account cannot currently run ads. Contact your Wander team."
+            : null,
+      })),
+  };
+}
+
 /** This is a provider-write receipt, not a cached pixel. An interrupted create
  * is never replayed, even after its worker expires or fails.
  */
@@ -90,12 +179,19 @@ async function createPixelOnce(input: {
  * account selection; account data/tracking reads follow an explicit allow.
  * Called on the Meta callback, never on ordinary page reads.
  */
-export async function completeMetaConnectSetup(brandId: string) {
+export async function completeMetaConnectSetup(
+  brandId: string,
+  choice: {
+    clientAdAccountId?: string;
+    providerScopedAdAccountId?: string;
+  } = {},
+) {
   const brand = await db.query.brandTable.findFirst({
     where: and(eq(brandTable.id, brandId), isNull(brandTable.deletedAt)),
   });
   if (!brand?.organizationId || !brand.zernioProfileId) return;
   const organizationId = brand.organizationId;
+  const requestedAdAccountId = choice.clientAdAccountId;
   const task = async (
     key: string,
     title: string,
@@ -126,21 +222,8 @@ export async function completeMetaConnectSetup(brandId: string) {
       });
   };
   try {
-    const profileAccounts = (await listZernioAccounts()).filter(
-      (a) =>
-        (typeof a.profileId === "string" ? a.profileId : a.profileId?._id) ===
-        brand.zernioProfileId,
-    );
-    const connections = profileAccounts.filter(
-      (a) =>
-        a.platform === "metaads" &&
-        a.enabled !== false &&
-        a.isActive !== false &&
-        !["error", "expired", "disconnected"].includes(
-          String(a.platformStatus).toLowerCase(),
-        ),
-    );
-    if (connections.length !== 1) {
+    const context = await loadMetaConnectAccounts(brandId);
+    if (!context) {
       await task(
         "connection",
         "Review Meta account connection",
@@ -148,9 +231,20 @@ export async function completeMetaConnectSetup(brandId: string) {
       );
       return;
     }
-    const connection = connections[0]!;
-    const connectionAccountId = connection._id ?? connection.id;
-    if (!connectionAccountId) throw new Error("Meta connection has no ID");
+    const {
+      profileAccounts,
+      connection,
+      connectionAccountId,
+      accounts,
+      blockedIds,
+      selectedId,
+    } = context;
+    // Validate an explicit client choice before any write or provider side effect.
+    if (
+      requestedAdAccountId &&
+      !selectMetaSetupAccount(accounts, requestedAdAccountId, blockedIds)
+    )
+      throw new Error("The selected account is not available to this client");
     const facebook = profileAccounts.find(
       (a) =>
         a.platform === "facebook" &&
@@ -184,31 +278,9 @@ export async function completeMetaConnectSetup(brandId: string) {
         .set({ metaPageId: pageId })
         .where(eq(brandTable.id, brandId));
     }
-    const accounts = await listZernioAdAccounts({
-      accountId: connectionAccountId,
-      limit: 1000,
-    });
-    const registry = await db.query.adAccountTable.findMany({
-      where: eq(adAccountTable.platform, "facebook"),
-    });
-    const blockedIds = registry
-      .filter((a) => !a.isAllowed || (a.brandId !== brandId && !a.isShared))
-      .map((a) => a.externalId);
-    const chosenAccounts = registry.filter(
-      (a) =>
-        a.brandId === brandId &&
-        a.isAllowed &&
-        !a.isShared &&
-        accounts.some((candidate) =>
-          sameAdAccountId("meta", candidate.id, a.externalId),
-        ),
-    );
     const account = selectMetaSetupAccount(
       accounts,
-      brand.performanceSettings?.metaAdsDestination?.adAccountId ??
-        (chosenAccounts.length === 1
-          ? chosenAccounts[0]!.externalId
-          : undefined),
+      requestedAdAccountId ?? selectedId ?? choice.providerScopedAdAccountId,
       blockedIds,
     );
     if (!account) {
@@ -257,6 +329,15 @@ export async function completeMetaConnectSetup(brandId: string) {
         performanceSettings: sql`(coalesce(${brandTable.performanceSettings}, '{}'::jsonb) - 'adsConnectionBrandId') || ${JSON.stringify({ metaAdsDestination: { connectionAccountId, adAccountId: account.id } })}::jsonb`,
       })
       .where(eq(brandTable.id, brandId));
+    await db
+      .update(brandTaskTable)
+      .set({ status: "done" })
+      .where(
+        and(
+          eq(brandTaskTable.brandId, brandId),
+          eq(brandTaskTable.templateKey, "meta-setup:account"),
+        ),
+      );
     const billing = metaAdBillingStatus(account);
     if (billing !== "present")
       await task(
