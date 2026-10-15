@@ -6,6 +6,8 @@ import {
   recordPerformanceBooking,
 } from "@/server/services/performance-booking.service";
 
+import { notifyPerformanceBooking } from "@/server/services/performance-booking-notification.service";
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -15,6 +17,7 @@ export async function POST(request: Request) {
     enabled: env.AMPLITUDE_INGEST_ENABLED === "true",
     record: recordPerformanceBooking,
     classify: classifyPerformanceBooking,
+    notify: notifyPerformanceBooking,
     after,
   });
 }

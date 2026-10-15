@@ -61,7 +61,7 @@ export type BookingAttribution = Record<
 >;
 export type BookingEvidence = {
   scope: AttributionScope;
-  channel: "meta" | "email";
+  channel: "meta" | "email" | "chatgpt";
   kind: "signal" | "campaign_name" | "campaign_id" | "message_id";
   matchedId?: string;
 };
@@ -78,6 +78,21 @@ function pick(input: Record<string, unknown>, prefix = "") {
   }
   return out;
 }
+function isChatGptReferral(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value.includes("://") ? value : `https://${value}`);
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      ["chatgpt.com", "www.chatgpt.com", "chat.openai.com"].includes(
+        url.hostname,
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function attributionSignals(
   attribution: BookingAttribution,
 ): BookingEvidence[] {
@@ -101,6 +116,13 @@ export function attributionSignals(
       props.message_send_id
     )
       evidence.push({ scope, channel: "email", kind: "signal" });
+    if (
+      source === "chatgpt" ||
+      isChatGptReferral(source) ||
+      isChatGptReferral(props.referrer) ||
+      isChatGptReferral(props.referring_domain)
+    )
+      evidence.push({ scope, channel: "chatgpt", kind: "signal" });
     return evidence;
   });
 }

@@ -4,7 +4,7 @@
     "projectId": 767045,
     "method": "POST",
     "url": "https://growth-red.vercel.app/api/workflows/amplitude-sites-order",
-    "enabled": false,
+    "enabled": true,
     "sendEvents": true,
     "sendUsers": false,
     "headers": {
@@ -13,6 +13,7 @@
     },
     "events": ["Order Completed"],
     "payloadMode": "default",
-    "status": "exact configuration planned locally; destination not created or enabled"
+    "destinationId": 30174927,
+    "status": "enabled 2026-10-15; production connection test passed"
   }
 ]

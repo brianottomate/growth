@@ -428,3 +428,15 @@ recorded in the destination's existing tracking defaults. Installation remains
 a CSM task assigned from the client's csLeadId, including the site and pixel
 IDs. Stable task keys prevent repeated callbacks duplicating the handoff without
 overwriting operator edits or completion. No site setting is changed automatically.
+
+
+### Performance booking alerts (2026-10-15)
+
+The booking remains the business record and Amplitude owns event history. ChatGPT
+source/referrer evidence joins Meta/email as a retained candidate, without implying
+Performance caused the referral. Slack delivery belongs to the existing workflow-run
+model: a deterministic booking + confidence run identity covers both concurrent
+webhook retries and replays after completion. No extra notification table or columns
+are needed. Reuse the existing claim, failure visibility and queued-run recovery;
+never automatically replay an ambiguous provider send. Notifications project the
+stored booking and re-check its brand/workspace before dispatch.

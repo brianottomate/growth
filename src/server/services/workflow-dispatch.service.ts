@@ -1,4 +1,5 @@
 import "server-only";
+import { runPerformanceBookingNotification } from "./performance-booking-notification.service";
 import { runPerformanceStageNotification } from "./performance-stage-notification.service";
 import { and, asc, eq, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
@@ -30,6 +31,10 @@ export async function recoverQueuedWorkflows() {
   await Promise.all(
     rows.map(async (run) => {
       try {
+        if (run.workflowType === "performance-booking-notification") {
+          await runPerformanceBookingNotification(run.id);
+          return;
+        }
         if (run.workflowType === "performance-stage-notification") {
           await runPerformanceStageNotification(run.id);
           return;

@@ -12,6 +12,11 @@ import {
   classifyPerformanceBooking,
   recordPerformanceBooking,
 } from "./performance-booking.service";
+import {
+  queuePerformanceBookingNotification,
+  bookingSlackMessage,
+} from "./performance-booking-notification.service";
+import { workflowRunTable } from "@/server/db/creative-work-schema";
 import { receiveSitesOrder } from "./performance-booking-webhook";
 
 const payload = {
@@ -143,6 +148,9 @@ test("auth, disabled ingest and failed persistence cannot acknowledge or schedul
     classify: async () => {
       calls++;
     },
+    notify: async () => {
+      calls++;
+    },
     after: () => {
       calls++;
     },
@@ -163,13 +171,13 @@ test("only relevant client bookings persist before ack; after classifies and rep
   try {
     // Minimal pre-existing relations; the new table is built from the real migration.
     await pg.exec(`
-      CREATE TABLE brand (id text primary key, organization_id text, wander_os_website_id text);
+      CREATE TABLE brand (id text primary key, organization_id text, wander_os_website_id text, name text, slug text);
       CREATE TABLE performance_account (id text primary key, brand_id text, organization_id text, deleted_at timestamp);
       CREATE TABLE performance_cycle (id text primary key, account_id text);
       CREATE TABLE platform_campaign (id text primary key, external_id text, name text, brand_id text, platform text, campaign_id text, performance_cycle_id text);
       CREATE TABLE platform_post (id text primary key, brand_id text);
       CREATE TABLE message_send (id text primary key, provider_broadcast_id text, sent_at timestamp, platform_post_id text, status text);
-      INSERT INTO brand VALUES ('brand-one','org-one','site-one'),('brand-two','org-two','site-two');
+      INSERT INTO brand VALUES ('brand-one','org-one','site-one','One','one'),('brand-two','org-two','site-two','Two','two');
       INSERT INTO performance_account VALUES ('account-one','brand-one','org-one',null),('account-two','brand-two','org-two',null);
       INSERT INTO platform_campaign VALUES ('campaign-one','campaign-external','Summer','brand-one','facebook','plan-one',null),('foreign-campaign','foreign-external','Other','brand-two','facebook','plan-two',null);
     `);
@@ -183,14 +191,27 @@ test("only relevant client bookings persist before ack; after classifies and rep
         ).text()
       ).replaceAll("--> statement-breakpoint", ""),
     );
+    const initial = await Bun.file(
+      new URL("../../../drizzle/0000_initial.sql", import.meta.url),
+    ).text();
+    await pg.exec(
+      /CREATE TYPE "public"\."workflow_run_status"[^;]+;/.exec(initial)![0],
+    );
+    await pg.exec(
+      /CREATE TABLE "workflow_run" \([\s\S]*?\n\);/.exec(initial)![0],
+    );
     const client = drizzle(pg, { casing: "snake_case" }) as unknown as Database;
     const pending: (() => Promise<void>)[] = [];
+    const notified: string[] = [];
     const options = {
       token,
       enabled: true,
       record: (booking: Parameters<typeof recordPerformanceBooking>[0]) =>
         recordPerformanceBooking(booking, client),
       classify: (id: string) => classifyPerformanceBooking(id, client),
+      notify: async (id: string) => {
+        notified.push(id);
+      },
       after: (work: () => Promise<void>) => {
         pending.push(work);
       },
@@ -222,12 +243,37 @@ test("only relevant client bookings persist before ack; after classifies and rep
     let rows = await client.select().from(performanceBookingTable);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.confidence).toBe("possible");
+    expect(notified).toHaveLength(0);
     expect(rows[0]!.classifiedAt).toBeNull();
     expect(rows[0]!.total).toBe(123.45);
+    const alerts = await Promise.all([
+      queuePerformanceBookingNotification("booking-one", client),
+      queuePerformanceBookingNotification("booking-one", client),
+    ]);
+    expect(alerts.filter(Boolean)).toHaveLength(1);
+    await pg.exec("UPDATE workflow_run SET status='succeeded'");
+    expect(
+      await queuePerformanceBookingNotification("booking-one", client),
+    ).toBeUndefined();
     await pending.shift()!();
+    expect(notified).toEqual(["booking-one"]);
     rows = await client.select().from(performanceBookingTable);
     expect(rows[0]!.confidence).toBe("confirmed");
     expect(rows[0]!.classifiedAt).not.toBeNull();
+    expect(
+      await queuePerformanceBookingNotification("booking-one", client),
+    ).toBeDefined();
+    expect(await client.select().from(workflowRunTable)).toHaveLength(2);
+    const alert = bookingSlackMessage({
+      booking: rows[0]!,
+      brandId: "brand-one",
+      brandName: "<@everyone>",
+      brandSlug: "one",
+      organizationId: "org-one",
+    });
+    expect(alert).toContain("Confirmed");
+    expect(alert).not.toContain("<@everyone>");
+    expect(alert).not.toContain("campaign-external");
     expect((await send()).status).toBe(200);
     expect(await client.select().from(performanceBookingTable)).toHaveLength(1);
     expect(
@@ -249,7 +295,7 @@ test("only relevant client bookings persist before ack; after classifies and rep
       "possible",
     );
     await pg.exec(
-      `INSERT INTO brand VALUES ('duplicate','org-one','site-one'); INSERT INTO performance_account VALUES ('duplicate-account','duplicate','org-one',null);`,
+      `INSERT INTO brand VALUES ('duplicate','org-one','site-one','Duplicate','duplicate'); INSERT INTO performance_account VALUES ('duplicate-account','duplicate','org-one',null);`,
     );
     expect(
       await (
@@ -261,3 +307,65 @@ test("only relevant client bookings persist before ack; after classifies and rep
     await pg.close();
   }
 }, 30000);
+
+test("ChatGPT referrals are retained as possible without accepting lookalike domains", () => {
+  for (const props of [
+    { utm_source: "chatgpt.com" },
+    { referrer: "https://chatgpt.com/c/123" },
+    { referring_domain: "chat.openai.com" },
+  ]) {
+    const parsed = parseSitesOrder({
+      ...payload,
+      event_properties: {
+        ...payload.event_properties,
+        utm_source: undefined,
+        utm_id: undefined,
+        ...props,
+      },
+      user_properties: {},
+    });
+    if (parsed.status !== "valid") throw new Error(parsed.status);
+    const classified = classifyBookingAttribution(
+      parsed.booking.attribution,
+      [],
+      [],
+      new Date(),
+    );
+    expect(classified.confidence).toBe("possible");
+    expect(classified.evidence).toEqual([
+      { scope: "event", channel: "chatgpt", kind: "signal" },
+    ]);
+  }
+  const attribution: BookingAttribution = {
+    event: { referrer: "https://chatgpt.com.evil.example/" },
+    current: { utm_source: "notchatgpt.com" },
+    last: { referrer: "https://evil.example/?source=chatgpt.com" },
+    initial: {},
+  };
+  expect(
+    classifyBookingAttribution(attribution, [], [], new Date()).evidence,
+  ).toHaveLength(0);
+});
+
+test("classification failure still alerts possible attribution after acknowledgement", async () => {
+  const pending: (() => Promise<void>)[] = [];
+  let notified = false;
+  const response = await receiveSitesOrder(request(), {
+    token,
+    enabled: true,
+    record: async () => ({ status: "accepted", bookingId: "booking-one" }),
+    classify: async () => {
+      throw new Error("classification unavailable");
+    },
+    notify: async () => {
+      notified = true;
+    },
+    after: (work) => {
+      pending.push(work);
+    },
+  });
+  expect(response.status).toBe(200);
+  expect(notified).toBe(false);
+  await pending[0]!();
+  expect(notified).toBe(true);
+});

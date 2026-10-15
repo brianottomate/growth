@@ -15,6 +15,7 @@ export async function receiveSitesOrder(
       booking: SitesOrder,
     ) => ReturnType<typeof recordPerformanceBooking>;
     classify: (bookingId: string) => Promise<void>;
+    notify: (bookingId: string) => Promise<void>;
     after: (work: () => Promise<void>) => void;
   },
 ) {
@@ -49,6 +50,13 @@ export async function receiveSitesOrder(
           await options.classify(result.bookingId);
         } catch {
           console.error("[Performance booking] Attribution incomplete", {
+            bookingId: result.bookingId,
+          });
+        }
+        try {
+          await options.notify(result.bookingId);
+        } catch {
+          console.error("[Performance booking] Slack notification incomplete", {
             bookingId: result.bookingId,
           });
         }
