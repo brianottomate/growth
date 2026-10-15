@@ -53,7 +53,8 @@ export function BrandTasks({ brandId }: { brandId: string }) {
   const roster = useQuery(orpc.performance.staffRoster.queryOptions());
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<TaskCategory>("setup");
-  const [filter, setFilter] = useState("open");
+  const [filter, setFilter] = useState("all");
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [tag, setTag] = useState("");
   const refresh = () =>
     queryClient.invalidateQueries({
@@ -61,7 +62,12 @@ export function BrandTasks({ brandId }: { brandId: string }) {
     });
   const create = useMutation(
     orpc.brandTask.create.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async (task) => {
+        setExpandedCategories((current) =>
+          current.includes(task.category)
+            ? current
+            : [...current, task.category],
+        );
         setTitle("");
         await refresh();
       },
@@ -101,6 +107,10 @@ export function BrandTasks({ brandId }: { brandId: string }) {
     return true;
   });
 
+  const visibleCategories = Object.keys(TASK_CATEGORIES).filter((key) =>
+    visible.some((task) => task.category === key),
+  );
+
   return (
     <section
       className="space-y-4 rounded-xl border p-4"
@@ -121,8 +131,8 @@ export function BrandTasks({ brandId }: { brandId: string }) {
             value={filter}
             onValueChange={setFilter}
             options={[
-              { value: "open", label: "Open tasks" },
               { value: "all", label: "All tasks" },
+              { value: "open", label: "Open tasks" },
               { value: "mine", label: "Assigned to me" },
               { value: "overdue", label: "Overdue" },
             ]}
@@ -161,41 +171,94 @@ export function BrandTasks({ brandId }: { brandId: string }) {
         </div>
       ) : (
         <>
-          {Object.entries(TASK_CATEGORIES).map(([key, label]) => {
-            const group = visible.filter((task) => task.category === key);
-            if (!group.length) return null;
-            const ordered = tasks.filter((task) => task.category === key);
-            return (
-              <div key={key} className="space-y-1">
-                <h3 className="text-xs font-medium text-muted-foreground">
-                  {label}
-                </h3>
-                <ul className="divide-y">
-                  {group.map((task) => {
-                    const index = ordered.findIndex(
-                      (row) => row.id === task.id,
-                    );
-                    return (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        onRemove={() => remove.mutate({ brandId, id: task.id })}
-                        removing={
-                          remove.isPending && remove.variables?.id === task.id
-                        }
-                        members={roster.data?.members ?? []}
-                        currentUserId={currentUserId}
-                        refresh={refresh}
-                        previousId={ordered[index - 1]?.id ?? null}
-                        nextId={ordered[index + 1]?.id ?? null}
-                        afterNextId={ordered[index + 2]?.id ?? null}
-                      />
-                    );
-                  })}
-                </ul>
+          {!!visible.length && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Check to mark Done. Use status for In progress or Not
+                applicable.
+              </p>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label="Expand all task categories"
+                  disabled={visibleCategories.every((key) =>
+                    expandedCategories.includes(key),
+                  )}
+                  onClick={() => setExpandedCategories(visibleCategories)}
+                >
+                  Expand all
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label="Collapse all task categories"
+                  disabled={!expandedCategories.length}
+                  onClick={() => setExpandedCategories([])}
+                >
+                  Collapse all
+                </Button>
               </div>
-            );
-          })}
+            </div>
+          )}
+          <AccordionRoot
+            multiple
+            keepMounted
+            value={expandedCategories}
+            onValueChange={(values) =>
+              setExpandedCategories(values as string[])
+            }
+          >
+            {Object.entries(TASK_CATEGORIES).map(([key, label]) => {
+              const group = visible.filter((task) => task.category === key);
+              if (!group.length) return null;
+              const ordered = tasks.filter((task) => task.category === key);
+              return (
+                <AccordionItem key={key} value={key}>
+                  <AccordionTrigger aria-label={`${label} tasks`}>
+                    <span className="flex flex-1 items-center justify-between gap-3">
+                      <span className="text-sm font-medium">{label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {
+                          ordered.filter((task) => taskSettled(task.status))
+                            .length
+                        }
+                        /{ordered.length} settled
+                      </span>
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionPanel>
+                    <ul className="divide-y">
+                      {group.map((task) => {
+                        const index = ordered.findIndex(
+                          (row) => row.id === task.id,
+                        );
+                        return (
+                          <TaskRow
+                            key={task.id}
+                            task={task}
+                            onRemove={() =>
+                              remove.mutate({ brandId, id: task.id })
+                            }
+                            removing={
+                              remove.isPending &&
+                              remove.variables?.id === task.id
+                            }
+                            members={roster.data?.members ?? []}
+                            currentUserId={currentUserId}
+                            refresh={refresh}
+                            previousId={ordered[index - 1]?.id ?? null}
+                            nextId={ordered[index + 1]?.id ?? null}
+                            afterNextId={ordered[index + 2]?.id ?? null}
+                          />
+                        );
+                      })}
+                    </ul>
+                  </AccordionPanel>
+                </AccordionItem>
+              );
+            })}
+          </AccordionRoot>
           {!visible.length && (
             <p className="text-sm text-muted-foreground">
               {tasks.length
@@ -319,7 +382,12 @@ function TaskRow({
     <li className="py-2">
       <div className="flex flex-wrap items-center gap-2">
         <Checkbox
-          aria-label={`Complete ${task.title}`}
+          aria-label={
+            task.status === "done"
+              ? `Reopen ${task.title}`
+              : `Mark ${task.title} as done`
+          }
+          title={task.status === "done" ? "Reopen as To do" : "Mark as Done"}
           checked={task.status === "done"}
           disabled={update.isPending}
           onCheckedChange={(checked) =>
@@ -390,32 +458,18 @@ function TaskRow({
           disabled={update.isPending}
         />
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 pl-7">
-        {!!task.tags.length && (
-          <div className="flex flex-wrap gap-1">
-            {task.tags.map((value, index) => (
-              <span
-                key={`${value}-${index}`}
-                className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
-              >
-                {value}
-              </span>
-            ))}
-          </div>
-        )}
-        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          {task.creator && <OwnerAvatar member={task.creator} size="sm" />}
-          <span>
-            Created by{" "}
-            {task.creator?.name ??
-              (task.templateKey ? "Default checklist" : "Former teammate")}
-          </span>
-          <span aria-hidden="true">·</span>
-          <time dateTime={new Date(task.createdAt).toISOString()}>
-            {new Date(task.createdAt).toLocaleDateString()}
-          </time>
+      {!!task.tags.length && (
+        <div className="mt-1 flex flex-wrap gap-1 pl-7">
+          {task.tags.map((value, index) => (
+            <span
+              key={`${value}-${index}`}
+              className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+            >
+              {value}
+            </span>
+          ))}
         </div>
-      </div>
+      )}
       <AccordionRoot className="mt-1 pl-7">
         <AccordionItem value="details">
           <AccordionTrigger
@@ -540,6 +594,22 @@ function TaskRow({
                   Save details
                 </Button>
               </form>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                {task.creator && (
+                  <OwnerAvatar member={task.creator} size="sm" />
+                )}
+                <span>
+                  Created by{" "}
+                  {task.creator?.name ??
+                    (task.templateKey
+                      ? "Default checklist"
+                      : "Former teammate")}
+                </span>
+                <span aria-hidden="true">·</span>
+                <time dateTime={new Date(task.createdAt).toISOString()}>
+                  {new Date(task.createdAt).toLocaleDateString()}
+                </time>
+              </div>
               {task.completedAt && (
                 <p className="text-xs text-muted-foreground">
                   Completed by {task.completedBy?.name ?? "Former teammate"} ·{" "}
