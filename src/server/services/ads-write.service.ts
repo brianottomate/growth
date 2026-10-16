@@ -130,6 +130,8 @@ import {
 } from "@/lib/performance-ads";
 import {
   adAccountTable,
+  seedListTable,
+  seedSnapshotTable,
   adTable,
   audienceTable,
   platformDeliveryGroupTable,
@@ -167,6 +169,7 @@ type AdsWriteContext = {
 };
 
 type AdDestination = {
+  localAdAccountId: string;
   brand: Pick<Brand, "id" | "slug" | "name" | "zernioProfileId" | "metaPageId">;
   connection: ZernioAccount;
   adAccount: {
@@ -254,6 +257,7 @@ async function allowedAccountsForBrand(
 ) {
   return db
     .select({
+      id: adAccountTable.id,
       externalId: adAccountTable.externalId,
       name: adAccountTable.name,
     })
@@ -520,11 +524,10 @@ async function requireAdDestination(input: {
       }`,
     );
   }
-  if (
-    !allowed.some((row) =>
-      sameAdAccountId(input.platform, row.externalId, input.adAccountId),
-    )
-  ) {
+  const registeredAccount = allowed.find((row) =>
+    sameAdAccountId(input.platform, row.externalId, input.adAccountId),
+  );
+  if (!registeredAccount) {
     throw new Error(
       `Ad account ${input.adAccountId} is outside ${brand.name}'s allowlist`,
     );
@@ -571,6 +574,7 @@ async function requireAdDestination(input: {
     );
   }
   return {
+    localAdAccountId: registeredAccount.id,
     brand,
     connection,
     adAccount: {
@@ -1315,6 +1319,9 @@ export type CreateAdAudienceInput = {
   type: "customer_list" | "lookalike";
   name: string;
   description?: string;
+  /** Internal lineage, validated before the provider call and stored with the mirror. */
+  seedSnapshotId?: string;
+  parentPlatformAudienceId?: string;
   sourceAudienceId?: string;
   country?: string;
   ratio?: number;
@@ -1382,7 +1389,20 @@ export async function syncBrandPlatformAudiences(input: {
     });
     if (!channel) continue;
 
+    const registeredAccounts = await allowedAccountsForBrand(
+      listed.brand.id,
+      platform,
+    );
     for (const destination of listed.destinations) {
+      const registered = registeredAccounts.find((a) =>
+        sameAdAccountId(platform, a.externalId, destination.adAccountId),
+      );
+      if (!registered) {
+        errors.push(
+          `${destination.adAccountId}: destination is no longer allowlisted`,
+        );
+        continue;
+      }
       const remote = await listZernioAdAudiences({
         accountId: destination.connectionAccountId,
         adAccountId: destination.adAccountId,
@@ -1413,6 +1433,7 @@ export async function syncBrandPlatformAudiences(input: {
         });
         const values = {
           brandId: listed.brand.id,
+          adAccountId: registered.id,
           channelId: channel.id,
           name: audience.name,
           // Zernio's `type` is its own vocabulary; ours is coarser. Only
@@ -1630,6 +1651,54 @@ export async function createAdAudience(
     }
   }
 
+  const channel = await db.query.channelTable.findFirst({
+    where: and(
+      eq(channelTable.brandId, destination.brand.id),
+      eq(channelTable.platform, "meta_ads"),
+      isNull(channelTable.deletedAt),
+    ),
+    columns: { id: true },
+  });
+  if (!channel)
+    throw new Error("Connect a Meta Ads channel before creating an audience");
+  const [seedSnapshot] = input.seedSnapshotId
+    ? await db
+        .select({ count: seedSnapshotTable.memberCount })
+        .from(seedSnapshotTable)
+        .innerJoin(
+          seedListTable,
+          eq(seedListTable.id, seedSnapshotTable.seedListId),
+        )
+        .where(
+          and(
+            eq(seedSnapshotTable.id, input.seedSnapshotId),
+            eq(seedListTable.brandId, destination.brand.id),
+          ),
+        )
+        .limit(1)
+    : [];
+  if (input.seedSnapshotId && (!seedSnapshot || input.type !== "customer_list"))
+    throw new Error(
+      "Choose a seed snapshot belonging to this brand for a customer list",
+    );
+  const parent =
+    input.type === "lookalike"
+      ? await db.query.platformAudienceTable.findFirst({
+          where: and(
+            eq(platformAudienceTable.brandId, destination.brand.id),
+            eq(platformAudienceTable.channelId, channel.id),
+            eq(platformAudienceTable.adAccountId, destination.localAdAccountId),
+            eq(platformAudienceTable.externalId, input.sourceAudienceId!),
+          ),
+          columns: { id: true },
+        })
+      : undefined;
+  if (
+    input.parentPlatformAudienceId &&
+    parent?.id !== input.parentPlatformAudienceId
+  )
+    throw new Error("The lookalike source is not this seed in this ad account");
+
   const provider = await createZernioAdAudience({
     accountId: input.connectionAccountId,
     adAccountId: destination.adAccount.id,
@@ -1647,14 +1716,6 @@ export async function createAdAudience(
   // (whose id the member upload needs).
   const audience = provider.audience;
   const externalId = audience?.platformAudienceId ?? null;
-  const channel = await db.query.channelTable.findFirst({
-    where: and(
-      eq(channelTable.brandId, destination.brand.id),
-      eq(channelTable.platform, "meta_ads"),
-      isNull(channelTable.deletedAt),
-    ),
-    columns: { id: true },
-  });
   let mirrored = null;
   if (channel) {
     if (input.personaId) {
@@ -1665,6 +1726,17 @@ export async function createAdAudience(
       .values({
         id: createId("paud"),
         channelId: channel.id,
+        adAccountId: destination.localAdAccountId,
+        seedSnapshotId: input.seedSnapshotId ?? null,
+        parentPlatformAudienceId: parent?.id ?? null,
+        seedMetadata: seedSnapshot
+          ? {
+              source: "seed",
+              count: seedSnapshot.count,
+              uploadedCount: 0,
+              status: "uploading",
+            }
+          : null,
         brandId: destination.brand.id,
         audienceId: input.planAudienceId ?? null,
         personaId: input.personaId ?? null,

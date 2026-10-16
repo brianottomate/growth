@@ -1,3 +1,5 @@
+import { adAccountTable } from "./ad-account-schema";
+import { seedSnapshotTable } from "./seed-schema";
 import type { DeliveryGroupConfiguration } from "@/lib/platform-delivery";
 import type { MetaPlacement } from "@/lib/meta-placement-plan";
 import type { IdeaStudio } from "@/lib/ad-idea-studio";
@@ -908,6 +910,20 @@ export const platformAudienceTable = pgTable(
     personaId: t
       .text()
       .references(() => personaTable.id, { onDelete: "set null" }),
+    /** Destination identity owned by the allowlist registry; provider JSON is provenance. */
+    adAccountId: t
+      .text()
+      .references(() => adAccountTable.id, { onDelete: "restrict" }),
+    /** New reusable seed workflow: exact frozen membership that was uploaded. */
+    seedSnapshotId: t
+      .text()
+      .references(() => seedSnapshotTable.id, { onDelete: "restrict" }),
+    /** Local identity of a lookalike's seed; external sourceId remains provider provenance. */
+    parentPlatformAudienceId: t
+      .text()
+      .references((): AnyPgColumn => platformAudienceTable.id, {
+        onDelete: "restrict",
+      }),
     /** The asset this one was derived from (lookalike seed, etc.). */
     sourceId: t.text(),
 
@@ -920,9 +936,10 @@ export const platformAudienceTable = pgTable(
     definition: t.jsonb(),
     /** Operational metadata only; never recipient rows or uploaded files. */
     seedMetadata: t.jsonb().$type<{
-      source: "csv" | "bigquery";
+      source: "csv" | "bigquery" | "seed";
       snapshotId?: string;
       count: number;
+      uploadedCount?: number;
       status: "uploading" | "ready" | "failed";
       cleanupFailed?: boolean;
     }>(),

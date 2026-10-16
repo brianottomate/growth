@@ -1,4 +1,18 @@
 import {
+  listSeedsAction,
+  readSeedAction,
+  previewSeedAction,
+  saveSeedAction,
+  compileSeedAction,
+  seedMembersAction,
+  seedPropertyOptionsAction,
+  suggestSeedsAction,
+  uploadSeedAction,
+  seedAssetStatusAction,
+  seedLookalikeAction,
+  attachSeedAssetAction,
+} from "./seeds";
+import {
   addReviewCommentAction,
   deleteReviewCommentAction,
   listReviewCommentsAction,
@@ -857,7 +871,34 @@ export const reviewWrite = growthDomainTool({
   },
 });
 
+export const seedRead = growthDomainTool({
+  description:
+    "Read, research and preview reusable seed audiences without exposing raw contacts.",
+  actions: {
+    list: listSeedsAction,
+    get: readSeedAction,
+    preview: previewSeedAction,
+    members: seedMembersAction,
+    propertyOptions: seedPropertyOptionsAction,
+    suggest: suggestSeedsAction,
+    assetStatus: seedAssetStatusAction,
+  },
+});
+export const seedWrite = growthDomainTool({
+  description:
+    "Save seed recipes, freeze membership, upload seeds, create lookalikes and attach assets to their intended campaign/persona.",
+  actions: {
+    save: saveSeedAction,
+    compile: compileSeedAction,
+    upload: uploadSeedAction,
+    lookalike: seedLookalikeAction,
+    attach: attachSeedAssetAction,
+  },
+});
+
 export const DOMAIN_CAPABILITY_TOOLS = {
+  seedRead,
+  seedWrite,
   reviewRead,
   reviewWrite,
   creativeRead,

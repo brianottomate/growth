@@ -5,6 +5,16 @@
  * handling all key off this one public ID/action map.
  */
 export const GROWTH_CAPABILITY_ACTIONS = {
+  seedRead: [
+    "list",
+    "get",
+    "preview",
+    "members",
+    "propertyOptions",
+    "suggest",
+    "assetStatus",
+  ],
+  seedWrite: ["save", "compile", "upload", "lookalike", "attach"],
   reviewRead: ["listComments"],
   reviewWrite: ["addComment", "deleteComment"],
   creativeRead: ["list", "get"],
@@ -322,6 +332,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
 export type GrowthCapabilityId = keyof typeof GROWTH_CAPABILITY_ACTIONS;
 
 export const GROWTH_CAPABILITY_LABELS = {
+  seedRead: "Reading seed audiences",
+  seedWrite: "Building seed audiences",
   operationRead: "Checking operation progress",
   workspaceOverview: "Reading workspace overview",
   navigateWorkspace: "Opening workspace",

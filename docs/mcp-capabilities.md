@@ -203,3 +203,13 @@ as the Performance Email forms. Draft edits use last-write-wins.
 activateSequence, enrollSequence and recoverSequence require in-app approval and
 are omitted from MCP and invoke-growth. Ingest credentials remain UI-only.
 See [delivery semantics](lifecycle-execution.md).
+
+## Reusable audience seeds
+
+`seedRead` exposes list/get, typed property options and AI hypotheses, source-backed
+preview, hashed membership pages and fresh provider status. `seedWrite` saves recipes,
+freezes hashed snapshots, uploads customer-list assets, builds lookalikes and attaches
+ready assets to campaign audiences or personas. Upload and lookalike creation require
+operator approval through app/MCP and never start spend. No arbitrary 1,000-person
+floor; optional size goals drive bounded radius expansion. Same action definitions
+serve `seed.*` oRPC. See [model, existing-versus-new and workflow](seed-audiences.md).

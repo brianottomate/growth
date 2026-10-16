@@ -1,0 +1,29 @@
+import { actionProcedure } from "@/server/api/orpc";
+import {
+  listSeedsAction,
+  readSeedAction,
+  previewSeedAction,
+  saveSeedAction,
+  compileSeedAction,
+  seedMembersAction,
+  seedPropertyOptionsAction,
+  suggestSeedsAction,
+  uploadSeedAction,
+  seedAssetStatusAction,
+  seedLookalikeAction,
+  attachSeedAssetAction,
+} from "@/server/ai/capabilities/seeds";
+export const seedRouter = {
+  list: actionProcedure(listSeedsAction),
+  get: actionProcedure(readSeedAction),
+  preview: actionProcedure(previewSeedAction),
+  save: actionProcedure(saveSeedAction),
+  compile: actionProcedure(compileSeedAction),
+  members: actionProcedure(seedMembersAction),
+  propertyOptions: actionProcedure(seedPropertyOptionsAction),
+  suggest: actionProcedure(suggestSeedsAction),
+  upload: actionProcedure(uploadSeedAction),
+  assetStatus: actionProcedure(seedAssetStatusAction),
+  lookalike: actionProcedure(seedLookalikeAction),
+  attach: actionProcedure(attachSeedAssetAction),
+};

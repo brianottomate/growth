@@ -933,7 +933,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
       sourceId: z.string().nullable(),
       seedMetadata: z
         .strictObject({
-          source: z.enum(["csv", "bigquery"]),
+          source: z.enum(["csv", "bigquery", "seed"]),
           snapshotId: z.string().optional(),
           count: z.number(),
           status: z.enum(["uploading", "ready", "failed"]),

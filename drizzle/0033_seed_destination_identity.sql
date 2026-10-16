@@ -1,0 +1,2 @@
+ALTER TABLE "platform_audience" ADD COLUMN "ad_account_id" text;--> statement-breakpoint
+ALTER TABLE "platform_audience" ADD CONSTRAINT "platform_audience_ad_account_id_ad_account_id_fk" FOREIGN KEY ("ad_account_id") REFERENCES "public"."ad_account"("id") ON DELETE restrict ON UPDATE no action;

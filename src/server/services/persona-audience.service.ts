@@ -1,3 +1,4 @@
+import { requireMetaAudienceAccount } from "./audience-account";
 import "server-only";
 
 import { and, asc, eq, isNull } from "drizzle-orm";
@@ -231,12 +232,11 @@ export async function createPersonaLookalike(
 
   const ratio = input.ratio ?? 0.01;
   const country = (input.country ?? DEFAULT_LOOKALIKE_COUNTRY).toUpperCase();
-  const seedAccount = (seed.definition as { adAccountId?: unknown } | null)
-    ?.adAccountId;
+  const seedAccount = await requireMetaAudienceAccount(seed);
   const destination = await resolveMetaDestination({
     organizationId: context.organizationId,
     brandSlug: brand.slug,
-    adAccountId: typeof seedAccount === "string" ? seedAccount : null,
+    adAccountId: seedAccount.externalId,
   });
 
   const created = await createAdAudience(

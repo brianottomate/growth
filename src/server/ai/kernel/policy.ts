@@ -57,6 +57,32 @@ const write = (
 });
 
 export const growthActionPolicies = {
+  seedRead: {
+    list: read(),
+    get: read(),
+    preview: read("provider-read"),
+    members: read(),
+    propertyOptions: read("provider-read"),
+    suggest: read("model-read"),
+    assetStatus: read("provider-read"),
+  },
+  seedWrite: {
+    save: write(),
+    compile: write(),
+    attach: write({ idempotent: true }),
+    upload: write({
+      consequence: "provider-write",
+      approval: "user",
+      surfaces: CONFIRMED,
+      idempotent: false,
+    }),
+    lookalike: write({
+      consequence: "provider-write",
+      approval: "user",
+      surfaces: CONFIRMED,
+      idempotent: false,
+    }),
+  },
   creativeRead: { list: read(), get: read() },
   creativeWrite: {
     create: write(),

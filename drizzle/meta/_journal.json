@@ -232,6 +232,20 @@
       "when": 1792104251333,
       "tag": "0031_performance_bookings",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792113192891,
+      "tag": "0032_reusable_seed_lists",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792113847812,
+      "tag": "0033_seed_destination_identity",
+      "breakpoints": true
     }
   ]
 }

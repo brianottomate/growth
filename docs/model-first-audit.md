@@ -472,3 +472,19 @@ Recovery dispatches only queued work; existing pixel-create receipts prevent
 replayed asset creation. Callback channel aliases/duplicate query values are
 handled so successful authorization cannot skip completion. Connect distinguishes
 authorization from destination selection and installation readiness.
+
+## Reusable seed audiences (2026-10-15)
+
+The local Winter Park/30A/AR experiment exposed a missing identity: an audience seed
+was either transient CSV rows or an email snapshot hanging from a campaign. A seed
+now owns its reusable typed recipe; a snapshot owns frozen hashed membership and
+source evidence; a platform asset points to that snapshot and a lookalike points
+to its local parent. Provider destination belongs to the existing `ad_account`
+registry, not mutable provider JSON. Generic audience create/sync normalize that
+account relationship at their boundary. No synthetic campaigns or personas needed.
+
+Existing email recipient snapshots and legacy assets are not backfilled into fake
+seed histories. The old campaign upload UI remains a compatibility entry point;
+new assistant/MCP/API work uses `seedRead`/`seedWrite`. Do not add another seed uploader
+or duplicate the new snapshot FK in JSON. Follow-up UI adoption can retire that
+campaign-only path once its consumers have moved. See [seed audiences](seed-audiences.md).

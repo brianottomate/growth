@@ -1,8 +1,10 @@
+import { requireMetaAudienceAccount } from "./audience-account";
 import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   audienceTable,
+  adAccountTable,
   brandTable,
   channelTable,
   emailAudienceTable,
@@ -121,7 +123,21 @@ async function destination(brand: { id: string; slug: string }, actor: Actor) {
     throw new Error(
       "Connect an allowlisted Meta ad account for this brand first",
     );
-  return { channel, target };
+  const allowed = await db.query.adAccountTable.findMany({
+    where: and(
+      eq(adAccountTable.brandId, brand.id),
+      eq(adAccountTable.platform, "facebook"),
+      eq(adAccountTable.isAllowed, true),
+    ),
+    columns: { id: true, externalId: true },
+  });
+  const account = allowed.find(
+    (a) =>
+      a.externalId.replace(/^act_/, "") ===
+      target.adAccountId.replace(/^act_/, ""),
+  );
+  if (!account) throw new Error("This ad account is no longer allowlisted");
+  return { channel, target, account };
 }
 /** Recipients are transient. No action receipts, logging, CSV blobs or recipient tables. */
 export async function uploadCampaignSeed(
@@ -140,7 +156,11 @@ export async function uploadCampaignSeed(
       "Confirm permission to use these customers for Meta audience matching",
     );
   const { audience, brand } = await scope(input.audienceId, actor);
-  const { channel, target } = await destination(brand, actor);
+  const {
+    channel,
+    target,
+    account: destinationAccount,
+  } = await destination(brand, actor);
   const users =
     input.source === "csv" ? normalizeSeedUsers(input.users ?? []) : [];
   let count = users.length;
@@ -183,6 +203,7 @@ export async function uploadCampaignSeed(
       id,
       brandId: brand.id,
       channelId: channel.id,
+      adAccountId: destinationAccount.id,
       name,
       type: "custom",
       source: "customer_list",
@@ -280,10 +301,13 @@ export async function buildCampaignLookalike(
     throw new Error(
       "Choose a ready Meta customer list belonging to this brand",
     );
-  const { channel, target } = await destination(brand, actor);
-  const account = (seed.definition as { adAccountId?: string } | null)
-    ?.adAccountId;
-  if (account && account !== target.adAccountId)
+  const {
+    channel,
+    target,
+    account: destinationAccount,
+  } = await destination(brand, actor);
+  const account = await requireMetaAudienceAccount(seed);
+  if (account.id !== destinationAccount.id)
     throw new Error("This seed belongs to a different Meta ad account");
   const name = `${brand.name} · ${audience.name} · 1% ${input.country} lookalike`;
   let providerId: string | null = null;
@@ -306,10 +330,12 @@ export async function buildCampaignLookalike(
       id: localId,
       brandId: brand.id,
       channelId: channel.id,
+      adAccountId: destinationAccount.id,
       name,
       type: "lookalike",
       source: "lookalike_seed",
       sourceId: seed.externalId,
+      parentPlatformAudienceId: seed.id,
       externalId: created.audience.platformAudienceId,
       definition: { ...created.audience, adAccountId: target.adAccountId },
     });

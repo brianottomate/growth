@@ -45,3 +45,5 @@ export * from "./lifecycle-execution-schema";
 
 export * from "./email-sequence-schema";
 export * from "./performance-booking-schema";
+
+export * from "./seed-schema";
