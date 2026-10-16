@@ -57,6 +57,11 @@ const PAGES: { name: string; href: string; note?: string }[] = [
     note: "live persisted runs: source capture, renderer, evaluation receipts",
   },
   {
+    name: "Intake form",
+    href: "/lab/intake",
+    note: "wander.com Performance+ intake, every step side by side",
+  },
+  {
     name: "Copy lab",
     href: "/lab/copy",
     note: "brand + home fixtures through the production copy calls, variants side by side",
