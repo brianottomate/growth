@@ -5,6 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db, withTransaction } from "@/server/db";
 import { initializeBrandTasks } from "./brand-task.service";
+import { ensureClientZernioProfile } from "./brand-connect.service";
 import {
   brandTable,
   leadDomainTable,
@@ -53,17 +54,22 @@ async function saveRelationship(
   changes: Partial<typeof brandTable.$inferInsert>,
   createdByUserId: string | null = null,
 ) {
-  return withTransaction(async (tx) => {
-    const [updated] = await tx
+  const updated = await withTransaction(async (tx) => {
+    const [row] = await tx
       .update(brandTable)
       .set(changes)
       .where(eq(brandTable.id, brand.id))
       .returning();
-    if (!updated) throw new PerformanceError("NOT_FOUND", "Brand not found");
-    if (brand.relationship !== "client" && updated.relationship === "client")
+    if (!row) throw new PerformanceError("NOT_FOUND", "Brand not found");
+    if (brand.relationship !== "client" && row.relationship === "client")
       await initializeBrandTasks(brand.id, createdByUserId, tx);
-    return updated;
+    return row;
   });
+  // Every path to client passes here. The provider call stays outside the
+  // transaction and never fails the move.
+  if (brand.relationship !== "client" && updated.relationship === "client")
+    await ensureClientZernioProfile(brand.id);
+  return updated;
 }
 
 /**

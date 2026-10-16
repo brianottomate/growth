@@ -30,6 +30,7 @@ import { posterForMedia } from "@/lib/media-url";
 import { PlatformBudget } from "./PlatformBudget";
 import { PushToPlatform } from "./PushToPlatform";
 import { MetaDeliverySummary } from "./MetaDeliverySummary";
+import { platformCampaignAdAccount } from "@/lib/platform-campaign-account";
 import { PushedMetaGroups } from "./PushedMetaGroups";
 import { SeedLookalikeStep } from "./SeedLookalikeStep";
 import { PushedSearchGroups } from "./PushedSearchGroups";
@@ -261,9 +262,7 @@ export async function PlatformSection({
   const running = platformCampaign.status === "live";
   // Each ad opens on its own editor in the platform. The account is the one
   // the push used, or the act= of a synced campaign's link.
-  const adAccountId =
-    platformCampaign.settings?.meta?.destination?.adAccountId ??
-    actOf(platformCampaign.manageUrl);
+  const adAccountId = platformCampaignAdAccount(platformCampaign);
   const adLink = (ad: (typeof ads)[number]) => {
     const build = adPlatformSpec(platform)?.adManageUrl;
     return build &&
@@ -470,14 +469,4 @@ export async function PlatformSection({
       )}
     </div>
   );
-}
-
-/** The ad account in an Ads Manager link, or null. */
-function actOf(url: string | null) {
-  if (!url) return null;
-  try {
-    return new URL(url).searchParams.get("act");
-  } catch {
-    return null;
-  }
 }

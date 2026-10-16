@@ -6,6 +6,7 @@ import {
 } from "@/lib/meta-placement-plan";
 import { importedPlacementLabel } from "@/lib/meta-preview";
 import { money, fmtDate } from "./format";
+import { platformCampaignAdAccount } from "@/lib/platform-campaign-account";
 
 export function MetaDeliverySummary({
   pc,
@@ -52,7 +53,9 @@ export function MetaDeliverySummary({
     ],
     [
       "Ad account",
-      accountName ?? meta?.destination?.adAccountId ?? "Not configured",
+      accountName ??
+        platformCampaignAdAccount(pc) ??
+        (pc.status === "draft" ? "Not configured" : "Not recorded"),
     ],
     [
       "Facebook Page",

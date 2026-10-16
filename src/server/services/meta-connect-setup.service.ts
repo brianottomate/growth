@@ -489,13 +489,19 @@ export async function completeMetaConnectSetup(
         performanceSettings: sql`(coalesce(${brandTable.performanceSettings}, '{}'::jsonb) - 'adsConnectionBrandId') || ${JSON.stringify({ metaAdsDestination: { connectionAccountId, adAccountId: account.id } })}::jsonb`,
       })
       .where(eq(brandTable.id, brandId));
+    // A saved destination is Meta connected: close the onboarding checklist's
+    // "Connect Facebook / Meta" and any earlier connection review with it.
     await db
       .update(brandTaskTable)
       .set({ status: "done" })
       .where(
         and(
           eq(brandTaskTable.brandId, brandId),
-          eq(brandTaskTable.templateKey, "meta-setup:account"),
+          inArray(brandTaskTable.templateKey, [
+            "meta-setup:account",
+            "meta-setup:connection",
+            "metaConnected",
+          ]),
         ),
       );
     const billing = metaAdBillingStatus(account);

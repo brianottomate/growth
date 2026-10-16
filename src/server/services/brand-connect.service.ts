@@ -223,6 +223,30 @@ async function ensureBrandZernioProfile(brand: {
   return profileId;
 }
 
+/**
+ * Give a brand that just became a client its own Zernio profile, so its
+ * connections are its own from day one rather than waiting for a first
+ * Connect click that a Leadsie-delegated brand never makes. Prospects get
+ * none, so they use no Zernio plan slots. Best effort: the connect link
+ * still creates the profile lazily if this fails.
+ */
+export async function ensureClientZernioProfile(brandId: string) {
+  if (!isZernioConfigured) return;
+  const brand = await db.query.brandTable.findFirst({
+    where: and(eq(brandTable.id, brandId), isNull(brandTable.deletedAt)),
+    columns: { id: true, name: true, zernioProfileId: true },
+  });
+  if (!brand || brand.zernioProfileId) return;
+  try {
+    await ensureBrandZernioProfile(brand);
+  } catch (error) {
+    console.error("Zernio profile for new client failed", {
+      brandId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+
 /** Revoke the sent link by replacing it. The old URL stops resolving. */
 export async function regenerateBrandConnectToken(
   brandId: string,
