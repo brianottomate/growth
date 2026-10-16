@@ -14,6 +14,7 @@ import {
   attachSeedAssetAction,
   shareSeedLookalikeAction,
   fillSeedContactsAction,
+  seedDeliveriesAction,
 } from "@/server/ai/capabilities/seeds";
 export const seedRouter = {
   list: actionProcedure(listSeedsAction),
@@ -30,4 +31,5 @@ export const seedRouter = {
   attach: actionProcedure(attachSeedAssetAction),
   share: actionProcedure(shareSeedLookalikeAction),
   fillContacts: actionProcedure(fillSeedContactsAction),
+  deliveries: actionProcedure(seedDeliveriesAction),
 };

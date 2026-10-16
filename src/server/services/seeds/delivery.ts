@@ -18,14 +18,19 @@ import {
   inArray,
   or,
   isNotNull,
+  desc,
 } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   adAccountTable,
+  audienceTable,
   brandTable,
+  campaignAudienceAssetTable,
   channelTable,
   platformAudienceTable,
+  seedListTable,
   seedMemberTable,
+  seedSnapshotTable,
 } from "@/server/db/schema";
 import {
   addUsersToZernioAdAudience,
@@ -40,7 +45,9 @@ import { linkPlatformAudience } from "../ads-draft.service";
 import { assignPersonaAudience } from "../persona-audience.service";
 import {
   readSeed,
+  requireSeedBrand,
   requireSeedSnapshot,
+  seedSnapshotSummary,
   requireWanderSeedSource,
   SEED_MIN_ENTRIES,
   type SeedActor,
@@ -91,6 +98,27 @@ async function seedDestination(actor: SeedActor) {
       allowed,
     }),
   };
+}
+
+/**
+ * Meta refuses custom audiences until the Meta user behind the connection has
+ * accepted the custom audience terms for that account (subcode 1870090). A
+ * retry cannot succeed, so stop with the one action that fixes it.
+ */
+async function createSeedAudience(
+  input: Parameters<typeof createAdAudience>[0],
+  actor: DeliveryActor,
+) {
+  try {
+    return await createAdAudience(input, actor);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("1870090")) throw error;
+    const act = input.adAccountId.replace(/^act_/, "");
+    throw new Error(
+      `Meta has not accepted the custom audience terms for ad account ${act}. The Meta user behind Zernio connection ${input.connectionAccountId} must accept them at https://business.facebook.com/ads/manage/customaudiences/tos/?act=${act}, then run this step again. No audience was created; do not retry before the terms are accepted.`,
+    );
+  }
 }
 
 const providerId = (asset: Asset) => {
@@ -187,7 +215,7 @@ export async function uploadSeed(
       matchedSize: await matchedSize(asset),
     };
   if (!asset) {
-    const created = await createAdAudience(
+    const created = await createSeedAudience(
       {
         brandSlug: WANDER_BRAND_SLUG,
         connectionAccountId: target.connectionAccountId,
@@ -342,9 +370,18 @@ async function clientAccount(brandId: string) {
 async function seedShare(lookalike: Asset, snapshotId: string) {
   if (!lookalike.forBrandId)
     throw new Error("This lookalike was not built for a client brand");
-  const [source, client] = await Promise.all([
+  const [source, client, seed] = await Promise.all([
     requireMetaAudienceAccount(lookalike),
     clientAccount(lookalike.forBrandId),
+    lookalike.parentPlatformAudienceId
+      ? db.query.platformAudienceTable.findFirst({
+          where: eq(
+            platformAudienceTable.id,
+            lookalike.parentPlatformAudienceId,
+          ),
+          columns: { id: true, name: true, externalId: true },
+        })
+      : undefined,
   ]);
   const mirror =
     client.local && lookalike.externalId
@@ -362,6 +399,9 @@ async function seedShare(lookalike: Asset, snapshotId: string) {
     platformAudienceId: lookalike.id,
     lookalikeName: lookalike.name,
     metaAudienceId: lookalike.externalId,
+    seedPlatformAudienceId: seed?.id ?? null,
+    seedName: seed?.name ?? null,
+    seedMetaAudienceId: seed?.externalId ?? null,
     sourceAdAccountId: source.externalId,
     adsManagerUrl: adsManagerAudiencesUrl(source.externalId),
     clientBrandId: client.brand.id,
@@ -417,7 +457,7 @@ export async function seedLookalike(
       "Meta is still processing this seed; check status again before creating a lookalike",
     );
   // Meta's own error (e.g. an unsupported country) surfaces as thrown.
-  const created = await createAdAudience(
+  const created = await createSeedAudience(
     {
       brandSlug: WANDER_BRAND_SLUG,
       connectionAccountId: target.connectionAccountId,
@@ -665,4 +705,157 @@ export async function attachSeedAsset(
       organizationId: actor.organizationId,
     });
   return { platformAudienceId: asset.id, attached: true };
+}
+
+export type SeedDeliveryStage =
+  | "recipe"
+  | "compiled"
+  | "uploading"
+  | "uploaded"
+  | "lookalike"
+  | "shared";
+
+/**
+ * Where each seed list stands on the way to a client's ad account: its active
+ * build (the uploaded one, else the newest), Wander's customer list, the
+ * lookalike, and the share. DB only, so it can list every brand at once.
+ */
+export async function listSeedDeliveries(
+  input: { brandId?: string; campaignAudienceId?: string },
+  actor: SeedActor,
+) {
+  if (input.brandId) await requireSeedBrand(input.brandId, actor);
+  // Which Meta asset this campaign audience's ad sets target, if asked.
+  const [linked] = input.campaignAudienceId
+    ? await db
+        .select({ id: campaignAudienceAssetTable.platformAudienceId })
+        .from(campaignAudienceAssetTable)
+        .innerJoin(
+          audienceTable,
+          eq(audienceTable.id, campaignAudienceAssetTable.audienceId),
+        )
+        .innerJoin(brandTable, eq(brandTable.id, audienceTable.brandId))
+        .where(
+          and(
+            eq(campaignAudienceAssetTable.audienceId, input.campaignAudienceId),
+            eq(campaignAudienceAssetTable.platform, "meta_ads"),
+            eq(brandTable.organizationId, actor.organizationId),
+          ),
+        )
+        .limit(1)
+    : [];
+  const lists = await db
+    .select({
+      id: seedListTable.id,
+      name: seedListTable.name,
+      brandId: brandTable.id,
+      brandName: brandTable.name,
+      brandSlug: brandTable.slug,
+      updatedAt: seedListTable.updatedAt,
+    })
+    .from(seedListTable)
+    .innerJoin(brandTable, eq(brandTable.id, seedListTable.brandId))
+    .where(
+      and(
+        eq(brandTable.organizationId, actor.organizationId),
+        isNull(brandTable.deletedAt),
+        ...(input.brandId ? [eq(brandTable.id, input.brandId)] : []),
+      ),
+    )
+    .orderBy(desc(seedListTable.updatedAt));
+  if (!lists.length) return [];
+  const snapshots = await db.query.seedSnapshotTable.findMany({
+    where: inArray(
+      seedSnapshotTable.seedListId,
+      lists.map((l) => l.id),
+    ),
+    orderBy: desc(seedSnapshotTable.createdAt),
+  });
+  const seeds = snapshots.length
+    ? await db.query.platformAudienceTable.findMany({
+        where: inArray(
+          platformAudienceTable.seedSnapshotId,
+          snapshots.map((s) => s.id),
+        ),
+        orderBy: desc(platformAudienceTable.createdAt),
+      })
+    : [];
+  const lookalikes = seeds.length
+    ? await db.query.platformAudienceTable.findMany({
+        where: and(
+          inArray(
+            platformAudienceTable.parentPlatformAudienceId,
+            seeds.map((s) => s.id),
+          ),
+          isNotNull(platformAudienceTable.forBrandId),
+        ),
+        orderBy: desc(platformAudienceTable.createdAt),
+      })
+    : [];
+  return Promise.all(
+    lists.map(async (list) => {
+      const own = snapshots.filter((s) => s.seedListId === list.id);
+      const seed = seeds.find((a) =>
+        own.some((s) => s.id === a.seedSnapshotId),
+      );
+      const snapshot =
+        own.find((s) => s.id === seed?.seedSnapshotId) ?? own[0] ?? null;
+      const lookalike = seed
+        ? lookalikes.find((l) => l.parentPlatformAudienceId === seed.id)
+        : undefined;
+      const share =
+        lookalike && snapshot ? await seedShare(lookalike, snapshot.id) : null;
+      const status = seed?.seedMetadata?.status;
+      const stage: SeedDeliveryStage =
+        share?.status === "shared"
+          ? "shared"
+          : lookalike
+            ? "lookalike"
+            : status === "ready"
+              ? "uploaded"
+              : seed
+                ? "uploading"
+                : snapshot
+                  ? "compiled"
+                  : "recipe";
+      return {
+        seedListId: list.id,
+        seedListName: list.name,
+        brandId: list.brandId,
+        brandName: list.brandName,
+        brandSlug: list.brandSlug,
+        stage,
+        snapshot: snapshot
+          ? (({ id, memberCount, diagnostics, createdAt, warning }) => ({
+              id,
+              memberCount,
+              entries: diagnostics.contacts?.identifiable ?? null,
+              warning,
+              createdAt,
+            }))(seedSnapshotSummary(snapshot))
+          : null,
+        seed: seed
+          ? {
+              platformAudienceId: seed.id,
+              name: seed.name,
+              metaAudienceId: seed.externalId,
+              status: status ?? null,
+              uploaded: seed.seedMetadata?.uploadedCount ?? null,
+              entries: seed.seedMetadata?.count ?? null,
+            }
+          : null,
+        lookalike: lookalike
+          ? {
+              platformAudienceId: lookalike.id,
+              name: lookalike.name,
+              metaAudienceId: lookalike.externalId,
+              sizeLabel: lookalike.sizeLabel,
+            }
+          : null,
+        share,
+        linkedToCampaignAudience:
+          !!linked && linked.id === share?.sharedPlatformAudienceId,
+      };
+    }),
+  );
 }

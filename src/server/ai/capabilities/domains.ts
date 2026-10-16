@@ -11,6 +11,7 @@ import {
   seedAssetStatusAction,
   seedLookalikeAction,
   shareSeedLookalikeAction,
+  seedDeliveriesAction,
   fillSeedContactsAction,
   attachSeedAssetAction,
 } from "./seeds";
@@ -884,6 +885,7 @@ export const seedRead = growthDomainTool({
     propertyOptions: seedPropertyOptionsAction,
     suggest: suggestSeedsAction,
     assetStatus: seedAssetStatusAction,
+    deliveries: seedDeliveriesAction,
   },
 });
 export const seedWrite = growthDomainTool({

@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { PersonasClient } from "./PersonasClient";
+import { SeedDeliveries } from "./SeedDeliveries";
 
 export default async function PersonasPage() {
   const session = await getSession();
@@ -27,5 +28,10 @@ export default async function PersonasPage() {
     columns: { id: true, name: true },
   });
 
-  return <PersonasClient brands={brands} />;
+  return (
+    <div className="space-y-10">
+      <PersonasClient brands={brands} />
+      <SeedDeliveries />
+    </div>
+  );
 }

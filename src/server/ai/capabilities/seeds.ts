@@ -18,6 +18,7 @@ import {
   attachSeedAsset,
   shareSeedLookalike,
   readSeedDelivery,
+  listSeedDeliveries,
 } from "@/server/services/seeds/delivery";
 import {
   seedPropertyOptions,
@@ -101,6 +102,9 @@ const share = z.object({
   platformAudienceId: z.string(),
   lookalikeName: z.string(),
   metaAudienceId: z.string().nullable(),
+  seedPlatformAudienceId: z.string().nullable(),
+  seedName: z.string().nullable(),
+  seedMetaAudienceId: z.string().nullable(),
   sourceAdAccountId: z.string(),
   adsManagerUrl: z.string(),
   clientBrandId: z.string(),
@@ -133,6 +137,61 @@ export const readSeedAction = growthAction({
     shares: z.array(share),
   }),
   execute: (i, c) => readSeedDelivery(i, actor(c)),
+});
+export const seedDeliveriesAction = growthAction({
+  description:
+    "List seed lists with their delivery stage: recipe, compiled (entries with email or phone), uploading/uploaded to Wander's Meta account, lookalike created, shared with the client's ad account. Omit brandId for every brand (the needs-sharing queue). Pass campaignAudienceId to learn whether that campaign audience already targets the shared lookalike. DB only, no contacts.",
+  inputSchema: z.object({
+    brandId: z.string().min(1).optional(),
+    campaignAudienceId: z.string().min(1).optional(),
+  }),
+  outputSchema: z.array(
+    z.object({
+      seedListId: z.string(),
+      seedListName: z.string(),
+      brandId: z.string(),
+      brandName: z.string(),
+      brandSlug: z.string().nullable(),
+      stage: z.enum([
+        "recipe",
+        "compiled",
+        "uploading",
+        "uploaded",
+        "lookalike",
+        "shared",
+      ]),
+      snapshot: z
+        .object({
+          id: z.string(),
+          memberCount: z.number(),
+          entries: z.number().nullable(),
+          warning: z.string().nullable(),
+          createdAt: z.string(),
+        })
+        .nullable(),
+      seed: z
+        .object({
+          platformAudienceId: z.string(),
+          name: z.string(),
+          metaAudienceId: z.string().nullable(),
+          status: z.string().nullable(),
+          uploaded: z.number().nullable(),
+          entries: z.number().nullable(),
+        })
+        .nullable(),
+      lookalike: z
+        .object({
+          platformAudienceId: z.string(),
+          name: z.string(),
+          metaAudienceId: z.string().nullable(),
+          sizeLabel: z.string().nullable(),
+        })
+        .nullable(),
+      share: share.nullable(),
+      linkedToCampaignAudience: z.boolean(),
+    }),
+  ),
+  execute: (i, c) => listSeedDeliveries(i, actor(c)),
 });
 export const previewSeedAction = growthAction({
   description:

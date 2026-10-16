@@ -26,6 +26,7 @@ import { ChannelLogo } from "@/components/channel-logos";
 import { Button } from "@/components/ui/button";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { AskAssistantButton } from "./AskAssistantButton";
+import { SeedLookalikeStep } from "./SeedLookalikeStep";
 import {
   Select,
   SelectContent,
@@ -50,6 +51,8 @@ import { money } from "./format";
 type Audience = {
   configuration?: DeliveryGroupConfiguration | null;
   id: string;
+  /** The campaign audience this ad set delivers; custom audiences link to it. */
+  audienceId?: string | null;
   name: string;
   geography: DeliveryGeography | null;
   ageMin: number | null;
@@ -315,6 +318,15 @@ export function MetaPlatformCard({
                       <p className="text-sm text-muted-foreground">
                         No ads included in this ad set.
                       </p>
+                    )}
+                    {audience.audienceId && (
+                      <SeedLookalikeStep
+                        brandId={pc.brandId}
+                        brandName={brandName}
+                        campaignId={campaignId}
+                        campaignName={campaignName}
+                        campaignAudienceId={audience.audienceId}
+                      />
                     )}
                   </div>
                 </details>

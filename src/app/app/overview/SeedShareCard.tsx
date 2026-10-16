@@ -7,9 +7,11 @@ import { ArrowUpRight, Share2 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { type RouterOutputs, orpc } from "@/orpc/client";
-
-type SeedShare = RouterOutputs["seed"]["lookalike"]["share"];
+import {
+  SeedShareDialog,
+  type SeedShare,
+} from "@/components/seed-share-dialog";
+import { orpc } from "@/orpc/client";
 
 function Row({ label, value }: { label: string; value: string | null }) {
   return (
@@ -67,6 +69,15 @@ export function SeedShareCard({ share: initial }: { share: SeedShare }) {
       )}
       {next && <p className="text-xs text-muted-foreground">{next}</p>}
       <div className="flex flex-wrap gap-2">
+        <SeedShareDialog
+          share={share}
+          onShared={setShare}
+          trigger={
+            <Button variant="outline" size="sm">
+              Share steps
+            </Button>
+          }
+        />
         <Button asChild variant="outline" size="sm">
           <a href={share.adsManagerUrl} target="_blank" rel="noreferrer">
             Ads Manager audiences

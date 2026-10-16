@@ -13,6 +13,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "propertyOptions",
     "suggest",
     "assetStatus",
+    "deliveries",
   ],
   seedWrite: [
     "save",

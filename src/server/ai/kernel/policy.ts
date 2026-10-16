@@ -65,6 +65,7 @@ export const growthActionPolicies = {
     propertyOptions: read("provider-read"),
     suggest: read("model-read"),
     assetStatus: read("provider-read"),
+    deliveries: read(),
   },
   seedWrite: {
     save: write(),
