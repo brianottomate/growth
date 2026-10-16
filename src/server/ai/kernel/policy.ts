@@ -363,9 +363,8 @@ export const growthActionPolicies = {
     savePillar: write({ idempotent: true }),
     saveSeries: write({ idempotent: true }),
     deleteSeries: write({ reversible: false }),
-    // One series is cheap to rebuild; a whole shelf is not, so the bulk clear is
-    // the one purge that stops for an explicit yes.
-    clearSeries: write({ approval: "user", reversible: false }),
+    // Local content can be cleared and regenerated directly.
+    clearSeries: write({ reversible: false }),
     organizeIdeas: write({ idempotent: true }),
     proposeGroupings: write({ consequence: "model-write" }),
     resolveGrouping: write({ idempotent: true }),

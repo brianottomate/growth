@@ -15,13 +15,14 @@ export type RouterOutputs = InferRouterOutputs<AppRouter>;
 
 const client: RouterClient<AppRouter> = createORPCClient(
   new RPCLink({
-    url: () => `${getBaseUrl()}/api/rpc`,
+    origin: getBaseUrl,
+    url: "/api/rpc",
     // Calls made in the same tick share one request; responses stream back
     // as each procedure finishes.
     plugins: [
       new BatchLinkPlugin({
         groups: [{ condition: () => true, context: {} }],
-        url: () => `${getBaseUrl()}/api/rpc/__batch__`,
+        url: "/api/rpc/__batch__",
       }),
     ],
   }),

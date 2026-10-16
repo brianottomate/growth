@@ -1010,7 +1010,7 @@ export async function POST(req: Request): Promise<Response> {
     > &
       typeof utilityTools = { ...modelTools, ...utilityTools };
     const historyMessages = await convertToModelMessages(
-      chatHistoryForModel(history),
+      chatHistoryForModel(history, incoming.role === "assistant"),
       {
         tools: chatTools,
         ignoreIncompleteToolCalls: true,

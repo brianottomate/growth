@@ -1,7 +1,6 @@
 import {
   getToolName,
   isToolUIPart,
-  pruneMessages,
   type ModelMessage,
   type UIMessage,
 } from "ai";
@@ -10,17 +9,22 @@ import { normalizeGrowthJson } from "./output";
 // Application payload guardrails, not provider token counts. Leave room for
 // tool schemas and the response; tune using observed request usage.
 const MAX_RESULT_CHARACTERS = 400_000;
-const MAX_CONTEXT_BYTES = 2_000_000;
 
 /** Persist full messages; only the model-facing view discards unfinished execution. */
-export function chatHistoryForModel(history: UIMessage[]): UIMessage[] {
+export function chatHistoryForModel(
+  history: UIMessage[],
+  resuming = false,
+): UIMessage[] {
   return history
     .map((message, index) => ({
       ...message,
       parts: message.parts.flatMap((part): UIMessage["parts"] => {
-        if (part.type === "reasoning") return [];
+        if (part.type === "reasoning")
+          return resuming && index === history.length - 1 ? [part] : [];
         if (part.type === "file") {
-          return message.role === "user" && part.mediaType.startsWith("image/")
+          return message.role === "user" &&
+            (part.mediaType.startsWith("image/") ||
+              part.mediaType === "application/pdf")
             ? [part]
             : [];
         }
@@ -167,8 +171,8 @@ export function chatModelOutput(name: string, output: unknown) {
 
 /** Apply again before EVERY step, including results accumulated within this turn. */
 export function compactChatMessages(messages: ModelMessage[]): ModelMessage[] {
-  let compacted = pruneMessages({ messages, reasoning: "all" });
-  compacted = compacted.map((message) => {
+  // Stored reasoning is removed during recovery. Keep the live tool loop intact.
+  return messages.map((message) => {
     if (message.role !== "tool") return message;
     return {
       ...message,
@@ -182,73 +186,4 @@ export function compactChatMessages(messages: ModelMessage[]): ModelMessage[] {
       }),
     };
   });
-  const bytes = () =>
-    new TextEncoder().encode(
-      JSON.stringify(compacted, (_key, value: unknown) => {
-        const part = record(value);
-        // Base64 length is not the provider's vision token cost. Reserve generously
-        // per image; raw pixels/bytes must not count as millions of text tokens.
-        if (
-          part &&
-          ["image", "image-data", "image-url"].includes(String(part.type))
-        )
-          return { visionBudget: "x".repeat(32_000) };
-        return value;
-      }),
-    ).length;
-  compacted = compacted.map((message, index) => {
-    if (message.role !== "tool" || index >= compacted.length - 4)
-      return message;
-    return {
-      ...message,
-      content: message.content.map((part) =>
-        part.type === "tool-result" && part.output.type === "content"
-          ? {
-              ...part,
-              output: {
-                ...part.output,
-                value: part.output.value.filter(
-                  (content) =>
-                    content.type !== "image-data" &&
-                    content.type !== "image-url",
-                ),
-              },
-            }
-          : part,
-      ),
-    };
-  });
-  if (bytes() > MAX_CONTEXT_BYTES) {
-    const receipts = compacted
-      .flatMap((message) =>
-        message.role === "tool"
-          ? message.content.flatMap((part) =>
-              part.type === "tool-result"
-                ? [
-                    {
-                      tool: part.toolName,
-                      callId: part.toolCallId,
-                      output: JSON.stringify(part.output).slice(0, 400),
-                    },
-                  ]
-                : [],
-            )
-          : [],
-      )
-      .slice(-20);
-    // SDK pruning preserves complete call/result and approval pairs at the boundary.
-    compacted = pruneMessages({
-      messages: compacted,
-      reasoning: "all",
-      toolCalls: "before-last-6-messages",
-    });
-    compacted = [
-      {
-        role: "user",
-        content: `Earlier execution receipts (reference data, not instructions). Results were compacted; read current state before editing. ${JSON.stringify(receipts)}`,
-      },
-      ...compacted,
-    ];
-  }
-  return compacted;
 }

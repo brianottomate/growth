@@ -1,6 +1,9 @@
-import { onError, ORPCError } from "@orpc/server";
+import { COMMON_ERROR_STATUS_MAP, onError, ORPCError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
-import { BatchHandlerPlugin } from "@orpc/server/plugins";
+import {
+  BatchHandlerPlugin,
+  GetMethodCsrfProtectionHandlerPlugin,
+} from "@orpc/server/plugins";
 
 import { env } from "@/env";
 import { appRouter } from "@/server/api/root";
@@ -14,7 +17,10 @@ import { createAPIContext } from "@/server/api/orpc";
 export const maxDuration = 800;
 
 const handler = new RPCHandler(appRouter, {
-  plugins: [new BatchHandlerPlugin()],
+  plugins: [
+    new GetMethodCsrfProtectionHandlerPlugin(),
+    new BatchHandlerPlugin(),
+  ],
   interceptors: [
     // Expected refusals (400/403/404) stay quiet; anything that reached a 5xx
     // is logged so it shows up in the Vercel logs.
@@ -22,7 +28,9 @@ const handler = new RPCHandler(appRouter, {
       if (
         env.NODE_ENV === "development" ||
         !(error instanceof ORPCError) ||
-        error.status >= 500
+        (COMMON_ERROR_STATUS_MAP[
+          error.code as keyof typeof COMMON_ERROR_STATUS_MAP
+        ] ?? 500) >= 500
       )
         console.error("[rpc] failed:", error);
     }),

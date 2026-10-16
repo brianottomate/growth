@@ -152,7 +152,7 @@ describe("withRequestContext", () => {
       },
     ],
   };
-  test("runs the approved call the SDK would otherwise skip", async () => {
+  test("keeps request context before the pending approval so the approved call executes", async () => {
     const run = async (messages: ModelMessage[]) => {
       let executed = false;
       const model = new MockLanguageModelV4({
@@ -203,7 +203,15 @@ describe("withRequestContext", () => {
       });
       return executed;
     };
-    expect(await run([prompt, call, approval, sheet])).toBe(false);
+    let invalidContinuation: unknown;
+    try {
+      await run([prompt, call, approval, sheet]);
+    } catch (error) {
+      invalidContinuation = error;
+    }
+    expect(invalidContinuation).toMatchObject({
+      name: "AI_MissingToolResultsError",
+    });
     expect(
       await run(withRequestContext([prompt, call, approval], [sheet])),
     ).toBe(true);
