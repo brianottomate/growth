@@ -15,6 +15,7 @@ import {
 import type { PerformanceConnectionSummary } from "@/lib/performance-connections";
 import {
   metaAdBillingStatus,
+  metaBillingIssueKey,
   type MetaAdBillingStatus,
 } from "@/lib/meta-ad-billing";
 
@@ -159,6 +160,11 @@ export async function loadPerformanceConnections(
             ]?.pixelId ??
             null)
           : null;
+        const billingIssue = destination
+          ? (settings?.metaBillingIssues?.[
+              metaBillingIssueKey(destination.adAccountId)
+            ] ?? null)
+          : null;
         const billingRead = async (): Promise<MetaAdBillingStatus> => {
           if (!destination) return "not_selected";
           // Read only the explicit, brand-allowlisted destination through its owner.
@@ -181,7 +187,9 @@ export async function loadPerformanceConnections(
               sameAdAccountId("meta", row.id, destination.adAccountId),
             );
             if (account?.selectable === false) meta = "blocked";
-            return account ? metaAdBillingStatus(account) : "unknown";
+            return account
+              ? metaAdBillingStatus(account, billingIssue)
+              : "unknown";
           } catch (error) {
             console.error("Performance ad billing unavailable", {
               brandId: brand.id,
@@ -190,14 +198,17 @@ export async function loadPerformanceConnections(
             return "unknown";
           }
         };
-        const [site, billing] = await Promise.all([
+        const [site, billingSeen] = await Promise.all([
           sitePixels(brand.website, brand.wanderOsWebsiteId),
           billingRead(),
         ]);
+        // Meta refusing a push outranks whatever the billing read could see.
+        const billing = billingIssue ? "payment_issue" : billingSeen;
         const summary: PerformanceConnectionSummary = {
           profile: brand.zernioProfileId ? "connected" : "missing",
           meta,
           billing,
+          billingIssueAt: billingIssue?.at ?? null,
           route: `${shared ? `Via ${owner?.name ?? "unavailable manager"}` : "Client connection"} · ${allowedAccount ? (allowedAccount.isShared ? "Shared ad account" : "Own ad account") : "Ad account not selected"}`,
           clientSetupComplete: Boolean(
             brand.zernioProfileId &&

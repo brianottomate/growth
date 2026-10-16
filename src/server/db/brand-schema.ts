@@ -285,6 +285,16 @@ export type PerformanceSettings = {
     }
   >;
 
+  /**
+   * A billing refusal Meta returned on a push, per ad account (keyed without
+   * `act_`). Zernio's billing read only sees a funding source on file; this is
+   * Meta saying it will not charge it. Cleared by the next successful push.
+   */
+  metaBillingIssues?: Record<
+    string,
+    import("@/lib/meta-ad-billing").MetaBillingIssue
+  >;
+
   /** Brand whose Zernio connection is explicitly shared for paid ads only. */
   adsConnectionBrandId?: string;
   /** Exact Meta credentials chosen in brand settings. Chat cannot change them. */

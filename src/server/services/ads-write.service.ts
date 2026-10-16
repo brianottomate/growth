@@ -25,6 +25,11 @@ import {
 import type { DraftAdPreviewResult } from "@/server/contracts/ad-tool-output";
 import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
 import { metaTrackingDefaults } from "./meta-tracking-defaults";
+import {
+  metaBillingIssueFrom,
+  metaBillingIssueKey,
+  type MetaBillingIssue,
+} from "@/lib/meta-ad-billing";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { adsConnectionProfile } from "./ads-connection-profile";
 import {
@@ -149,6 +154,7 @@ import {
   type MediaItem,
   type PlatformCampaign,
   type PlatformCampaignSettings,
+  type IncompletePlatformPush,
   brandTable,
   platformCampaignTable,
   channelTable,
@@ -601,21 +607,8 @@ async function requireAdDestination(input: {
  * guard. Run scope still replays a genuine in-flight retry, because runId and
  * payload are identical there.
  */
-/**
- * After a failed push deletes its shell, the next attempt must mint a new
- * one. The shell's key carries the draft's edit time, so moving that time on
- * is what stops Zernio replaying the deleted campaign (Legacy RnR, 2026-09-28:
- * "Ad Sets may not be added to deleted Campaigns").
- */
-async function retireShellKey(draftId: string) {
-  await db
-    .update(platformCampaignTable)
-    .set({ updatedAt: new Date() })
-    .where(eq(platformCampaignTable.id, draftId))
-    .catch((error: unknown) =>
-      console.error("could not retire the shell key", draftId, error),
-    );
-}
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 function idempotencyKey(
   context: AdsWriteContext,
@@ -660,7 +653,6 @@ export type CreateMetaAdDraftInput = {
   targeting?: ZernioAdTargeting;
   startDate?: string;
   endDate?: string;
-  validateOnly?: boolean;
   promotedObject?: CreateZernioStandaloneAdInput["promotedObject"];
 };
 
@@ -887,7 +879,7 @@ export async function createMetaAdDraft(
     startDate: input.startDate,
     endDate: input.endDate,
     promotedObject: input.promotedObject,
-    ...metaDraftProviderControls(input.validateOnly),
+    ...metaDraftProviderControls(),
   };
   const result = await createMetaAd(payload, {
     pageId:
@@ -906,7 +898,6 @@ export async function createMetaAdDraft(
     connectionAccountId: input.connectionAccountId,
     adAccount: destination.adAccount,
     requestedStatus: "PAUSED" as const,
-    validateOnly: input.validateOnly ?? false,
     provider: result,
   };
 }
@@ -933,9 +924,6 @@ export function assertLinkedInAdPayload(
     throw new Error(
       "LinkedIn carousels ride on platformSpecificData.carousel, not carouselCards",
     );
-  }
-  if (payload.validateOnly) {
-    throw new Error("LinkedIn has no dry run through Zernio");
   }
   if (!(LINKEDIN_PUSH_GOALS as readonly string[]).includes(payload.goal)) {
     throw new Error(
@@ -2452,8 +2440,7 @@ export async function pushDraftToPlatform(
   input: Parameters<typeof performPlatformPush>[0],
   context: AdsWriteContext,
 ) {
-  if (input.validateOnly || input.platform !== "meta_ads")
-    return performPlatformPush(input, context);
+  if (input.platform !== "meta_ads") return performPlatformPush(input, context);
   const campaign = await db.query.campaignTable.findFirst({
     where: eq(campaignTable.id, input.campaignId),
   });
@@ -2523,7 +2510,6 @@ async function performPlatformPush(
     connectionAccountId?: string;
     adAccountId?: string;
     goal?: AdPushGoal;
-    validateOnly?: boolean;
   },
   context: AdsWriteContext,
 ) {
@@ -2775,8 +2761,41 @@ async function performPlatformPush(
   };
   if (platform === "google_ads") return pushToGoogle(pushArgs);
   if (platform === "linkedin_ads") return pushToLinkedIn(pushArgs);
-  const result = await pushToMeta(pushArgs);
+  const billingKey = metaBillingIssueKey(destination.adAccount.id);
+  const result = await pushToMeta(pushArgs).catch(async (error: unknown) => {
+    const issue = metaBillingIssueFrom(error);
+    if (!issue) throw error;
+    // The dot on the brand's Performance card reads this; Zernio's own
+    // billing read only sees that a funding source is on file.
+    await setMetaBillingIssue(brand.id, billingKey, {
+      ...issue,
+      at: new Date().toISOString(),
+    }).catch((recordError: unknown) =>
+      console.error("could not record the Meta billing issue", recordError),
+    );
+    throw new Error(
+      `Meta rejected the payment method on ${destination.adAccount.id}; fix it in Meta Billing before pushing again. ${errorText(error)}`,
+    );
+  });
+  if (brand.performanceSettings?.metaBillingIssues?.[billingKey])
+    await setMetaBillingIssue(brand.id, billingKey, null);
   return result;
+}
+
+/** Record (or, with null, clear) Meta's billing refusal for one ad account. */
+async function setMetaBillingIssue(
+  brandId: string,
+  adAccountKey: string,
+  issue: MetaBillingIssue | null,
+) {
+  await db
+    .update(brandTable)
+    .set({
+      performanceSettings: issue
+        ? sql`jsonb_set(coalesce(${brandTable.performanceSettings}, '{}'::jsonb), '{metaBillingIssues}', coalesce(${brandTable.performanceSettings}->'metaBillingIssues', '{}'::jsonb) || ${JSON.stringify({ [adAccountKey]: issue })}::jsonb)`
+        : sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) #- ${`{metaBillingIssues,${adAccountKey}}`}::text[]`,
+    })
+    .where(eq(brandTable.id, brandId));
 }
 
 type PushArgs = {
@@ -2785,7 +2804,6 @@ type PushArgs = {
     connectionAccountId: string;
     adAccountId: string;
     goal: AdPushGoal;
-    validateOnly?: boolean;
   };
   context: AdsWriteContext;
   campaign: Campaign;
@@ -2992,13 +3010,6 @@ async function pushToGoogle(args: PushArgs) {
     warnings,
   } = args;
 
-  // Zernio's validate-only IS Meta's own execution_options; Google has no
-  // equivalent, so a "dry run" here would build the campaign for real.
-  if (input.validateOnly) {
-    throw new Error(
-      "Google has no dry run — Zernio's validate-only is Meta's own. Review the draft, then push for real",
-    );
-  }
   const google = settings.google ?? {};
   const campaignType = google.campaignType;
   if (!campaignType) {
@@ -3084,9 +3095,42 @@ async function pushToGoogle(args: PushArgs) {
     );
   };
   const created: Created[] = [];
+  const record = () => ({
+    adAccountId: destination.adAccount.id,
+    draft,
+    campaign,
+    status: opening.status,
+    budgetAmount,
+    budgetType,
+    externalCampaignId: campaignExternalId,
+    heroThumbnailUrl: plan.units.find((u) => u.imageUrl)?.imageUrl ?? null,
+    sets: created.map(({ group, adGroupId, ads: made }) => ({
+      audience: group.audience,
+      name: group.audience?.name ?? campaign.name,
+      externalId: adGroupId,
+      targetingSpec: group.spec ?? null,
+      budget: budgetAmount,
+      budgetType,
+      ads: made.map(({ unit, externalId }) => ({
+        planAd: unit.ad,
+        externalId,
+        headline: unit.headline,
+        body: unit.body,
+        linkUrl: unit.linkUrl,
+        media: unit.media,
+        copy:
+          campaignType === "search"
+            ? { headlines: unit.headlines, descriptions: unit.descriptions }
+            : null,
+      })),
+    })),
+  });
+  let step = `adding ads to ad group 1 of ${plan.groups.length}`;
   try {
     const attachRest = async (group: Created, scope: string) => {
+      const label = step;
       for (const unit of restUnits) {
+        step = `${label}, adding ${unit.ad.name}`;
         if (!group.adGroupId) {
           throw new Error(
             "Zernio returned no ad group id to add the next ad to",
@@ -3120,7 +3164,8 @@ async function pushToGoogle(args: PushArgs) {
       `${campaign.id}:${firstGroup!.audience?.id ?? "all"}:google`,
     );
 
-    for (const group of restGroups) {
+    for (const [index, group] of restGroups.entries()) {
+      step = `creating ad group ${index + 2} of ${plan.groups.length}`;
       if (!campaignExternalId) {
         throw new Error("Zernio returned no campaign id to add ad groups to");
       }
@@ -3151,62 +3196,21 @@ async function pushToGoogle(args: PushArgs) {
       await attachRest(next, scope);
     }
   } catch (error) {
-    const cleanedUp = campaignExternalId
-      ? await deleteZernioCampaign({
-          campaignId: campaignExternalId,
-          accountId: input.connectionAccountId,
-        })
-          .then(() => true)
-          .catch((cleanupError) => {
-            console.error("google push rollback failed", cleanupError);
-            return false;
-          })
-      : false;
-    throw new Error(
-      `Google push failed after ${created.length} of ${plan.groups.length} ad groups — ${
-        cleanedUp
-          ? "the campaign was removed from Google so nothing is half-built"
-          : `the campaign ${campaignExternalId ?? "(no id returned)"} could not be removed, delete it in Google Ads`
-      }. ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return keepIncompletePush({
+      platformName: "Google",
+      managedIn: "Google Ads",
+      stoppedAt: step,
+      error,
+      record: record(),
+    });
   }
 
-  await recordCompiledCampaign({
-    adAccountId: destination.adAccount.id,
-    draft,
-    campaign,
-    status: opening.status,
-    budgetAmount,
-    budgetType,
-    externalCampaignId: campaignExternalId,
-    heroThumbnailUrl: plan.units.find((u) => u.imageUrl)?.imageUrl ?? null,
-    sets: created.map(({ group, adGroupId, ads: made }) => ({
-      audience: group.audience,
-      name: group.audience?.name ?? campaign.name,
-      externalId: adGroupId,
-      targetingSpec: group.spec ?? null,
-      budget: budgetAmount,
-      budgetType,
-      ads: made.map(({ unit, externalId }) => ({
-        planAd: unit.ad,
-        externalId,
-        headline: unit.headline,
-        body: unit.body,
-        linkUrl: unit.linkUrl,
-        media: unit.media,
-        copy:
-          campaignType === "search"
-            ? { headlines: unit.headlines, descriptions: unit.descriptions }
-            : null,
-      })),
-    })),
-  });
+  await recordCompiledCampaign(record());
 
   const adsCreated = created.reduce((n, c) => n + c.ads.length, 0);
   return {
     campaignId: campaign.id,
     platform: "google_ads" as const,
-    validateOnly: false,
     platformCampaignRowId: draft.id,
     adSetsCreated: created.length,
     adsCreated,
@@ -3346,8 +3350,8 @@ export async function ensureBrandReportingConversion(
 // One path for every Meta push: the campaign shell first (it owns the budget
 // under CBO), then one ad set per plan audience, opened with its first ad,
 // then one attach per remaining ad. Every image ad goes as a creative Growth
-// built, so Zernio only creates the campaign, the ad sets and the ads. Any
-// failure deletes the shell so nothing is left half-built.
+// built, so Zernio only creates the campaign, the ad sets and the ads. A
+// failure keeps what was made (all paused) and records it as incomplete.
 async function pushToMeta(args: PushArgs) {
   const {
     input,
@@ -3581,8 +3585,8 @@ async function pushToMeta(args: PushArgs) {
     destination.brand.metaPageId ??
     metaPageIdFromConnection(destination.connection.platformUserId);
   // Keyed on the plan, not the request: a retried push replays what it
-  // already made instead of making it twice. A failed push touches the
-  // draft (retireShellKey), so the next attempt starts on fresh keys.
+  // already made instead of making it twice. Recording a failed push touches
+  // the draft, so a push after deleting it starts on fresh keys.
   const planKey = (...parts: string[]) =>
     `push:${draft.id}:${draft.updatedAt.getTime()}:${parts.join(":")}`;
 
@@ -3604,14 +3608,22 @@ async function pushToMeta(args: PushArgs) {
 
   let completedAds = 0;
   const totalAds = usable.length * Math.max(1, compiled.length);
+  /** Where the push is, for the error if it stops there. */
+  let step = "creating the campaign";
 
-  /** An ad set opened with the first ad, then every other ad attached. */
+  /**
+   * An ad set opened with the first ad, then every other ad attached. The set
+   * is handed to `opened` as soon as it exists, and its attaches land on it
+   * one by one, so a failure partway still knows everything that was made.
+   */
   const createAdSet = async (setArgs: {
     audience: CompiledDeliveryAudience | null;
     spec: ZernioAdTargeting | undefined;
-    existingCampaignId?: string;
-    validateOnly: boolean;
-  }): Promise<CreatedSet> => {
+    existingCampaignId: string;
+    /** "creating ad set 2 of 3 (name)", for the error if an attach stops. */
+    label: string;
+    opened: (set: CreatedSet) => void;
+  }) => {
     const [lead, ...rest] = usable;
     await context.reportProgress?.(
       `Creating ad set and uploading ${lead!.ad.name}`,
@@ -3641,7 +3653,7 @@ async function pushToMeta(args: PushArgs) {
       startDate,
       endDate,
       promotedObject,
-      ...metaDraftProviderControls(setArgs.validateOnly),
+      ...metaDraftProviderControls(),
     };
     const result = await createMetaAd(payload, {
       pageId,
@@ -3653,9 +3665,8 @@ async function pushToMeta(args: PushArgs) {
       ),
       adAccount: destination.adAccount,
     });
-    if (setArgs.validateOnly || result.validateOnly) {
-      return { result, attached: [] };
-    }
+    const set: CreatedSet = { result, attached: [] };
+    setArgs.opened(set);
     await context.reportProgress?.("Ad set created", ++completedAds, totalAds);
     const adSetId = writtenAdSetId(result);
     if (!adSetId && rest.length > 0) {
@@ -3663,8 +3674,8 @@ async function pushToMeta(args: PushArgs) {
         "Zernio returned no ad set id to attach the other ads to",
       );
     }
-    const attached: CreatedSet["attached"] = [];
     for (const { ad, content } of rest) {
+      step = `${setArgs.label}, adding ${ad.name}`;
       await context.reportProgress?.(
         `Uploading and creating ${ad.name}`,
         completedAds,
@@ -3677,9 +3688,9 @@ async function pushToMeta(args: PushArgs) {
         name: adNameFor(ad, content),
         goal: input.goal,
         ...(await adFields(ad, content)),
-        ...metaDraftProviderControls(false),
+        ...metaDraftProviderControls(),
       };
-      attached.push({
+      set.attached.push({
         planAd: ad,
         result: await createMetaAd(attach, {
           pageId,
@@ -3694,7 +3705,6 @@ async function pushToMeta(args: PushArgs) {
       });
       await context.reportProgress?.("Ad created", ++completedAds, totalAds);
     }
-    return { result, attached };
   };
 
   const externalAdId = (result: ZernioAdWriteResponse) => {
@@ -3725,28 +3735,6 @@ async function pushToMeta(args: PushArgs) {
   const sets = compiled.length
     ? compiled
     : [{ audience: null as CompiledDeliveryAudience | null, spec: undefined }];
-
-  // ---- dry run: Meta validates the first ad set as a standalone create --
-  if (input.validateOnly) {
-    if (sets.length > 1 || useCbo) {
-      warnings.push(
-        "The dry run checks the first ad set and its first ad as one standalone create; the push itself builds the campaign first",
-      );
-    }
-    const set = await createAdSet({
-      audience: sets[0]!.audience,
-      spec: sets[0]!.spec,
-      validateOnly: true,
-    });
-    return {
-      campaignId: campaign.id,
-      platform: "meta_ads" as const,
-      validateOnly: true,
-      adsCreated: 0,
-      warnings,
-      provider: set.result,
-    };
-  }
 
   await context.reportProgress?.("Creating paused Meta campaign", 0, totalAds);
   const shell = await createZernioAdCampaign(
@@ -3781,54 +3769,11 @@ async function pushToMeta(args: PushArgs) {
     spec: ZernioAdTargeting | undefined;
     set: CreatedSet;
   }> = [];
-  // If any ad set or ad fails, the shell is a campaign nobody finished:
-  // delete it rather than stranding it, and say where it stopped.
-  try {
-    for (const { audience, spec } of sets) {
-      const set = await createAdSet({
-        audience,
-        spec,
-        existingCampaignId: shellId,
-        validateOnly: false,
-      });
-      perSet.push({ audience, spec, set });
-    }
-    await context.reportProgress?.(
-      "Verifying every Meta ad is paused",
-      completedAds,
-      totalAds,
-    );
-    const adIds = perSet.flatMap(({ set }) =>
-      setAdsFor(set).map((ad) => ad.externalId),
-    );
-    if (adIds.some((id) => !id))
-      throw new Error("Meta returned an ad without an ID");
-    await ensureMetaAdsPaused(adIds as string[]);
-  } catch (error) {
-    const cleanedUp = await deleteZernioCampaign({
-      campaignId: shellId,
-      accountId: input.connectionAccountId,
-    })
-      .then(() => true)
-      .catch((cleanupError) => {
-        console.error("push rollback failed", shellId, cleanupError);
-        return false;
-      });
-    await retireShellKey(draft.id);
-    throw new Error(
-      `Push failed after ${perSet.length} of ${sets.length} ad sets — ${
-        cleanedUp
-          ? "the campaign was removed from Meta so nothing is half-built"
-          : `removing campaign ${shellId} from Meta also failed, delete it in Ads Manager`
-      }. ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  await recordCompiledCampaign({
+  const record = () => ({
     adAccountId: destination.adAccount.id,
     draft,
     campaign,
-    status: "paused",
+    status: "paused" as const,
     budgetAmount,
     budgetType,
     externalCampaignId: shellId,
@@ -3844,11 +3789,66 @@ async function pushToMeta(args: PushArgs) {
       ads: setAdsFor(set),
     })),
   });
+  const createdAdIds = () =>
+    perSet.flatMap(({ set }) =>
+      setAdsFor(set).flatMap((ad) => (ad.externalId ? [ad.externalId] : [])),
+    );
+  let verifying = false;
+  // If any ad set or ad fails, keep what exists (paused) and record it as an
+  // incomplete push. Deleting or finishing it is the operator's call.
+  try {
+    for (const [index, { audience, spec }] of sets.entries()) {
+      const label = `creating ad set ${index + 1} of ${sets.length} (${adSetNameFor(audience)})`;
+      step = label;
+      await createAdSet({
+        audience,
+        spec,
+        existingCampaignId: shellId,
+        label,
+        opened: (set) => perSet.push({ audience, spec, set }),
+      });
+    }
+    step = "verifying every ad is paused";
+    verifying = true;
+    await context.reportProgress?.(
+      "Verifying every Meta ad is paused",
+      completedAds,
+      totalAds,
+    );
+    const adIds = perSet.flatMap(({ set }) =>
+      setAdsFor(set).map((ad) => ad.externalId),
+    );
+    if (adIds.some((id) => !id))
+      throw new Error("Meta returned an ad without an ID");
+    await ensureMetaAdsPaused(adIds as string[]);
+  } catch (error) {
+    // Everything was created PAUSED; check that held for what exists.
+    const made = createdAdIds();
+    const pauseConfirmed =
+      !verifying &&
+      (made.length === 0 ||
+        (await ensureMetaAdsPaused(made).then(
+          () => true,
+          (pauseError: unknown) => {
+            console.error("partial push pause check failed", pauseError);
+            return false;
+          },
+        )));
+    return keepIncompletePush({
+      platformName: "Meta",
+      managedIn: "Ads Manager",
+      stoppedAt: step,
+      error,
+      record: record(),
+      pauseConfirmed,
+    });
+  }
+
+  await recordCompiledCampaign(record());
 
   return {
     campaignId: campaign.id,
     platform: "meta_ads" as const,
-    validateOnly: false,
     platformCampaignRowId: draft.id,
     adSetsCreated: perSet.length,
     adsCreated: perSet.length * usable.length,
@@ -3905,11 +3905,6 @@ async function pushToLinkedIn(args: PushArgs) {
     linkUrl,
   });
   if (requirement) throw new Error(requirement);
-  if (input.validateOnly) {
-    throw new Error(
-      "LinkedIn has no dry run through Zernio — push it paused and review it in Campaign Manager",
-    );
-  }
 
   const linkedin = settings.linkedin ?? {};
   const bidding =
@@ -4020,17 +4015,24 @@ async function pushToLinkedIn(args: PushArgs) {
     attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }>;
   };
 
+  /** Where the push is, for the error if it stops there. */
+  let step = "creating the campaign";
+
   /**
-   * Create one LinkedIn campaign and every creative inside it. A failed
-   * attach on a fresh group deletes the group rather than stranding it.
+   * Create one LinkedIn campaign and every creative inside it. The campaign
+   * is handed to `opened` as soon as it exists and its creatives land on it
+   * one by one, so a failure partway still knows everything that was made.
    */
   const createCampaignWithAds = async (setArgs: {
     audience: CompiledDeliveryAudience | null;
     spec: ZernioAdTargeting | undefined;
     existingCampaignId?: string;
     keyScope: string;
-  }): Promise<CreatedSet> => {
+    label: string;
+    opened: (set: CreatedSet) => void;
+  }) => {
     const [lead, ...rest] = usable;
+    step = setArgs.label;
     const payload = openingPayload({ ...setArgs, lead: lead! });
     const result = await createLinkedInAd(payload, {
       idempotencyKey: idempotencyKey(
@@ -4040,71 +4042,35 @@ async function pushToLinkedIn(args: PushArgs) {
       ),
       adAccount: destination.adAccount,
     });
-    const rollbackCampaignId = setArgs.existingCampaignId
-      ? null
-      : writtenCampaignId(result);
-    const attached: CreatedSet["attached"] = [];
-    try {
-      const adSetId = writtenAdSetId(result);
-      for (const { ad, content } of rest) {
-        if (!adSetId) {
-          throw new Error(
-            `Zernio created the LinkedIn campaign but returned no campaign id to attach the remaining creatives to. Response carried: ${Object.keys(
-              result,
-            ).join(", ")}${
-              result.ad
-                ? ` (ad: ${Object.keys(result.ad).join(", ")})`
-                : " (no ad object)"
-            }`,
-          );
-        }
-        const attach = attachPayload(adSetId, ad, content);
-        attached.push({
-          planAd: ad,
-          result: await createLinkedInAd(attach, {
-            idempotencyKey: idempotencyKey(
-              context,
-              `push-attach:${setArgs.keyScope}:${ad.id}`,
-              attach,
-            ),
-            adAccount: destination.adAccount,
-          }),
-        });
+    const set: CreatedSet = { lead: lead!, result, attached: [] };
+    setArgs.opened(set);
+    const adSetId = writtenAdSetId(result);
+    for (const { ad, content } of rest) {
+      step = `${setArgs.label}, adding ${ad.name}`;
+      if (!adSetId) {
+        throw new Error(
+          `Zernio created the LinkedIn campaign but returned no campaign id to attach the remaining creatives to. Response carried: ${Object.keys(
+            result,
+          ).join(", ")}${
+            result.ad
+              ? ` (ad: ${Object.keys(result.ad).join(", ")})`
+              : " (no ad object)"
+          }`,
+        );
       }
-    } catch (error) {
-      const cleanedUp = rollbackCampaignId
-        ? await deleteZernioCampaign({
-            campaignId: rollbackCampaignId,
-            accountId: input.connectionAccountId,
-          })
-            .then(() => true)
-            .catch((cleanupError) => {
-              console.error(
-                "attach rollback failed",
-                rollbackCampaignId,
-                cleanupError,
-              );
-              return false;
-            })
-        : null;
-      throw new Error(
-        `Push failed while attaching creative ${attached.length + 2} of ${usable.length}${
-          cleanedUp === true
-            ? " — the campaign group was removed from LinkedIn so nothing is half-built"
-            : cleanedUp === false
-              ? ` — removing campaign group ${rollbackCampaignId} from LinkedIn also failed, delete it in Campaign Manager`
-              : setArgs.existingCampaignId
-                ? " — the campaign it was attaching to was already there and was left alone"
-                : // No id came back, so there is nothing to delete BY id even
-                  // though a campaign was created. Silence here read as "nothing
-                  // was created": a first live push left an orphaned group and
-                  // campaign in Campaign Manager while the operator was told
-                  // the failure was clean.
-                  " — a campaign group WAS created on LinkedIn but no id came back, so it could not be removed. Check Campaign Manager and delete it by hand"
-        }. ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const attach = attachPayload(adSetId, ad, content);
+      set.attached.push({
+        planAd: ad,
+        result: await createLinkedInAd(attach, {
+          idempotencyKey: idempotencyKey(
+            context,
+            `push-attach:${setArgs.keyScope}:${ad.id}`,
+            attach,
+          ),
+          adAccount: destination.adAccount,
+        }),
+      });
     }
-    return { lead: lead!, result, attached };
   };
 
   const externalAdId = (row: ZernioAdWriteResponse["ad"] | undefined) =>
@@ -4142,16 +4108,12 @@ async function pushToLinkedIn(args: PushArgs) {
   // ---- one (or no) audience: one campaign under a fresh group ------------
   if (compiled.length <= 1) {
     const only = compiled[0] ?? null;
-    const set = await createCampaignWithAds({
-      audience: only?.audience ?? null,
-      spec: only?.spec,
-      keyScope: `push:${campaign.id}:linkedin`,
-    });
-    await recordCompiledCampaign({
+    let made: CreatedSet | null = null;
+    const record = (set: CreatedSet) => ({
       adAccountId: destination.adAccount.id,
       draft,
       campaign,
-      status: "paused",
+      status: "paused" as const,
       budgetAmount,
       budgetType,
       externalCampaignId: writtenCampaignId(set.result),
@@ -4168,10 +4130,31 @@ async function pushToLinkedIn(args: PushArgs) {
         },
       ],
     });
+    try {
+      await createCampaignWithAds({
+        audience: only?.audience ?? null,
+        spec: only?.spec,
+        keyScope: `push:${campaign.id}:linkedin`,
+        label: "creating the campaign",
+        opened: (set) => {
+          made = set;
+        },
+      });
+    } catch (error) {
+      const set = made as CreatedSet | null;
+      if (!set) throw error;
+      return keepIncompletePush({
+        platformName: "LinkedIn",
+        managedIn: "Campaign Manager",
+        stoppedAt: step,
+        error,
+        record: record(set),
+      });
+    }
+    await recordCompiledCampaign(record(made!));
     return {
       campaignId: campaign.id,
       platform: "linkedin_ads" as const,
-      validateOnly: false,
       platformCampaignRowId: draft.id,
       adSetsCreated: 1,
       adsCreated: usable.length,
@@ -4215,42 +4198,11 @@ async function pushToLinkedIn(args: PushArgs) {
     spec: ZernioAdTargeting | undefined;
     set: CreatedSet;
   }> = [];
-  try {
-    for (const { audience, spec } of compiled) {
-      const set = await createCampaignWithAds({
-        audience,
-        spec,
-        existingCampaignId: shellId,
-        // Suffixed so a plan pushed to Meta and LinkedIn never shares a key.
-        keyScope: `push:${campaign.id}:${audience.id}:linkedin`,
-      });
-      perSet.push({ audience, spec, set });
-    }
-  } catch (error) {
-    const cleanedUp = await deleteZernioCampaign({
-      campaignId: shellId,
-      accountId: input.connectionAccountId,
-    })
-      .then(() => true)
-      .catch((cleanupError) => {
-        console.error("push rollback failed", shellId, cleanupError);
-        return false;
-      });
-    await retireShellKey(draft.id);
-    throw new Error(
-      `Push failed after ${perSet.length} of ${compiled.length} audiences — ${
-        cleanedUp
-          ? "the campaign group was removed from LinkedIn so nothing is half-built"
-          : `removing campaign group ${shellId} from LinkedIn also failed, delete it in Campaign Manager`
-      }. ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  await recordCompiledCampaign({
+  const record = () => ({
     adAccountId: destination.adAccount.id,
     draft,
     campaign,
-    status: "paused",
+    status: "paused" as const,
     budgetAmount,
     budgetType,
     externalCampaignId: shellId,
@@ -4265,11 +4217,33 @@ async function pushToLinkedIn(args: PushArgs) {
       ads: setAdsFor(set),
     })),
   });
+  try {
+    for (const [index, { audience, spec }] of compiled.entries()) {
+      await createCampaignWithAds({
+        audience,
+        spec,
+        existingCampaignId: shellId,
+        // Suffixed so a plan pushed to Meta and LinkedIn never shares a key.
+        keyScope: `push:${campaign.id}:${audience.id}:linkedin`,
+        label: `creating campaign ${index + 1} of ${compiled.length} (${audience.name})`,
+        opened: (set) => perSet.push({ audience, spec, set }),
+      });
+    }
+  } catch (error) {
+    return keepIncompletePush({
+      platformName: "LinkedIn",
+      managedIn: "Campaign Manager",
+      stoppedAt: step,
+      error,
+      record: record(),
+    });
+  }
+
+  await recordCompiledCampaign(record());
 
   return {
     campaignId: campaign.id,
     platform: "linkedin_ads" as const,
-    validateOnly: false,
     platformCampaignRowId: draft.id,
     adSetsCreated: perSet.length,
     adsCreated: perSet.length * usable.length,
@@ -4279,11 +4253,68 @@ async function pushToLinkedIn(args: PushArgs) {
 }
 
 /**
+ * A push that stops partway keeps what it made. Everything is created
+ * PAUSED, so the partial campaign cannot spend. It is recorded in the mirror
+ * with the push marked incomplete, which also arms the one-push guard: a
+ * retry is refused rather than building a second campaign beside it. What
+ * happens next is the operator's call: delete it and push again, finish it in
+ * the platform, or resume it once sync can create the missing ads.
+ */
+export async function keepIncompletePush(
+  input: {
+    platformName: string;
+    /** The platform's own UI, e.g. "Ads Manager". */
+    managedIn: string;
+    stoppedAt: string;
+    error: unknown;
+    record: CompiledCampaignRecord;
+    /** False when the created ads could not be confirmed paused. */
+    pauseConfirmed?: boolean;
+  },
+  write = recordCompiledCampaign,
+): Promise<never> {
+  const { platformName, managedIn, record } = input;
+  const cause = errorText(input.error);
+  const stopped = `${platformName} push stopped while ${input.stoppedAt}: ${cause}`;
+  const note =
+    input.pauseConfirmed === false || record.status !== "paused"
+      ? ` The created ads could not be confirmed paused: check them in ${managedIn} now.`
+      : "";
+  const sets = record.sets.length;
+  const ads = record.sets.reduce((n, set) => n + set.ads.length, 0);
+  const made = `${sets} ad set${sets === 1 ? "" : "s"} and ${ads} ad${ads === 1 ? "" : "s"}`;
+  if (!record.externalCampaignId) {
+    // Without the campaign id Growth cannot guard a retry or delete it.
+    throw new Error(
+      `${stopped}. ${platformName} created a campaign with ${made} but returned no campaign id, so Growth could not record it. Find it in ${managedIn} and delete it before pushing again.${note}`,
+    );
+  }
+  const kept = `Kept on ${platformName}${note ? "" : ", paused"}: campaign ${record.externalCampaignId} with ${made}`;
+  try {
+    await write({
+      ...record,
+      incomplete: {
+        at: new Date().toISOString(),
+        stoppedAt: input.stoppedAt,
+        error: cause,
+      },
+    });
+  } catch (recordError) {
+    throw new Error(
+      `${stopped}. ${kept}, but recording it in Growth failed (${errorText(recordError)}). Delete campaign ${record.externalCampaignId} in ${managedIn} before pushing again.${note}`,
+    );
+  }
+  throw new Error(
+    `${stopped}. ${kept}, recorded in Growth as an incomplete push. Finish it in ${managedIn}, or delete it (adsWrite.deletePlatformCampaign) before pushing again for a clean retry.${note}`,
+  );
+}
+
+/**
  * Record what the compile created: the draft platform_campaign becomes real
  * (externalId, status), and mirror rows are written for every ad set and ad
  * with their plan lineage. The mirror describes what the platform now holds.
  */
-async function recordCompiledCampaign(input: {
+type CompiledCampaignRecord = {
   draft: PlatformCampaign;
   campaign: Campaign;
   status: PlatformCampaignStatus;
@@ -4311,7 +4342,11 @@ async function recordCompiledCampaign(input: {
       copy?: { headlines: string[]; descriptions: string[] } | null;
     }>;
   }>;
-}) {
+  /** Set when the push stopped partway; see keepIncompletePush. */
+  incomplete?: IncompletePlatformPush;
+};
+
+async function recordCompiledCampaign(input: CompiledCampaignRecord) {
   const adCount = input.sets.reduce((n, set) => n + set.ads.length, 0);
   await db
     .update(platformCampaignTable)
@@ -4323,6 +4358,14 @@ async function recordCompiledCampaign(input: {
       budgetType: input.budgetType,
       adCount,
       heroThumbnailUrl: input.heroThumbnailUrl,
+      ...(input.incomplete
+        ? {
+            settings: {
+              ...input.draft.settings,
+              incompletePush: input.incomplete,
+            },
+          }
+        : {}),
       // Sync sets this when it PULLS a campaign, so a pushed one had no link
       // to the platform at all and the "Open in platform" button never
       // appeared on the thing we had just created.

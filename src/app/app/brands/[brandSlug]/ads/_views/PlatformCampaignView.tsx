@@ -100,6 +100,7 @@ export async function PlatformCampaignView({
         })
       : [];
 
+  const incompletePush = platformCampaign.settings?.incompletePush;
   const stats = platformCampaign.stats ?? {};
   const statCards: { label: string; value: string }[] = [
     { label: "Spend", value: money(stats.spend ?? platformCampaign.spend) },
@@ -220,6 +221,19 @@ export async function PlatformCampaignView({
             />
           </div>
         </div>
+        {incompletePush && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+            <p className="font-medium text-amber-600 dark:text-amber-400">
+              Push incomplete: stopped while {incompletePush.stoppedAt}
+            </p>
+            <p className="mt-1">{incompletePush.error}</p>
+            <p className="mt-1 text-muted-foreground">
+              What it created is kept, paused. Finish it in{" "}
+              {platformLabel(platformCampaign.platform)}, or delete it before
+              pushing again.
+            </p>
+          </div>
+        )}
       </header>
 
       <WorkspaceCard title="Results" icon={ChartNoAxesCombined}>

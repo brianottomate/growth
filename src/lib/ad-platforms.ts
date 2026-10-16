@@ -54,8 +54,6 @@ export type AdPlatformSpec = {
   stage: AdPlatformStage;
   zernio: AdPlatformZernio | null;
   features: {
-    /** Provider validate-only pass that creates nothing. */
-    dryRun: boolean;
     /** N creatives in one ad set from one create call (Zernio `creatives[]`). */
     multiCreativeAdSet: boolean;
     /** Text-asset ads (headline / description pools) compile here. */
@@ -87,7 +85,6 @@ const identity = (value: string) => value;
 const noManageUrl = () => undefined;
 
 const NO_FEATURES: AdPlatformSpec["features"] = {
-  dryRun: false,
   multiCreativeAdSet: false,
   textAds: false,
   creativeAds: false,
@@ -119,7 +116,6 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       normalizeAccountId: (value) => value.replace(/^act_/i, ""),
     },
     features: {
-      dryRun: true,
       multiCreativeAdSet: true,
       textAds: false,
       creativeAds: true,
@@ -151,7 +147,6 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       normalizeAccountId: (value) => value.replace(/-/g, ""),
     },
     features: {
-      dryRun: false,
       multiCreativeAdSet: false,
       textAds: true,
       creativeAds: true,
@@ -181,7 +176,6 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
         value.replace(/^urn:li:sponsoredAccount:/i, ""),
     },
     features: {
-      dryRun: false,
       multiCreativeAdSet: false,
       textAds: false,
       creativeAds: true,

@@ -281,11 +281,24 @@ export type HomesRun = {
  * migration cadence. Anything we DO query (budget, status, externalId) is a
  * column.
  */
+/**
+ * A push that stopped partway. What it created stays on the platform,
+ * paused, and is mirrored; this records that the plan is not all there.
+ * The platform status stays whatever sync reads.
+ */
+export type IncompletePlatformPush = {
+  at: string;
+  /** Where it stopped, e.g. "creating ad set 2 of 3 (name)". */
+  stoppedAt: string;
+  error: string;
+};
+
 export type PlatformCampaignSettings = {
   /** Omitted = all eligible campaign ads; [] = none. Explicit selection stays fixed as ideas are added. */
   selectedAdIds?: string[];
   /** Unassigned Studio ideas shown for planning only; never consumed by publishing. */
   previewAdIds?: string[];
+  incompletePush?: IncompletePlatformPush;
   google?: {
     goal?: "traffic" | "engagement" | "awareness" | "conversions";
     geography?: DeliveryGeography;

@@ -128,9 +128,11 @@ Neither is large. Both are out of scope for the schema PR that introduced
   what `createMetaAdDraft` validates against. Media spend is billed by Meta to
   the ad account's funding source (monthly invoicing); Zernio meters only its
   own API product.
-- Carousel and single-image drafts both pass Meta's `validateOnly` check through
-  Zernio's `carouselCards` path — campaign and creative nodes validate, ad sets
-  cannot be validated before a campaign exists (Meta subcode 1487604).
+- Carousel and single-image drafts both passed Meta's `validateOnly` check
+  through Zernio's `carouselCards` path (campaign and creative nodes; ad sets
+  cannot be validated before a campaign exists, Meta subcode 1487604). Growth
+  no longer sends validate-only: it failed with a generic "(#2)" while real
+  paused pushes showed the actual error.
 - The four Away & Stay homes were already products in catalog
   `Catalog_2026_Listed_NewHomes`, and their `retailer_id`s are the monolith
   property ids — so the catalog is the wander.com-URL-to-property-id resolver.

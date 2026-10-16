@@ -31,8 +31,8 @@ that brand's profile, and exact platform ad account in the default-deny
 allowlist. The detailed MCP and `invoke_growth` projections omit this domain
 because their current execution path cannot present the same approval card.
 
-Meta standalone creation is paused by construction and can use Zernio's
-`validateOnly`. Meta duplication also requests a paused copy. Meta boost and
+Meta standalone creation is paused by construction. There is no
+validate-only pass. Meta duplication also requests a paused copy. Meta boost and
 Google campaign creation can start spend after provider acceptance, which is
 called out in their tool descriptions and approval payloads.
 

@@ -4,6 +4,8 @@ export type PerformanceConnectionSummary = {
   profile: "connected" | "missing";
   meta: "ready" | "incomplete" | "reconnect" | "unknown" | "blocked";
   billing: MetaAdBillingStatus;
+  /** When Meta last refused a push on billing grounds, if it has. */
+  billingIssueAt?: string | null;
   route: string;
   clientSetupComplete: boolean;
   pixelId: string | null;
@@ -35,7 +37,7 @@ export function performanceConnectionLines(
       value: {
         present: "Payment method present",
         missing: "Payment method missing · Add in Meta billing",
-        payment_issue: "Payment issue · Review Meta billing",
+        payment_issue: `Payment issue · Review Meta billing${value.billingIssueAt ? ` · Meta refused a push ${value.billingIssueAt.slice(0, 10)}` : ""}`,
         unknown: "Unverified · Check ad-account admin/billing access in Meta",
         not_selected: "Select an ad account",
       }[value.billing],

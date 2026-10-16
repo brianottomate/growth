@@ -6,8 +6,10 @@ import {
   connectionRunsAsBrandPage,
   configuredMetaDestination,
   googlePauseOutcome,
+  keepIncompletePush,
   metaPromotedObjectFor,
 } from "@/server/services/ads-write.service";
+import type { Ad, Campaign, PlatformCampaign } from "@/server/db/ads-schema";
 /**
  * The provider contract for a Meta create. Both live failures this guards
  * against were rules Zernio documents and one of our three payload builders
@@ -272,5 +274,78 @@ describe("configured Meta destination", () => {
         metaAdsDestination: destination,
       }),
     ).toEqual(destination);
+  });
+});
+
+/**
+ * A push that fails after the shell exists used to delete the campaign, which
+ * hid the real platform error behind a cleanup. Now the shell and whatever ad
+ * sets and ads were made are recorded as an incomplete push, and the error
+ * says what exists and how to retry cleanly.
+ */
+describe("keepIncompletePush", () => {
+  it("records the partial campaign as incomplete and names it in the error", async () => {
+    const written: unknown[] = [];
+    const ad = { id: "ad_1", name: "Lake house" } as Ad;
+    const error = await keepIncompletePush(
+      {
+        platformName: "Meta",
+        managedIn: "Ads Manager",
+        stoppedAt: "creating ad set 2 of 2 (Families)",
+        error: new Error("Hot Tubs has no access to pixel 340"),
+        record: {
+          adAccountId: "act_1",
+          draft: {
+            id: "pcamp_1",
+            settings: { selectedAdIds: ["ad_1"] },
+          } as PlatformCampaign,
+          campaign: { id: "camp_1" } as Campaign,
+          status: "paused",
+          budgetAmount: 50,
+          budgetType: "daily",
+          externalCampaignId: "120200",
+          heroThumbnailUrl: null,
+          sets: [
+            {
+              audience: null,
+              name: "Couples",
+              externalId: "120201",
+              targetingSpec: null,
+              budget: null,
+              budgetType: "daily",
+              ads: [
+                {
+                  planAd: ad,
+                  externalId: "120202",
+                  headline: null,
+                  body: null,
+                  linkUrl: null,
+                  media: null,
+                },
+              ],
+            },
+          ],
+        },
+      },
+      async (record) => {
+        written.push(record);
+      },
+    ).catch((caught: Error) => caught);
+
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({
+      externalCampaignId: "120200",
+      sets: [{ externalId: "120201", ads: [{ externalId: "120202" }] }],
+      incomplete: {
+        stoppedAt: "creating ad set 2 of 2 (Families)",
+        error: "Hot Tubs has no access to pixel 340",
+      },
+    });
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain("Hot Tubs has no access to pixel 340");
+    expect(error.message).toContain(
+      "Kept on Meta, paused: campaign 120200 with 1 ad set and 1 ad",
+    );
+    expect(error.message).toContain("deletePlatformCampaign");
   });
 });

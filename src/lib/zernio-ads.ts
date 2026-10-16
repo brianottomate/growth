@@ -49,17 +49,13 @@ export function allowlistPlatform(platform: ZernioAdPlatform): string {
   return zernioSpec(platform).zernio!.allowlistPlatform;
 }
 
-export function metaDraftProviderControls(validateOnly?: boolean) {
-  return {
-    status: "PAUSED" as const,
-    validateOnly,
-  };
+export function metaDraftProviderControls() {
+  return { status: "PAUSED" as const };
 }
 
 /**
  * LinkedIn pauses the whole campaign group → campaign → creative hierarchy on
- * `status: PAUSED`. Zernio documents validate-only for Meta alone, so a
- * LinkedIn push never sends it.
+ * `status: PAUSED`.
  */
 export function linkedInDraftProviderControls() {
   return { status: "PAUSED" as const };

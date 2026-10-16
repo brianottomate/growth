@@ -159,12 +159,6 @@ const adSchema = z
   })
   .catchall(jsonValueSchema);
 
-const resultItemSchema = z.strictObject({
-  node: z.string().optional(),
-  reason: z.string().optional(),
-  status: z.string().optional(),
-});
-
 const providerSchema = z
   .strictObject({
     ad: adSchema.optional(),
@@ -172,8 +166,6 @@ const providerSchema = z
     message: z.string().optional(),
     platformAdSetId: z.string().optional(),
     platformCampaignId: z.string().optional(),
-    results: z.array(resultItemSchema).optional(),
-    validateOnly: z.boolean().optional(),
   })
   .catchall(jsonValueSchema);
 
@@ -719,7 +711,6 @@ export const createSpecializedMetaDraftActionOutputSchema = z.strictObject({
   connectionAccountId: z.string(),
   provider: providerSchema,
   requestedStatus: z.literal("PAUSED"),
-  validateOnly: z.boolean(),
 });
 
 export const boostMetaPostActionOutputSchema = z.strictObject({
@@ -1137,7 +1128,6 @@ export const pushDraftActionOutputSchema = z.union([
     platform: z.literal("google_ads"),
     platformCampaignRowId: z.string(),
     provider: providerSchema,
-    validateOnly: z.boolean(),
     warnings: z.array(z.string()),
   }),
   z.strictObject({
@@ -1147,15 +1137,6 @@ export const pushDraftActionOutputSchema = z.union([
     path: z.string(),
     platform: z.literal("linkedin_ads"),
     platformCampaignRowId: z.string(),
-    validateOnly: z.boolean(),
-    warnings: z.array(z.string()),
-  }),
-  z.strictObject({
-    adsCreated: z.number(),
-    campaignId: z.string(),
-    platform: z.literal("meta_ads"),
-    provider: providerSchema,
-    validateOnly: z.boolean(),
     warnings: z.array(z.string()),
   }),
   z.strictObject({
@@ -1165,7 +1146,6 @@ export const pushDraftActionOutputSchema = z.union([
     path: z.string(),
     platform: z.literal("meta_ads"),
     platformCampaignRowId: z.string(),
-    validateOnly: z.boolean(),
     warnings: z.array(z.string()),
   }),
 ]);
@@ -1777,52 +1757,7 @@ export const pushDraftActionNativeResultSchema = z.union([
       .catchall(z.unknown()),
   }),
   pushDraftActionOutputSchema.options[1],
-  pushDraftActionOutputSchema.options[2].extend({
-    provider: pushDraftActionOutputSchema.options[2].shape.provider
-      .extend({
-        ad: pushDraftActionOutputSchema.options[2].shape.provider.shape.ad
-          .unwrap()
-          .extend({
-            creative:
-              pushDraftActionOutputSchema.options[2].shape.provider.shape.ad
-                .unwrap()
-                .shape.creative.unwrap()
-                .catchall(z.unknown())
-                .optional(),
-            metrics:
-              pushDraftActionOutputSchema.options[2].shape.provider.shape.ad
-                .unwrap()
-                .shape.metrics.unwrap()
-                .catchall(z.unknown())
-                .optional(),
-          })
-          .catchall(z.unknown())
-          .optional(),
-        ads: z
-          .array(
-            pushDraftActionOutputSchema.options[2].shape.provider.shape.ads
-              .unwrap()
-              .element.extend({
-                creative:
-                  pushDraftActionOutputSchema.options[2].shape.provider.shape.ads
-                    .unwrap()
-                    .element.shape.creative.unwrap()
-                    .catchall(z.unknown())
-                    .optional(),
-                metrics:
-                  pushDraftActionOutputSchema.options[2].shape.provider.shape.ads
-                    .unwrap()
-                    .element.shape.metrics.unwrap()
-                    .catchall(z.unknown())
-                    .optional(),
-              })
-              .catchall(z.unknown()),
-          )
-          .optional(),
-      })
-      .catchall(z.unknown()),
-  }),
-  pushDraftActionOutputSchema.options[3],
+  pushDraftActionOutputSchema.options[2],
 ]);
 
 /** Native service result; the existing wire contract validates its JSON projection. */

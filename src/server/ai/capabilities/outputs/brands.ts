@@ -82,6 +82,16 @@ const performanceSettingsShape = {
     )
     .optional(),
   metaReportingConversions: metaReportingConversionsSchema,
+  metaBillingIssues: z
+    .record(
+      z.string(),
+      z.strictObject({
+        subcode: z.number().nullable(),
+        message: z.string(),
+        at: z.string(),
+      }),
+    )
+    .optional(),
   agreedAdSpend: z.number().nullable().optional(),
   catalogFormatId: z.enum(["portrait", "square"]).nullable().optional(),
   catalogAd: catalogAdCopySchema.nullable().optional(),

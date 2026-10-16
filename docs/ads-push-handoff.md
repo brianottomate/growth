@@ -225,8 +225,12 @@ the push. `createMetaPlacementCreative` in `meta.client.ts`, called through
   audience opened with its first ad, then one attach per remaining ad. The
   multi-creative (`creatives[]`) opening and the single-create shortcut are
   gone. Idempotency keys are the draft, its edit time, the audience and the
-  plan ad, so a retried push replays instead of duplicating; a failed push
-  deletes the shell and touches the draft, so the next try starts fresh.
+  plan ad, so a retried push replays instead of duplicating. A push that
+  fails partway keeps what it created (paused), records it in the mirror
+  with `settings.incompletePush` (where it stopped, the error), and says so.
+  The one-push guard then refuses a second push; the operator finishes the
+  campaign in Ads Manager or deletes it with `deletePlatformCampaign` and
+  pushes again. Deleting the draft row means the next push mints fresh keys.
 - **Videos** still go through Zernio (`placementAssets`), one ad per call
   like everything else.
 - **Images go up in one request per ad** (multipart `adimages`), and a
@@ -273,12 +277,11 @@ renders (below) are the reference.
 
 **Checking a push before and after**
 
-- Before: a validate-only push (`pushDraftToPlatform` with
-  `validateOnly: true`) makes Meta check the first ad set and its first ad as
-  one standalone create, and creates nothing. Zernio refuses validate-only on
-  attaches, so the remaining ads are not checked. It caught the video feeds
-  refusal. It builds the opening ad's creative on Meta to validate it (a
-  creative, not an ad).
+- Before: there is no dry run (removed 2026-10-16). Meta's validate-only
+  returned "(#2) Service temporarily unavailable" at the ad stage on every
+  attempt, while a real paused push surfaced the actual error at once. Push
+  for real; everything is created paused, and a partial push is kept and
+  recorded rather than deleted.
 - After: read the ads' `creative{asset_feed_spec}` for their rules, and Meta's
   own renders with `GET /{ad_id}/previews?ad_format=DESKTOP_FEED_STANDARD`
   (also `MOBILE_FEED_STANDARD`, `MARKETPLACE_MOBILE`, `INSTAGRAM_STANDARD`,

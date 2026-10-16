@@ -369,7 +369,7 @@ export const createSpecializedMetaDraftAction = growthAction({
   nativeOutputSchema: createSpecializedMetaDraftActionNativeResultSchema,
   outputSchema: createSpecializedMetaDraftActionOutputSchema,
   description:
-    "Create a specialized Meta campaign for lead generation, lead conversion, app promotion, or catalog sales through Zernio. Standard traffic, engagement, awareness, video views, and conversion campaigns must use draftCampaign then push. Create a campaign, ad set, and ad — single-image via imageUrl, or a 2–10 card carousel via carouselCards. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Set validateOnly to check Meta's tree without creating it. Requires explicit operator approval even for validation because Meta uploads referenced media during dry runs.",
+    "Create a specialized Meta campaign for lead generation, lead conversion, app promotion, or catalog sales through Zernio. Standard traffic, engagement, awareness, video views, and conversion campaigns must use draftCampaign then push. Create a campaign, ad set, and ad — single-image via imageUrl, or a 2–10 card carousel via carouselCards. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Requires explicit operator approval.",
   inputSchema: z
     .object({
       ...destinationSchema,
@@ -424,7 +424,6 @@ export const createSpecializedMetaDraftAction = growthAction({
         .describe("Required for lead_generation."),
       targeting: targetingSchema.optional(),
       ...schedulingSchema,
-      validateOnly: z.boolean().optional().default(false),
       promotedObject: z
         .object({
           pixelId: z.string().min(1).optional(),
@@ -1280,7 +1279,7 @@ export const pushDraftAction = growthAction({
   nativeOutputSchema: pushDraftActionNativeResultSchema,
   outputSchema: pushDraftActionOutputSchema,
   description:
-    "COMPILE a LOCAL campaign onto one platform: each planned delivery group becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Meta uses the exact connection already pinned in brand settings; omit credential ids and use the saved goal (default conversions). Do not ask the operator to choose credentials. For other platforms call adsRead.listDestinations for the account ids; never guess them.",
+    "COMPILE a LOCAL campaign onto one platform: each planned delivery group becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. There is no dry run: push for real. If the push fails partway, what it created stays paused and recorded as an incomplete push, and the error says where it stopped; report that and let the operator choose to finish it in the platform or delete it with adsWrite.deletePlatformCampaign before pushing again. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Meta uses the exact connection already pinned in brand settings; omit credential ids and use the saved goal (default conversions). Do not ask the operator to choose credentials. For other platforms call adsRead.listDestinations for the account ids; never guess them.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     platform: z
@@ -1291,7 +1290,6 @@ export const pushDraftAction = growthAction({
     connectionAccountId: destinationSchema.connectionAccountId.optional(),
     adAccountId: destinationSchema.adAccountId.optional(),
     goal: z.enum(AD_PUSH_GOALS).optional(),
-    validateOnly: z.boolean().optional(),
   }),
   execute: async (input, ctx) =>
     pushDraftToPlatform(input, {

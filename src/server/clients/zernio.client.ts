@@ -1301,7 +1301,6 @@ export type CreateZernioStandaloneAdInput = {
   startDate?: string;
   endDate?: string;
   status?: "PAUSED";
-  validateOnly?: boolean;
   /**
    * Meta: click-URL parameters for the creative's `url_tags`. Per ad, so an
    * attach call must resend it. Meta macros such as {{ad.name}} pass through.
@@ -1388,12 +1387,6 @@ export type ZernioAdWriteResponse = {
   /** Multi-creative shape only. Legacy shape puts these on `ad`. */
   platformCampaignId?: string;
   platformAdSetId?: string;
-  validateOnly?: boolean;
-  results?: Array<{
-    node?: string;
-    status?: string;
-    reason?: string;
-  }>;
   message?: string;
   [key: string]: unknown;
 };
@@ -1433,8 +1426,6 @@ export async function createZernioStandaloneAd(
   input: CreateZernioStandaloneAdInput,
   options: { idempotencyKey: string; carouselSeedBudget?: number },
 ): Promise<ZernioAdWriteResponse> {
-  if (input.adSetId && input.carouselCards && input.validateOnly)
-    throw new Error("Validate the carousel before attaching it to an ad set.");
   // The campaign-creation route honors pageId; the standalone creative route
   // currently ignores it. Seed a paused carousel, reuse its creative in the
   // intended ad set, then remove only the temporary campaign we just created.
@@ -1486,11 +1477,6 @@ export async function createZernioStandaloneAd(
   // /ads/create rejects carouselCards + adSetId. Reuse a standalone
   // carousel creative when adding another ad to an existing ad set.
   if (input.adSetId && input.carouselCards) {
-    if (input.validateOnly) {
-      throw new Error(
-        "Validate the carousel before attaching it to an ad set.",
-      );
-    }
     const { carouselCards, ...attached } = input;
     const creative = await zernioFetch<{ creativeId: string }>(
       "/ads/creatives",
