@@ -30,6 +30,7 @@ const QUESTIONS: {
   { key: "invoiceEmail", label: "Invoice email", kind: "text" },
   { key: "creativeDriveUrl", label: "Creative folder", kind: "link" },
   { key: "guestListDriveUrl", label: "Guest list", kind: "link" },
+  { key: "guestConsent", label: "Guest list consent", kind: "yes" },
   { key: "accountsConnected", label: "Ad accounts connected", kind: "yes" },
 ];
 

@@ -188,6 +188,7 @@ export const submitIntakeSchema = z
         ugcPermission: z.string().max(4000).optional(),
         creativeDriveUrl: z.string().max(4000).optional(),
         guestListDriveUrl: z.string().max(4000).optional(),
+        guestConsent: z.boolean().optional(),
         propertyNotes: z.string().max(20000).optional(),
         anythingElse: z.string().max(20000).optional(),
         contactName: z.string().max(500).optional(),

@@ -327,6 +327,10 @@ export type PerformanceSettings = {
   siteLive?: string | null;
   /** Monthly Spend agreed with the client, over the intake's figure. */
   agreedAdSpend?: number | null;
+  /** The client's email choices from the intake; edited in place. */
+  emailPreferences?:
+    | import("@/lib/intake-email-preferences").IntakeEmailPreferences
+    | null;
   /** Whether new ad and catalog cards carry the brand mark. Unset means yes; a card can still override it. */
   logoOnCreatives?: boolean | null;
   /** The catalog card every home uses unless it has its own. */

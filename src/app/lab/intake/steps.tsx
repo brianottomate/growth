@@ -1,17 +1,12 @@
 "use client";
 
 /**
- * A copy of the Performance+ intake steps from wander.com, rendered read-only.
+ * The brand section of the proposed intake, rendered read-only.
  *
- * Source: wandercom/wander.com
- *   src/app/(marketing)/internal/intake/[handle]/IntakeForm.tsx
- *   src/features/intake/IntakeSetupCheck.tsx
- * Ported from dev at 047911505c (2026-10-16). Copy and wording are verbatim;
- * wander.com's theme aliases (`text-content-*`, `text-default`) are swapped
- * for the tokens growth defines. Re-sync by hand when the form changes.
- *
- * Kept out: the localStorage draft, step navigation, the submit request and
- * the live setup check. The lab shows every step at once from fixtures.
+ * Started as a copy of wander.com's IntakeForm.tsx at 047911505c
+ * (2026-10-16) and now diverges on purpose: sending moves ahead of the
+ * account connection, and the guest list carries its consent. This is the
+ * design to port back, not a mirror of what wander.com runs today.
  */
 
 import { Button } from "@wandercom/design-system-web/ui/button";
@@ -22,7 +17,6 @@ import type {
   IntakeAnswers as Answers,
   IntakeListing,
   IntakePrefill,
-  IntakeSetup,
 } from "./fixtures";
 
 const BUDGET_PRESETS = ["$2,500", "$5,000", "$10,000", "$20,000"];
@@ -40,11 +34,10 @@ export type Step = {
 /** Read-only: every handler in the copied markup lands here. */
 const noop = () => undefined;
 
-export function buildSteps(
+export function buildBrandSteps(
   prefill: IntakePrefill,
   listings: { supported: boolean; listings: IntakeListing[] },
   a: Answers,
-  setup: IntakeSetup | null,
 ): Step[] {
   const set = noop as <K extends keyof Answers>(
     key: K,
@@ -174,10 +167,10 @@ export function buildSteps(
       ),
     },
     {
-      label: "Creative",
-      title: "Where can we find your photos and video?",
-      help: "We build the ads from your booking site: your photography, your homes, your logo. Links are easiest, so nothing has to upload.",
-      complete: true,
+      label: "Content and guests",
+      title: "Where can we find your photos and guest list?",
+      help: "We build the ads from your booking site: your photography, your homes, your logo.",
+      complete: !a.guestListDriveUrl.trim() || a.guestConsent,
       body: (
         <>
           <Field
@@ -204,6 +197,14 @@ export function buildSteps(
               onChange={(e) => set("guestListDriveUrl", e.target.value)}
             />
           </Field>
+          {a.guestListDriveUrl.trim() && (
+            <Check
+              checked={a.guestConsent}
+              onChange={(v) => set("guestConsent", v)}
+              label="These guests gave us their details when they booked or signed up, and we may use them for advertising and email."
+              required
+            />
+          )}
           <p className="rounded-lg border border-border-primary px-3 py-2.5 text-xs leading-relaxed text-secondary">
             <span className="font-medium text-primary">
               Check the sharing settings first.
@@ -216,102 +217,62 @@ export function buildSteps(
       ),
     },
     {
-      label: "Connect",
-      title: "Last step: give us access",
-      help: prefill.links?.connect
-        ? "Click the button, sign in and approve. You stay the owner of everything and can revoke our access any time."
-        : "You can finish the intake now. Your Wander contact will share a private connection link.",
-      complete: !prefill.links?.connect || a.accountsConnected,
-      body: (
-        <>
-          {prefill.links?.connect ? (
-            <Button variant="primary" size="md" className="w-full">
-              Connect advertising accounts
-            </Button>
-          ) : (
-            <p className="text-sm text-secondary">
-              Ask your Wander contact for your private account connection link.
-            </p>
-          )}
-          {prefill.links?.connect && (
-            <p className="mt-3 text-sm text-secondary">
-              The link opens Wander Growth Connect, where you approve your Meta
-              Ads and Google Ads accounts.
-            </p>
-          )}
-          {prefill.links?.emailDns ? (
-            <div className="mt-6 space-y-3">
-              <h3 className="font-medium">Set up your email domain</h3>
-              <p className="text-sm font-medium text-secondary">
-                Optional, but strongly recommended
-              </p>
-              <p className="text-sm text-secondary">
-                Send guest marketing emails from your own domain. Open the setup
-                link to connect your DNS provider through Entri or add the
-                records yourself. You can finish this intake and return to email
-                setup later.
-              </p>
-              <Button variant="secondary" size="md" className="w-full">
-                Set up email and DNS
-              </Button>
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-secondary">
-              Email setup is optional, but strongly recommended for sending
-              guest marketing emails from your own domain. Your Wander contact
-              will share an email / DNS setup link when your sending domain is
-              prepared.
-            </p>
-          )}
-          {prefill.links?.connect && <SetupCheck setup={setup} />}
-          {prefill.links?.connect && (
-            <Check
-              checked={a.accountsConnected}
-              onChange={(v) => set("accountsConnected", v)}
-              label="Done, I've approved access."
-              required
-            />
-          )}
-        </>
-      ),
-    },
-    {
-      label: "Done",
-      title: "That's everything",
-      help: `${prefill.repName ?? "Your Wander contact"} takes it from here. Your launch plan comes back within two business days.`,
+      label: "Send",
+      title: "Send it in",
+      help: `${prefill.repName ?? "Your Wander contact"} starts on your launch plan as soon as this arrives. Connecting your accounts and setting up email come next, now or later from this same link.`,
       complete: true,
       body: (
-        <div className="space-y-3">
-          <p className="text-sm leading-relaxed text-secondary">
-            That is everything we need. Send it over and we will take it from
-            here.
-          </p>
+        <>
+          <ReviewList answers={a} />
+          <Field label="Anything else we should know?" optional>
+            <Textarea
+              rows={3}
+              value={a.anythingElse}
+              onChange={(e) => set("anythingElse", e.target.value)}
+            />
+          </Field>
           <Button variant="primary" size="md" className="w-full">
             Send it in
           </Button>
-        </div>
+        </>
       ),
     },
   ];
 }
 
-/** What the Done step turns into once the submit succeeds. */
-export function SentNotice({ repName }: { repName: string | null }) {
+function ReviewList({ answers: a }: { answers: Answers }) {
+  const rows: [string, string][] = [
+    [
+      "Homes",
+      a.allProperties
+        ? "All of them"
+        : a.propertyUrls.length
+          ? `${a.propertyUrls.length} selected`
+          : "None yet",
+    ],
+    [
+      "Monthly budget",
+      a.budget === "recommend" ? "Your recommendation" : a.budget || "Not set",
+    ],
+    ["Report goes to", a.reportEmails || "You"],
+    ["Photos and video", a.creativeDriveUrl ? "Link added" : "No link"],
+    ["Guest list", a.guestListDriveUrl ? "Link added" : "No link"],
+  ];
   return (
-    <div className="space-y-2 rounded-xl border border-border-secondary p-5">
-      <p className="text-sm font-medium">Sent. Nothing else needed from you.</p>
-      <p className="text-sm leading-relaxed text-secondary">
-        {repName ?? "Your Wander contact"} has everything and your launch plan
-        comes back within two business days. If anything changes on your side, a
-        property coming offline or new photography, just send it over.
-      </p>
-    </div>
+    <dl className="divide-y divide-border-primary rounded-xl border border-border-secondary text-sm">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex justify-between gap-4 px-4 py-2.5">
+          <dt className="text-secondary">{label}</dt>
+          <dd className="text-right font-medium">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
 // ---- pieces -----------------------------------------------------------
 
-function Field({
+export function Field({
   label,
   children,
   hint,
@@ -341,7 +302,7 @@ function Field({
   );
 }
 
-function Check({
+export function Check({
   checked,
   onChange,
   label,
@@ -369,7 +330,7 @@ function Check({
   );
 }
 
-function Chip({
+export function Chip({
   active,
   children,
 }: {
@@ -515,67 +476,5 @@ function BudgetPerProperty({
       Under ${MIN_PER_PROPERTY} each, the spend spreads too thin to get real
       traction. Either raise the budget or feature fewer homes.
     </p>
-  );
-}
-
-const STATE_LABELS = {
-  ready: "Ready",
-  action_required: "Action needed",
-  pending: "Wander is finishing setup",
-  unknown: "Not verified",
-};
-
-/** IntakeSetupCheck's rendering, fed a fixture instead of /api/intake/check. */
-function SetupCheck({ setup }: { setup: IntakeSetup | null }) {
-  return (
-    <section
-      className="mt-6 rounded-xl border border-border-primary p-4"
-      aria-label="Account setup status"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="font-medium">Your setup status</h3>
-        <Button variant="secondary" size="sm" type="button">
-          Check again
-        </Button>
-      </div>
-      <p className="mt-2 text-sm text-secondary">
-        We check when you reach this step and when you return from connecting an
-        account or updating DNS. You can submit while Wander finishes any
-        remaining setup.
-      </p>
-      {setup ? (
-        <>
-          <p className="mt-4 text-sm font-medium">
-            {setup.ready
-              ? "All listed setup checks are ready."
-              : "Here is what is ready and what still needs attention."}
-          </p>
-          <ul className="mt-3 space-y-4">
-            {setup.checks.map((item) => (
-              <li key={item.key}>
-                <div className="flex flex-wrap justify-between gap-x-3 text-sm">
-                  <span className="font-medium">{item.label}</span>
-                  <span>{STATE_LABELS[item.state]}</span>
-                </div>
-                <p className="mt-1 text-sm text-secondary">{item.detail}</p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-xs text-secondary">
-            Last checked{" "}
-            {new Date(setup.checkedAt).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              timeZone: "America/New_York",
-            })}
-          </p>
-        </>
-      ) : (
-        <p className="mt-3 text-sm text-secondary">
-          We could not check your setup right now. Please try again or contact
-          your Wander team.
-        </p>
-      )}
-    </section>
   );
 }

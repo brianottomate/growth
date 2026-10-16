@@ -1,4 +1,5 @@
 import { manualBillingResultSchema } from "@/lib/manual-billing";
+import { intakeEmailPreferencesSchema } from "@/lib/intake-email-preferences";
 import { creativeDirectionSchema } from "@/lib/brand-direction";
 import { catalogAdCopySchema } from "@/lib/catalog-studio";
 import { homesSchema, metaReportingConversionsSchema } from "./shared";
@@ -74,6 +75,7 @@ const performanceSettingsShape = {
     .optional(),
   influencer: z.string().nullable().optional(),
   logoOnCreatives: z.boolean().nullable().optional(),
+  emailPreferences: intakeEmailPreferencesSchema.nullable().optional(),
   invoiceEmail: z.string().nullable().optional(),
   metaTrackingDefaults: z
     .record(

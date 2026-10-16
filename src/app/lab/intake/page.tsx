@@ -2,9 +2,8 @@ import Link from "next/link";
 
 import {
   ANSWER_OPTIONS,
-  LINK_OPTIONS,
-  SETUP_OPTIONS,
   SITE_OPTIONS,
+  STAGE_OPTIONS,
   type Scenario,
   parseScenario,
 } from "./fixtures";
@@ -15,10 +14,9 @@ const AXES: {
   label: string;
   options: Record<string, string>;
 }[] = [
-  { key: "link", label: "Link", options: LINK_OPTIONS },
+  { key: "stage", label: "Progress", options: STAGE_OPTIONS },
   { key: "site", label: "Site", options: SITE_OPTIONS },
-  { key: "answers", label: "Answers", options: ANSWER_OPTIONS },
-  { key: "setup", label: "Setup check", options: SETUP_OPTIONS },
+  { key: "answers", label: "Brand answers", options: ANSWER_OPTIONS },
 ];
 
 export default async function IntakeLabPage({
@@ -34,8 +32,9 @@ export default async function IntakeLabPage({
         <div>
           <h1 className="text-2xl font-semibold">Intake form</h1>
           <p className="mt-1 text-sm text-secondary">
-            wander.com /internal/intake/[handle], every step at once. Fixture
-            data, read-only.
+            The proposed Performance+ intake, every screen at once: brand
+            section sent first, then accounts, then email with its own send.
+            Fixture data, read-only.
           </p>
         </div>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">

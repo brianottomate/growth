@@ -406,6 +406,8 @@ export type PerformanceIntakeAnswers = {
   /** Drive or Dropbox links. Both may be the same folder; this is human intake. */
   creativeDriveUrl?: string;
   guestListDriveUrl?: string;
+  /** The client's attestation for the guest list; stamps `guestListConsentAt`. */
+  guestConsent?: boolean;
   anythingElse?: string;
   accountsConnected?: boolean;
   [key: string]: unknown;

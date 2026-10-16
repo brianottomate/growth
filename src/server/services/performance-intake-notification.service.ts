@@ -58,3 +58,42 @@ export async function notifyPerformanceIntakeSubmission(
     }
   }
 }
+
+/**
+ * Best-effort note that a client sent the email section, which arrives on
+ * its own after the intake. One attempt: the preferences are already saved
+ * and show on the client page, so a missed note loses nothing.
+ */
+export async function notifyPerformanceIntakeEmail(input: {
+  brandName: string;
+  brandSlug: string | null;
+  replyTo: string;
+  programs: string[];
+}): Promise<void> {
+  try {
+    const brandName = escapeSlackMrkdwn(input.brandName).replace(
+      /@/g,
+      "@\u200b",
+    );
+    const url = input.brandSlug
+      ? `${env.NEXT_PUBLIC_BASE_URL}/app/performance/clients/${encodeURIComponent(input.brandSlug)}`
+      : `${env.NEXT_PUBLIC_BASE_URL}/app/performance/clients`;
+    const programs = input.programs.length
+      ? input.programs.join(", ")
+      : "no guest email for now";
+    const text = `Performance email setup sent: ${brandName}\n${escapeSlackMrkdwn(programs)} · replies to ${escapeSlackMrkdwn(input.replyTo)}\n<${url}|View client>`;
+    const result = await postOnSlack({
+      channel: "C0BSSECHK08", // #team-performance
+      text,
+      blocks: [{ type: "section", text: { type: "mrkdwn", text } }],
+      unfurl_links: false,
+      unfurl_media: false,
+    });
+    if (!result.success) throw new Error(result.error);
+  } catch (error) {
+    console.error("Performance intake email notification failed", {
+      brand: input.brandSlug,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}

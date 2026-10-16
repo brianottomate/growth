@@ -245,12 +245,14 @@ export async function regenerateBrandConnectToken(
 
 /**
  * Mint the per-click OAuth URL for one channel. The redirect sends the
- * client's browser back to the connect page, which re-syncs and shows the
- * tick. Throws "already_connected" when Zernio reports the account exists.
+ * client's browser back to the page they started on (this app's connect page,
+ * or the intake on wander.com), which re-syncs and shows the tick. Throws
+ * "already_connected" when Zernio reports the account exists.
  */
 export async function startBrandConnect(
   token: string,
   channelKey: BrandConnectChannelKey,
+  returnTo: "connect" | "intake" = "connect",
 ): Promise<string> {
   const brand = await getBrandByConnectToken(token);
   if (!brand) throw new Error("Unknown connect link");
@@ -263,7 +265,7 @@ export async function startBrandConnect(
   return getZernioConnectUrl({
     target: channel.target,
     profileId,
-    redirectUrl: `${brandConnectUrl(token)}?connected=${channel.key}`,
+    redirectUrl: `${returnTo === "intake" ? brandIntakeUrl(token) : brandConnectUrl(token)}?connected=${channel.key}`,
   });
 }
 

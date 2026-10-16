@@ -3,6 +3,7 @@ import { queuePerformanceStageNotification } from "./performance-stage-notificat
 import { pipelineStage } from "@/lib/performance-pipeline";
 import "server-only";
 import { manualBillingPatchSchema } from "@/lib/manual-billing";
+import { intakeEmailPreferencesSchema } from "@/lib/intake-email-preferences";
 import { currentPeriod } from "@/lib/performance-billing";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -62,6 +63,7 @@ export const performanceSettingsPatchSchema = z.object({
   siteLive: text.nullish(),
   agreedAdSpend: performanceAmountSchema.nullish(),
   logoOnCreatives: z.boolean().nullish(),
+  emailPreferences: intakeEmailPreferencesSchema.nullish(),
 });
 
 export type PerformanceSettingsPatch = z.infer<

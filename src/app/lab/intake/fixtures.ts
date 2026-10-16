@@ -3,11 +3,13 @@ import {
   intakeSetupSummary,
 } from "@/lib/intake-setup-status";
 import type { ConnectViewProps } from "@/app/connect/[token]/ConnectView";
+import type { EmailDnsRecord } from "@/lib/email-dns";
 
 /**
- * Mirrors of wander.com's `src/features/intake/schema.ts` types. The form
- * lives on wander.com, so these are copies, not imports: when the schema
- * there changes, change these with it.
+ * The proposed intake. The brand section is a one-time submission (the
+ * receipt `performance_intake.answers` already is); everything after it is
+ * live state read from the record that owns it, which is what makes a
+ * section resumable without saving drafts on a semi-public link.
  */
 export type IntakeAnswers = {
   detailsConfirmed: boolean;
@@ -18,11 +20,11 @@ export type IntakeAnswers = {
   budget: string;
   billingAcknowledged: boolean;
   invoiceEmail: string;
-  ugcPermission: "" | "yes" | "unsure" | "no";
   creativeDriveUrl: string;
   guestListDriveUrl: string;
+  /** Meta's Custom Audience attestation; becomes `guestListConsentAt`. */
+  guestConsent: boolean;
   anythingElse: string;
-  accountsConnected: boolean;
 };
 
 export type IntakePrefill = {
@@ -31,10 +33,8 @@ export type IntakePrefill = {
   contact: string | null;
   email: string | null;
   site: string | null;
-  properties: string[];
   repName: string | null;
   repEmail: string | null;
-  links?: { connect: string | null; emailDns: string | null };
 };
 
 export type IntakeListing = {
@@ -50,12 +50,74 @@ export type IntakeSetup = {
   checks: IntakeSetupCheck[];
 };
 
+/** Owner: brand channels, written by the post-OAuth sync. */
+export type ConnectionRow = {
+  key: "meta-ads" | "google-ads" | "instagram" | "facebook";
+  label: string;
+  group: "ads" | "social";
+  connected: boolean;
+  account: string | null;
+};
+
+/** Owner: `brand.emailSender.marketingDomain` plus Postmark's verify calls. */
+export type EmailDomainState = {
+  sendingDomain: string;
+  state: "not_started" | "waiting" | "verified";
+  records: EmailDnsRecord[];
+  dkimVerified: boolean;
+  returnPathVerified: boolean;
+};
+
+export const EMAIL_PROGRAMS = {
+  newsletter: {
+    label: "Newsletter",
+    detail:
+      "Once a month: featured homes, what is on locally, a reason to plan the next trip.",
+  },
+  offers: {
+    label: "Offers and announcements",
+    detail:
+      "A few a year: a last-minute opening, a new home, a seasonal offer.",
+  },
+  sequences: {
+    label: "Automated emails",
+    detail:
+      "Sent on their own when a guest signs up, stays or has not been back in a while.",
+  },
+} as const;
+
+export type EmailProgram = keyof typeof EMAIL_PROGRAMS;
+
+export const EMAIL_TOOLS = [
+  "None",
+  "Mailchimp",
+  "Klaviyo",
+  "Constant Contact",
+  "My PMS sends them",
+  "Something else",
+] as const;
+
+/**
+ * Sent from the email section on its own, after the intake. Reply-to goes
+ * to `brand.emailSender`, the rest to Performance settings; a later send
+ * replaces it.
+ */
+export type EmailPreferences = {
+  replyTo: string;
+  programs: EmailProgram[];
+  discount: "ask" | "cap";
+  discountCapDollars: string;
+  emailTool: (typeof EMAIL_TOOLS)[number] | "";
+  saved: boolean;
+};
+
 // ---- scenario axes ----------------------------------------------------
 
-export const LINK_OPTIONS = {
-  token: "Token link, connect + DNS",
-  connect: "Token link, connect only",
-  slug: "Slug link, no setup links",
+export const STAGE_OPTIONS = {
+  fresh: "Not sent yet",
+  sent: "Sent, nothing connected",
+  partway: "Sent, Meta connected",
+  done: "Everything done",
 } as const;
 
 export const SITE_OPTIONS = {
@@ -68,17 +130,10 @@ export const ANSWER_OPTIONS = {
   filled: "Filled in",
 } as const;
 
-export const SETUP_OPTIONS = {
-  partial: "Setup in progress",
-  ready: "Setup ready",
-  none: "Check unavailable",
-} as const;
-
 export type Scenario = {
-  link: keyof typeof LINK_OPTIONS;
+  stage: keyof typeof STAGE_OPTIONS;
   site: keyof typeof SITE_OPTIONS;
   answers: keyof typeof ANSWER_OPTIONS;
-  setup: keyof typeof SETUP_OPTIONS;
 };
 
 function pick<T extends Record<string, string>>(
@@ -94,10 +149,9 @@ export function parseScenario(
   params: Record<string, string | string[] | undefined>,
 ): Scenario {
   return {
-    link: pick(LINK_OPTIONS, params.link),
+    stage: pick(STAGE_OPTIONS, params.stage),
     site: pick(SITE_OPTIONS, params.site),
     answers: pick(ANSWER_OPTIONS, params.answers),
-    setup: pick(SETUP_OPTIONS, params.setup),
   };
 }
 
@@ -142,11 +196,10 @@ const EMPTY_ANSWERS: IntakeAnswers = {
   budget: "",
   billingAcknowledged: false,
   invoiceEmail: "",
-  ugcPermission: "",
   creativeDriveUrl: "",
   guestListDriveUrl: "",
+  guestConsent: false,
   anythingElse: "",
-  accountsConnected: false,
 };
 
 /**
@@ -167,43 +220,27 @@ function filledAnswers(site: Scenario["site"]): IntakeAnswers {
     budget: "$2,000",
     billingAcknowledged: true,
     invoiceEmail: "accounts@saltmarshstays.com",
-    ugcPermission: "",
     creativeDriveUrl: "https://drive.google.com/drive/folders/example",
-    guestListDriveUrl: "",
+    guestListDriveUrl: "https://drive.google.com/file/d/guests-example",
+    guestConsent: true,
     anythingElse: "",
-    accountsConnected: true,
   };
 }
 
-function prefill(scenario: Scenario): IntakePrefill {
-  const slug = scenario.link === "slug";
-  return {
-    brand: "Saltmarsh Stays",
-    slug: "saltmarsh-stays",
-    // A slug-addressed page gets no contact details from growth.
-    contact: slug ? null : "Jordan Avery",
-    email: slug ? null : "jordan@saltmarshstays.com",
-    site: SITE.replace("https://", ""),
-    properties: [],
-    repName: "Sam Ortiz",
-    repEmail: "sam@wander.com",
-    links: slug
-      ? { connect: null, emailDns: null }
-      : {
-          connect: "https://growth.wander.com/connect/example",
-          emailDns:
-            scenario.link === "token"
-              ? "https://growth.wander.com/connect/email/example"
-              : null,
-        },
-  };
-}
+const PREFILL: IntakePrefill = {
+  brand: "Saltmarsh Stays",
+  slug: "saltmarsh-stays",
+  contact: "Jordan Avery",
+  email: "jordan@saltmarshstays.com",
+  site: SITE.replace("https://", ""),
+  repName: "Sam Ortiz",
+  repEmail: "sam@wander.com",
+};
 
 const CHECKED_AT = "2026-10-16T15:42:00.000Z";
+export const SENT_AT = "2026-10-16T14:05:00.000Z";
 
-function setup(scenario: Scenario): IntakeSetup | null {
-  if (scenario.setup === "none") return null;
-  const ready = scenario.setup === "ready";
+function setup(ready: boolean): IntakeSetup {
   const summary = intakeSetupSummary(
     {
       profile: "connected",
@@ -222,22 +259,108 @@ function setup(scenario: Scenario): IntakeSetup | null {
   return { checkedAt: CHECKED_AT, ...summary };
 }
 
-export function scenarioData(scenario: Scenario) {
+function connections(stage: Scenario["stage"]): ConnectionRow[] {
+  const meta = stage === "partway" || stage === "done";
+  const all = stage === "done";
+  return [
+    {
+      key: "meta-ads",
+      label: "Meta Ads",
+      group: "ads",
+      connected: meta,
+      account: meta ? "Saltmarsh Stays Ads" : null,
+    },
+    {
+      key: "google-ads",
+      label: "Google Ads",
+      group: "ads",
+      connected: all,
+      account: all ? "482-913-5520" : null,
+    },
+    {
+      key: "instagram",
+      label: "Instagram",
+      group: "social",
+      connected: meta,
+      account: meta ? "@saltmarshstays" : null,
+    },
+    {
+      key: "facebook",
+      label: "Facebook Page",
+      group: "social",
+      connected: all,
+      account: all ? "Saltmarsh Stays" : null,
+    },
+  ];
+}
+
+const DNS_RECORDS: EmailDnsRecord[] = [
+  {
+    type: "TXT",
+    host: "20261016._domainkey.post",
+    value: "k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC…",
+    ttl: 3600,
+  },
+  {
+    type: "CNAME",
+    host: "pm-bounces.post",
+    value: "pm.mtasv.net",
+    ttl: 3600,
+  },
+];
+
+function emailDomain(stage: Scenario["stage"]): EmailDomainState {
+  const state =
+    stage === "done"
+      ? "verified"
+      : stage === "partway"
+        ? "waiting"
+        : "not_started";
   return {
-    prefill: prefill(scenario),
+    sendingDomain: "post.saltmarshstays.com",
+    state,
+    records: DNS_RECORDS,
+    dkimVerified: state === "verified",
+    returnPathVerified: state === "verified",
+  };
+}
+
+function emailPreferences(stage: Scenario["stage"]): EmailPreferences {
+  const saved = stage === "done";
+  return {
+    replyTo: PREFILL.email ?? "",
+    programs: saved ? ["newsletter", "sequences"] : [],
+    discount: saved ? "cap" : "ask",
+    discountCapDollars: saved ? "150" : "",
+    emailTool: saved ? "Mailchimp" : "",
+    saved,
+  };
+}
+
+export function scenarioData(scenario: Scenario) {
+  const sent = scenario.stage !== "fresh";
+  return {
+    prefill: PREFILL,
     listings:
       scenario.site === "wanderos"
         ? { supported: true, listings: LISTINGS }
         : { supported: false, listings: [] },
+    // Once sent, the form is the receipt: always the filled answers.
     answers:
-      scenario.answers === "filled"
+      sent || scenario.answers === "filled"
         ? filledAnswers(scenario.site)
         : EMPTY_ANSWERS,
-    setup: setup(scenario),
+    sentAt: sent ? SENT_AT : null,
+    connections: connections(scenario.stage),
+    setup: setup(scenario.stage === "done"),
+    emailDomain: emailDomain(scenario.stage),
+    emailPreferences: emailPreferences(scenario.stage),
   };
 }
 
-// ---- growth /connect/[token] ------------------------------------------
+export type ScenarioData = ReturnType<typeof scenarioData>;
+
+// ---- growth /connect/[token], today's page, for reference ------------
 
 type ConnectStatusRow = ConnectViewProps["status"][number];
 
@@ -257,7 +380,7 @@ function connectRow(
   };
 }
 
-const META_ACCOUNTS = [
+export const META_ACCOUNTS = [
   {
     id: "act_1877763863159956",
     name: "Saltmarsh Stays Ads",
@@ -277,15 +400,8 @@ const META_ACCOUNTS = [
 ];
 
 function metaChecks(ready: boolean) {
-  return (
-    setup({
-      link: "token",
-      site: "wanderos",
-      answers: "filled",
-      setup: ready ? "ready" : "partial",
-    })?.checks.filter((check) =>
-      ["meta", "billing", "pixel"].includes(check.key),
-    ) ?? []
+  return setup(ready).checks.filter((check) =>
+    ["meta", "billing", "pixel"].includes(check.key),
   );
 }
 
@@ -306,7 +422,7 @@ export const CONNECT_STATES: {
 }[] = [
   {
     id: "connect-fresh",
-    caption: "Connect · nothing connected",
+    caption: "Today · growth connect, nothing connected",
     props: {
       ...CONNECT_BASE,
       status: [connectRow("meta-ads", false), connectRow("google-ads", false)],
@@ -318,7 +434,7 @@ export const CONNECT_STATES: {
   },
   {
     id: "connect-choose",
-    caption: "Connect · choose Meta ad account",
+    caption: "Today · growth connect, choose Meta account",
     props: {
       ...CONNECT_BASE,
       status: [connectRow("meta-ads", true), connectRow("google-ads", false)],
@@ -326,18 +442,6 @@ export const CONNECT_STATES: {
       metaChoice: { selectedId: null, accounts: META_ACCOUNTS },
       setupChecks: metaChecks(false),
       allDone: false,
-    },
-  },
-  {
-    id: "connect-done",
-    caption: "Connect · all done",
-    props: {
-      ...CONNECT_BASE,
-      status: [connectRow("meta-ads", true), connectRow("google-ads", true)],
-      metaConnected: true,
-      metaChoice: { selectedId: META_ACCOUNTS[0]!.id, accounts: META_ACCOUNTS },
-      setupChecks: metaChecks(true),
-      allDone: true,
     },
   },
 ];

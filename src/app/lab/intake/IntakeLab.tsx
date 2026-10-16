@@ -10,63 +10,101 @@ import {
 } from "@/app/connect/[token]/ConnectView";
 
 import { CONNECT_STATES, type Scenario, scenarioData } from "./fixtures";
-import { SUPPORT_EMAIL, SentNotice, type Step, buildSteps } from "./steps";
+import { ConnectSection, EmailSection, Hub, Receipt } from "./sections";
+import { SUPPORT_EMAIL, type Step, buildBrandSteps } from "./steps";
+
+type Frame = {
+  id: string;
+  caption: string;
+  /** Why the screen is the way it is, for whoever reviews the lab. */
+  note?: string;
+  gate?: boolean;
+  /** Growth's own pages run on growth's dark theme and need desktop width. */
+  growth?: boolean;
+  node: React.ReactNode;
+};
 
 /**
- * Every intake screen side by side, inert. Each step frame is the right-hand
- * column of the live form at that step; the welcome panel beside it on
- * desktop gets one frame of its own rather than repeating in all of them.
+ * Every screen of the proposed intake side by side, inert. Brand steps first
+ * and sent on their own, so a client who stalls on an ad account has still
+ * given us everything we need to start. The other sections hang off a hub
+ * and read live state, so they can be done later and in any order.
  */
 export function IntakeLab({ scenario }: { scenario: Scenario }) {
   const data = scenarioData(scenario);
-  const steps = buildSteps(
-    data.prefill,
-    data.listings,
-    data.answers,
-    data.setup,
-  );
+  const steps = buildBrandSteps(data.prefill, data.listings, data.answers);
 
-  const frames: {
-    id: string;
-    caption: string;
-    gate?: boolean;
-    /** Growth's own pages run on growth's dark theme and need desktop width. */
-    growth?: boolean;
-    node: React.ReactNode;
-  }[] = [
+  const frames: Frame[] = [
     {
       id: "welcome",
       caption: "Welcome panel",
       node: <WelcomePanel brand={data.prefill.brand} />,
     },
+    {
+      id: "hub",
+      caption: "Your setup",
+      note: "The link's landing page. Each row's status comes from its owner, so returning to it is the resume.",
+      node: <Hub data={data} />,
+    },
     ...steps.map((step, index) => ({
-      id: `step-${index + 1}`,
-      caption: `${index + 1} · ${step.label}`,
+      id: `brand-${index + 1}`,
+      caption: `Brand ${index + 1} · ${step.label}`,
+      note:
+        index === steps.length - 1
+          ? "Writes the performance_intake receipt. Connecting comes after, so an ads login problem never costs us the answers."
+          : step.label === "Content and guests"
+            ? "Consent appears with the guest list link and is required once one is given."
+            : undefined,
       gate: index < steps.length - 1 ? step.complete : undefined,
       node: <StepFrame step={step} index={index} total={steps.length} />,
     })),
+    ...(data.sentAt
+      ? [
+          {
+            id: "receipt",
+            caption: "Brand · what you sent",
+            note: "Read-only, from the receipt. Shown only on a token link; edits go through the rep.",
+            node: (
+              <Receipt
+                answers={data.answers}
+                sentAt={data.sentAt}
+                repName={data.prefill.repName}
+              />
+            ),
+          },
+        ]
+      : []),
     {
-      id: "sent",
-      caption: "After sending",
+      id: "connect",
+      caption: "Ads and social",
+      note: "Inline on the intake, not a hop to Growth. Each platform is one block: Meta carries its ad account (a summary with Change once chosen, as in #716) and its setup checks.",
       node: (
-        <StepFrame
-          step={{ ...steps[steps.length - 1]!, body: null }}
-          index={steps.length - 1}
-          total={steps.length}
-          body={<SentNotice repName={data.prefill.repName} />}
+        <ConnectSection
+          connections={data.connections}
+          setup={data.setup}
+          metaChosen={scenario.stage === "done"}
         />
+      ),
+    },
+    {
+      id: "email",
+      caption: "Email",
+      note: "Last, with its own send: reply-to to emailSender, the rest to Performance settings, and a Slack note to the team. The optional sending domain sits underneath and checks itself.",
+      node: (
+        <EmailSection prefs={data.emailPreferences} domain={data.emailDomain} />
       ),
     },
     { id: "inactive", caption: "Inactive link", node: <InactiveLink /> },
     ...CONNECT_STATES.map((state) => ({
       id: state.id,
       caption: state.caption,
+      note: "Today's page, for comparison.",
       growth: true,
       node: <ConnectView {...state.props} />,
     })),
     {
       id: "connect-inactive",
-      caption: "Connect · inactive link",
+      caption: "Today · growth connect, inactive link",
       growth: true,
       node: <InactiveConnect />,
     },
@@ -105,6 +143,11 @@ export function IntakeLab({ scenario }: { scenario: Scenario }) {
                 </span>
               )}
             </figcaption>
+            {frame.note && (
+              <p className="text-xs leading-relaxed text-secondary">
+                {frame.note}
+              </p>
+            )}
             {/* wander.com pins data-theme="light"; growth renders dark. */}
             <div
               inert
@@ -193,9 +236,9 @@ function WelcomePanel({ brand }: { brand: string }) {
         </p>
         <ol className="mt-8 space-y-4">
           {[
-            "About five minutes, mostly single taps",
-            "One link at the end connects your accounts",
-            "Your launch plan comes back within two business days",
+            "Five minutes about your brand, and we can start",
+            "Connect your ad and social accounts, now or later",
+            "Set up email whenever suits you",
           ].map((line, index) => (
             <li key={line} className="flex gap-3">
               <span className="grid size-6 shrink-0 place-items-center rounded-full border border-border-secondary text-[11px] font-medium text-secondary">
