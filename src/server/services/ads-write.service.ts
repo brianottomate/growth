@@ -1309,6 +1309,8 @@ export type CreateAdAudienceInput = {
   description?: string;
   /** Internal lineage, validated before the provider call and stored with the mirror. */
   seedSnapshotId?: string;
+  /** Client brand a seed asset in another brand's account is built for; owns the snapshot. */
+  forBrandId?: string;
   parentPlatformAudienceId?: string;
   sourceAudienceId?: string;
   country?: string;
@@ -1649,6 +1651,17 @@ export async function createAdAudience(
   });
   if (!channel)
     throw new Error("Connect a Meta Ads channel before creating an audience");
+  if (input.forBrandId) {
+    const forBrand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, input.forBrandId),
+        eq(brandTable.organizationId, context.organizationId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (!forBrand) throw new Error("The seed's brand is not in this workspace");
+  }
   const [seedSnapshot] = input.seedSnapshotId
     ? await db
         .select({ count: seedSnapshotTable.memberCount })
@@ -1660,7 +1673,7 @@ export async function createAdAudience(
         .where(
           and(
             eq(seedSnapshotTable.id, input.seedSnapshotId),
-            eq(seedListTable.brandId, destination.brand.id),
+            eq(seedListTable.brandId, input.forBrandId ?? destination.brand.id),
           ),
         )
         .limit(1)
@@ -1717,6 +1730,7 @@ export async function createAdAudience(
         adAccountId: destination.localAdAccountId,
         seedSnapshotId: input.seedSnapshotId ?? null,
         parentPlatformAudienceId: parent?.id ?? null,
+        forBrandId: input.forBrandId ?? null,
         seedMetadata: seedSnapshot
           ? {
               source: "seed",

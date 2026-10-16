@@ -1,19 +1,36 @@
 import { requireMetaAudienceAccount } from "../audience-account";
-import { uploadSeedBatches, SeedAcknowledgmentError } from "./upload-batches";
+import {
+  pickSeedDestination,
+  sameMetaAccount,
+  uploadSeedBatches,
+  SeedAcknowledgmentError,
+  type SeedUploadUser,
+} from "./upload-batches";
 import { z } from "zod";
 import "server-only";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gt,
+  isNull,
+  inArray,
+  or,
+  isNotNull,
+} from "drizzle-orm";
 import { db } from "@/server/db";
 import {
-  emailListMemberTable,
-  channelTable,
   adAccountTable,
+  brandTable,
+  channelTable,
   platformAudienceTable,
+  seedMemberTable,
 } from "@/server/db/schema";
-import { getBigQueryClient } from "@/server/clients/bigquery.client";
 import {
   addUsersToZernioAdAudience,
   getZernioAdAudience,
+  listZernioAdAudiences,
 } from "@/server/clients/zernio.client";
 import {
   createAdAudience,
@@ -22,129 +39,110 @@ import {
 import { linkPlatformAudience } from "../ads-draft.service";
 import { assignPersonaAudience } from "../persona-audience.service";
 import {
+  readSeed,
   requireSeedSnapshot,
-  seedEmailHash,
-  seedMembers,
   requireWanderSeedSource,
+  SEED_MIN_ENTRIES,
   type SeedActor,
 } from "./service";
-import { buildClientSeedQuery, seedEligibleProfilesSql } from "./query";
-import type { SeedDefinition } from "@/lib/seed-definition";
-
-class SeedSourceChangedError extends Error {}
 
 type DeliveryActor = SeedActor & { runId: string };
-async function destination(
-  brand: { id: string; slug: string | null },
-  actor: SeedActor,
-  adAccountId?: string,
-) {
-  if (!brand.slug) throw new Error("Brand has no slug");
-  const channel = await db.query.channelTable.findFirst({
+type Asset = typeof platformAudienceTable.$inferSelect;
+export type SeedTarget = { type: "campaign_audience" | "persona"; id: string };
+
+const WANDER_BRAND_SLUG = "wander";
+
+async function requireWanderBrand(actor: SeedActor) {
+  const brand = await db.query.brandTable.findFirst({
     where: and(
-      eq(channelTable.brandId, brand.id),
-      eq(channelTable.platform, "meta_ads"),
-      isNull(channelTable.deletedAt),
+      eq(brandTable.organizationId, actor.organizationId),
+      eq(brandTable.slug, WANDER_BRAND_SLUG),
+      isNull(brandTable.deletedAt),
     ),
-    columns: { id: true },
   });
-  if (!channel)
-    throw new Error("Connect a Meta Ads channel before creating an audience");
-  const listed = await listAdsWriteDestinations({
-    organizationId: actor.organizationId,
-    brandSlug: brand.slug,
-    platform: "meta",
-  });
-  const options = adAccountId
-    ? listed.destinations.filter((d) => d.adAccountId === adAccountId)
-    : listed.destinations;
-  if (options.length !== 1)
-    throw new Error(
-      "Choose exactly one allowlisted Meta destination; no account will be guessed",
-    );
-  const target = options[0]!;
-  const allowed = await db.query.adAccountTable.findMany({
-    where: and(
-      eq(adAccountTable.brandId, brand.id),
-      eq(adAccountTable.platform, "facebook"),
-      eq(adAccountTable.isAllowed, true),
-    ),
-    columns: { id: true, externalId: true },
-  });
-  const local = allowed.find(
-    (a) =>
-      a.externalId.replace(/^act_/, "") ===
-      target.adAccountId.replace(/^act_/, ""),
-  );
-  if (!local) throw new Error("The destination is no longer allowlisted");
-  return { ...target, localAdAccountId: local.id };
+  if (!brand)
+    throw new Error("The Wander brand is missing from this workspace");
+  return brand;
 }
-async function resolveEmails(
-  hashes: string[],
-  d: SeedDefinition,
-  websiteId: string | null,
-  asOf: string,
+
+/** Wander's account receives every seed; the client sees only the shared lookalike. */
+async function seedDestination(actor: SeedActor) {
+  const wander = await requireWanderBrand(actor);
+  const [listed, allowed] = await Promise.all([
+    listAdsWriteDestinations({
+      organizationId: actor.organizationId,
+      brandSlug: WANDER_BRAND_SLUG,
+      platform: "meta",
+    }),
+    db.query.adAccountTable.findMany({
+      where: and(
+        eq(adAccountTable.brandId, wander.id),
+        eq(adAccountTable.platform, "facebook"),
+        eq(adAccountTable.isAllowed, true),
+      ),
+      columns: { id: true, brandId: true, externalId: true },
+    }),
+  ]);
+  return {
+    wander,
+    ...pickSeedDestination({
+      wanderBrandId: wander.id,
+      listed: listed.destinations,
+      allowed,
+    }),
+  };
+}
+
+const providerId = (asset: Asset) => {
+  const record = asset.definition as { id?: string; _id?: string } | null;
+  const id = record?.id ?? record?._id;
+  if (!id)
+    throw new Error(
+      `Audience ${asset.id} has no provider record ID; inspect before retrying`,
+    );
+  return id;
+};
+const identifiable = or(
+  isNotNull(seedMemberTable.email),
+  isNotNull(seedMemberTable.phone),
+);
+async function uploadableEntries(snapshotId: string) {
+  const [row] = await db
+    .select({ n: count() })
+    .from(seedMemberTable)
+    .where(and(eq(seedMemberTable.snapshotId, snapshotId), identifiable));
+  return row?.n ?? 0;
+}
+async function matchedSize(asset: Asset) {
+  const provider = await getZernioAdAudience(providerId(asset)).catch(
+    () => null,
+  );
+  const size = provider?.audience?.size ?? provider?.audience?.approximateCount;
+  return typeof size === "number" ? size : null;
+}
+
+/** Seed assets of a snapshot live under the Wander brand; never trust the client brand id. */
+async function requireSeedAsset(
+  id: string,
+  snapshotId: string,
+  actor: SeedActor,
 ) {
-  const wanted = new Set(hashes),
-    emails = new Map<string, string>();
-  if (d.uploadedListIds.length) {
-    const rows = await db.query.emailListMemberTable.findMany({
-      where: inArray(emailListMemberTable.listId, d.uploadedListIds),
-      columns: { email: true },
-    });
-    for (const row of rows) {
-      const hash = seedEmailHash(row.email);
-      if (wanted.has(hash)) emails.set(hash, row.email.trim().toLowerCase());
-    }
-  }
-  const queries = [];
-  if (d.wander)
-    queries.push({
-      sql: `WITH ${seedEligibleProfilesSql} SELECT DISTINCT email FROM eligible WHERE email_hash IN UNNEST(@hashes)`,
-      params: { hashes },
-    });
-  if (d.clientBookers) {
-    const q = buildClientSeedQuery(websiteId!, asOf);
-    const plaintext = q.sql.replace(
-      "LOWER(TO_HEX(SHA256(u.email))) email_hash",
-      "u.email email",
-    );
-    queries.push({
-      sql: `SELECT email FROM (${plaintext}) WHERE LOWER(TO_HEX(SHA256(email))) IN UNNEST(@hashes)`,
-      params: { ...q.params, hashes },
-    });
-  }
-  if (queries.length) {
-    const bq = await getBigQueryClient();
-    for (const q of queries) {
-      const [job] = await bq.createQueryJob({
-        query: q.sql,
-        params: q.params,
-        location: "us-central1",
-        maximumBytesBilled: "20000000000",
-      });
-      const [raw] = (await job.getQueryResults()) as [unknown[]];
-      const rows = z.array(z.object({ email: z.email() })).parse(raw);
-      for (const row of rows) {
-        if (typeof row.email !== "string")
-          throw new Error("Source returned an invalid email identity");
-        const hash = seedEmailHash(row.email);
-        if (wanted.has(hash)) emails.set(hash, row.email.trim().toLowerCase());
-      }
-    }
-  }
-  if (emails.size !== wanted.size)
-    throw new SeedSourceChangedError(
-      `Resolved ${emails.size}/${wanted.size} snapshot contacts. Refresh the seed before uploading; source contacts changed.`,
-    );
-  return hashes.map((h) => ({ email: emails.get(h)! }));
+  const wander = await requireWanderBrand(actor);
+  const asset = await db.query.platformAudienceTable.findFirst({
+    where: and(
+      eq(platformAudienceTable.id, id),
+      eq(platformAudienceTable.brandId, wander.id),
+      eq(platformAudienceTable.seedSnapshotId, snapshotId),
+    ),
+  });
+  if (!asset) throw new Error("Seed asset not found on this snapshot");
+  return asset;
 }
 
 /** Never auto-retry creation. Resume a known local asset instead; uploads are additive. */
 export async function uploadSeed(
   input: {
     snapshotId: string;
-    adAccountId?: string;
     platformAudienceId?: string;
     name?: string;
     approved: true;
@@ -157,40 +155,46 @@ export async function uploadSeed(
     actor,
   );
   if (snapshot.definition.wander) await requireWanderSeedSource(actor);
-  if (!snapshot.memberCount)
-    throw new Error("This snapshot has no matching contacts");
-  const target = await destination(brand, actor, input.adAccountId);
+  const entries = await uploadableEntries(snapshot.id);
+  if (entries < SEED_MIN_ENTRIES)
+    throw new Error(
+      `${entries} of ${snapshot.memberCount} members have an email or phone; a seed upload needs at least ${SEED_MIN_ENTRIES} entries.${snapshot.diagnostics.contacts ? "" : " This snapshot predates stored contacts: fill its contacts first."}`,
+    );
+  const target = await seedDestination(actor);
   let asset = input.platformAudienceId
-    ? await db.query.platformAudienceTable.findFirst({
-        where: and(
-          eq(platformAudienceTable.id, input.platformAudienceId),
-          eq(platformAudienceTable.brandId, brand.id),
-        ),
-      })
+    ? await requireSeedAsset(input.platformAudienceId, snapshot.id, actor)
     : null;
   if (
-    input.platformAudienceId &&
-    (asset?.seedSnapshotId !== snapshot.id ||
-      asset.adAccountId !== target.localAdAccountId ||
-      asset.source !== "customer_list")
+    asset &&
+    (asset.adAccountId !== target.localAdAccountId ||
+      asset.source !== "customer_list" ||
+      asset.forBrandId !== brand.id)
   )
     throw new Error(
-      "Resume an audience created from this snapshot in this exact ad account",
+      "Resume an audience created from this snapshot in Wander's ad account",
+    );
+  if (asset && asset.seedMetadata?.count !== entries)
+    throw new Error(
+      `This upload began with ${asset.seedMetadata?.count} entries and the snapshot now has ${entries}; compile a new snapshot instead of resuming`,
     );
   if (asset?.seedMetadata?.status === "ready")
     return {
       platformAudienceId: asset.id,
-      uploaded: asset.seedMetadata.uploadedCount ?? asset.seedMetadata.count,
-      total: snapshot.memberCount,
+      adAccountId: target.adAccountId,
+      uploaded: asset.seedMetadata.uploadedCount ?? entries,
+      entries,
+      memberCount: snapshot.memberCount,
+      matchedSize: await matchedSize(asset),
     };
   if (!asset) {
     const created = await createAdAudience(
       {
-        brandSlug: brand.slug!,
+        brandSlug: WANDER_BRAND_SLUG,
         connectionAccountId: target.connectionAccountId,
         adAccountId: target.adAccountId,
         type: "customer_list",
         seedSnapshotId: snapshot.id,
+        forBrandId: brand.id,
         name:
           input.name?.trim() || `${brand.name} · ${list.name} · ${snapshot.id}`,
       },
@@ -200,127 +204,181 @@ export async function uploadSeed(
       throw new Error(
         "Provider audience created without a local record. Inspect the provider before retrying.",
       );
-    asset =
-      (await db.query.platformAudienceTable.findFirst({
-        where: eq(platformAudienceTable.id, created.platformAudienceId),
-      })) ?? null;
+    [asset = null] = await db
+      .update(platformAudienceTable)
+      .set({
+        seedMetadata: {
+          source: "seed",
+          count: entries,
+          uploadedCount: 0,
+          status: "uploading",
+        },
+      })
+      .where(eq(platformAudienceTable.id, created.platformAudienceId))
+      .returning();
     if (!asset)
       throw new Error(
         `Seed ${created.platformAudienceId} was created; inspect it before retrying`,
       );
   }
-  const providerId =
-    (asset.definition as { id?: string; _id?: string } | null)?.id ??
-    (asset.definition as { _id?: string } | null)?._id;
-  if (!providerId)
-    throw new Error(
-      `Audience ${asset.id} has no provider record ID; inspect before retrying`,
-    );
-  let uploaded = asset.seedMetadata?.uploadedCount ?? 0;
+  const audience = asset;
+  const record = providerId(audience);
+  let uploaded = audience.seedMetadata?.uploadedCount ?? 0;
+  const mark = (status: "uploading" | "ready" | "failed") =>
+    db
+      .update(platformAudienceTable)
+      .set({
+        seedMetadata: {
+          source: "seed",
+          count: entries,
+          uploadedCount: uploaded,
+          status,
+        },
+      })
+      .where(eq(platformAudienceTable.id, audience.id));
   try {
     await uploadSeedBatches({
       alreadyUploaded: uploaded,
       page: async (afterHash) => {
-        const page = await seedMembers(
-          { snapshotId: snapshot.id, afterHash, limit: 10000 },
-          actor,
-        );
+        const rows = await db
+          .select({
+            emailHash: seedMemberTable.emailHash,
+            email: seedMemberTable.email,
+            phone: seedMemberTable.phone,
+          })
+          .from(seedMemberTable)
+          .where(
+            and(
+              eq(seedMemberTable.snapshotId, snapshot.id),
+              identifiable,
+              ...(afterHash ? [gt(seedMemberTable.emailHash, afterHash)] : []),
+            ),
+          )
+          .orderBy(asc(seedMemberTable.emailHash))
+          .limit(10000);
         return {
-          hashes: page.members.map((m) => m.emailHash),
-          nextAfterHash: page.nextAfterHash,
+          users: rows.map((r): SeedUploadUser => ({
+            ...(r.email ? { email: r.email } : {}),
+            ...(r.phone ? { phone: r.phone } : {}),
+          })),
+          nextAfterHash: rows.length === 10000 ? rows.at(-1)!.emailHash : null,
         };
       },
-      resolve: (hashes) =>
-        resolveEmails(
-          hashes,
-          snapshot.definition,
-          brand.wanderOsWebsiteId,
-          snapshot.asOf.toISOString(),
-        ),
-      send: (users) => addUsersToZernioAdAudience(providerId, users),
-      progress: async (count) => {
-        uploaded = count;
-        await db
-          .update(platformAudienceTable)
-          .set({
-            seedMetadata: {
-              source: "seed",
-              count: snapshot.memberCount,
-              uploadedCount: uploaded,
-              status: "uploading",
-            },
-          })
-          .where(eq(platformAudienceTable.id, asset.id));
+      send: (users) => addUsersToZernioAdAudience(record, users),
+      progress: async (n) => {
+        uploaded = n;
+        await mark("uploading");
       },
     });
-    await db
-      .update(platformAudienceTable)
-      .set({
-        seedMetadata: {
-          source: "seed",
-          count: snapshot.memberCount,
-          uploadedCount: uploaded,
-          status: "ready",
-        },
-      })
-      .where(eq(platformAudienceTable.id, asset.id));
+    await mark("ready");
   } catch (error) {
-    await db
-      .update(platformAudienceTable)
-      .set({
-        seedMetadata: {
-          source: "seed",
-          count: snapshot.memberCount,
-          uploadedCount: uploaded,
-          status: "failed",
-        },
-      })
-      .where(eq(platformAudienceTable.id, asset.id));
+    await mark("failed");
     throw new Error(
-      `${error instanceof SeedSourceChangedError || error instanceof SeedAcknowledgmentError ? error.message + " " : ""}Upload stopped after ${uploaded}/${snapshot.memberCount} confirmed contacts. Resume platformAudienceId ${asset.id}; do not create another audience. No lookalike or campaign attachment was made.`,
+      `${error instanceof SeedAcknowledgmentError ? error.message + " " : ""}Upload stopped after ${uploaded}/${entries} confirmed entries. Resume platformAudienceId ${audience.id}; do not create another audience. No lookalike was made.`,
     );
   }
   return {
-    platformAudienceId: asset.id,
+    platformAudienceId: audience.id,
+    adAccountId: target.adAccountId,
     uploaded,
-    total: snapshot.memberCount,
+    entries,
+    memberCount: snapshot.memberCount,
+    matchedSize: await matchedSize(audience),
   };
 }
+
 export async function seedAssetStatus(
   input: { snapshotId: string; platformAudienceId: string },
   actor: SeedActor,
 ) {
-  const { snapshot, brand } = await requireSeedSnapshot(
-    input.snapshotId,
+  const { snapshot } = await requireSeedSnapshot(input.snapshotId, actor);
+  const asset = await requireSeedAsset(
+    input.platformAudienceId,
+    snapshot.id,
     actor,
   );
-  const asset = await db.query.platformAudienceTable.findFirst({
-    where: and(
-      eq(platformAudienceTable.id, input.platformAudienceId),
-      eq(platformAudienceTable.brandId, brand.id),
-      eq(platformAudienceTable.seedSnapshotId, snapshot.id),
-    ),
-  });
-  if (!asset) throw new Error("Seed asset not found on this snapshot");
-  const record = asset.definition as { id?: string; _id?: string } | null;
-  const providerId = record?.id ?? record?._id;
-  if (!providerId) throw new Error("Audience has no provider ID");
   // Recheck allowlisting even for reads; permission may have changed after upload.
-  await destination(
-    brand,
-    actor,
-    (await requireMetaAudienceAccount(asset)).externalId,
-  );
-  const provider = await getZernioAdAudience(providerId);
+  await requireMetaAudienceAccount(asset);
+  const provider = await getZernioAdAudience(providerId(asset));
+  const size = provider.audience?.size ?? provider.audience?.approximateCount;
   return {
     platformAudienceId: asset.id,
     sourceCount: snapshot.memberCount,
+    entries: asset.seedMetadata?.count ?? null,
     uploadStatus: asset.seedMetadata?.status ?? null,
+    matchedSize: typeof size === "number" ? size : null,
     provider: provider.audience
       ? z.record(z.string(), z.json()).parse(provider.audience)
       : null,
   };
 }
+
+const adsManagerAudiencesUrl = (adAccountId: string) =>
+  `https://adsmanager.facebook.com/adsmanager/audiences?act=${adAccountId.replace(/^act_/, "")}`;
+
+/** The client's own Meta account: its brand's pinned, allowlisted destination. */
+async function clientAccount(brandId: string) {
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, brandId),
+    columns: { id: true, name: true, slug: true, performanceSettings: true },
+  });
+  if (!brand) throw new Error("Client brand not found");
+  const pinned = brand.performanceSettings?.metaAdsDestination;
+  const local = pinned
+    ? (
+        await db.query.adAccountTable.findMany({
+          where: and(
+            eq(adAccountTable.brandId, brand.id),
+            eq(adAccountTable.platform, "facebook"),
+            eq(adAccountTable.isAllowed, true),
+          ),
+        })
+      ).find((a) => sameMetaAccount(a.externalId, pinned.adAccountId))
+    : undefined;
+  return { brand, pinned: local ? pinned! : null, local: local ?? null };
+}
+
+/** Everything an operator needs to share a lookalike from Wander's account by hand. */
+async function seedShare(lookalike: Asset, snapshotId: string) {
+  if (!lookalike.forBrandId)
+    throw new Error("This lookalike was not built for a client brand");
+  const [source, client] = await Promise.all([
+    requireMetaAudienceAccount(lookalike),
+    clientAccount(lookalike.forBrandId),
+  ]);
+  const mirror =
+    client.local && lookalike.externalId
+      ? await db.query.platformAudienceTable.findFirst({
+          where: and(
+            eq(platformAudienceTable.brandId, client.brand.id),
+            eq(platformAudienceTable.adAccountId, client.local.id),
+            eq(platformAudienceTable.externalId, lookalike.externalId),
+          ),
+          columns: { id: true, createdAt: true },
+        })
+      : undefined;
+  return {
+    snapshotId,
+    platformAudienceId: lookalike.id,
+    lookalikeName: lookalike.name,
+    metaAudienceId: lookalike.externalId,
+    sourceAdAccountId: source.externalId,
+    adsManagerUrl: adsManagerAudiencesUrl(source.externalId),
+    clientBrandId: client.brand.id,
+    clientBrandName: client.brand.name,
+    clientAdAccountId: client.local?.externalId ?? null,
+    clientAdAccountName: client.local?.name ?? null,
+    status: !client.local
+      ? ("no_client_account" as const)
+      : mirror
+        ? ("shared" as const)
+        : ("not_shared" as const),
+    sharedPlatformAudienceId: mirror?.id ?? null,
+    sharedAt: mirror?.createdAt.toISOString() ?? null,
+  };
+}
+export type SeedShare = Awaited<ReturnType<typeof seedShare>>;
+
 export async function seedLookalike(
   input: {
     snapshotId: string;
@@ -337,44 +395,38 @@ export async function seedLookalike(
     input.snapshotId,
     actor,
   );
-  const seed = await db.query.platformAudienceTable.findFirst({
-    where: and(
-      eq(platformAudienceTable.id, input.seedPlatformAudienceId),
-      eq(platformAudienceTable.brandId, brand.id),
-      eq(platformAudienceTable.seedSnapshotId, snapshot.id),
-    ),
-  });
+  const seed = await requireSeedAsset(
+    input.seedPlatformAudienceId,
+    snapshot.id,
+    actor,
+  );
   if (
-    !seed?.externalId ||
+    !seed.externalId ||
     seed.source !== "customer_list" ||
     seed.seedMetadata?.status !== "ready"
   )
     throw new Error(
       "Choose a fully uploaded customer-list asset for this snapshot",
     );
-  const target = await destination(
-    brand,
-    actor,
-    (await requireMetaAudienceAccount(seed)).externalId,
-  );
-  const fresh = await seedAssetStatus(
-    { snapshotId: snapshot.id, platformAudienceId: seed.id },
-    actor,
-  );
-  const status = fresh.provider?.status;
+  const target = await seedDestination(actor);
+  if (seed.adAccountId !== target.localAdAccountId)
+    throw new Error("This seed is not in Wander's ad account");
+  const status = (await getZernioAdAudience(providerId(seed))).audience?.status;
   if (status === "pending" || status === "processing")
     throw new Error(
       "Meta is still processing this seed; check status again before creating a lookalike",
     );
+  // Meta's own error (e.g. an unsupported country) surfaces as thrown.
   const created = await createAdAudience(
     {
-      brandSlug: brand.slug!,
+      brandSlug: WANDER_BRAND_SLUG,
       connectionAccountId: target.connectionAccountId,
       adAccountId: target.adAccountId,
       type: "lookalike",
       name: `${seed.name} · ${Math.round(input.ratio * 100)}% ${input.country}`,
       sourceAudienceId: seed.externalId,
       parentPlatformAudienceId: seed.id,
+      forBrandId: brand.id,
       country: input.country,
       ratio: input.ratio,
     },
@@ -384,16 +436,181 @@ export async function seedLookalike(
     throw new Error(
       "Lookalike created without a local record; inspect before retrying",
     );
+  const lookalike = await db.query.platformAudienceTable.findFirst({
+    where: eq(platformAudienceTable.id, created.platformAudienceId),
+  });
   return {
     platformAudienceId: created.platformAudienceId,
     parentPlatformAudienceId: seed.id,
+    share: await seedShare(lookalike!, snapshot.id),
   };
 }
+
+async function requireDeliveredLookalike(
+  id: string,
+  snapshotId: string,
+  actor: SeedActor,
+) {
+  const wander = await requireWanderBrand(actor);
+  const lookalike = await db.query.platformAudienceTable.findFirst({
+    where: and(
+      eq(platformAudienceTable.id, id),
+      eq(platformAudienceTable.brandId, wander.id),
+    ),
+  });
+  const parent = lookalike?.parentPlatformAudienceId
+    ? await db.query.platformAudienceTable.findFirst({
+        where: eq(platformAudienceTable.id, lookalike.parentPlatformAudienceId),
+        columns: { seedSnapshotId: true },
+      })
+    : null;
+  if (!lookalike || parent?.seedSnapshotId !== snapshotId)
+    throw new Error("Choose a lookalike built from this snapshot");
+  return lookalike;
+}
+
+/**
+ * Sharing happens in Ads Manager. Detection reads the client account's
+ * audiences through Zernio; when Meta lists the lookalike there, or the
+ * operator confirms the share, the client account gets its own mirror row,
+ * which is what the client's campaigns and personas target.
+ */
+export async function shareSeedLookalike(
+  input: {
+    snapshotId: string;
+    platformAudienceId: string;
+    confirmShared?: boolean;
+    target?: SeedTarget;
+  },
+  actor: SeedActor,
+) {
+  const { snapshot, brand } = await requireSeedSnapshot(
+    input.snapshotId,
+    actor,
+  );
+  const lookalike = await requireDeliveredLookalike(
+    input.platformAudienceId,
+    snapshot.id,
+    actor,
+  );
+  if (lookalike.forBrandId !== brand.id)
+    throw new Error("This lookalike was built for a different brand");
+  let share = await seedShare(lookalike, snapshot.id);
+  if (share.status === "no_client_account")
+    throw new Error(
+      `${brand.name} has no pinned, allowlisted Meta ad account to share with. Set its Meta destination on the brand page first.`,
+    );
+  let detected: "provider" | "operator" | "same_account" | null = null;
+  if (share.status === "not_shared") {
+    const client = await clientAccount(brand.id);
+    const found = sameMetaAccount(
+      client.local!.externalId,
+      share.sourceAdAccountId,
+    )
+      ? "same_account"
+      : (
+          await listZernioAdAudiences({
+            accountId: client.pinned!.connectionAccountId,
+            adAccountId: client.pinned!.adAccountId,
+          })
+        ).find(
+          (a) =>
+            a.platformAudienceId === lookalike.externalId ||
+            a.id === lookalike.externalId,
+        );
+    if (found || input.confirmShared) {
+      detected =
+        found === "same_account"
+          ? "same_account"
+          : found
+            ? "provider"
+            : "operator";
+      const channel = await db.query.channelTable.findFirst({
+        where: and(
+          eq(channelTable.brandId, brand.id),
+          eq(channelTable.platform, "meta_ads"),
+          isNull(channelTable.deletedAt),
+        ),
+        columns: { id: true },
+      });
+      if (!channel)
+        throw new Error(
+          `${brand.name} has no Meta Ads channel to hold the audience`,
+        );
+      await db
+        .insert(platformAudienceTable)
+        .values({
+          channelId: channel.id,
+          brandId: brand.id,
+          adAccountId: client.local!.id,
+          name: lookalike.name,
+          type: "lookalike",
+          source: "lookalike_seed",
+          externalId: lookalike.externalId,
+          sourceId: lookalike.sourceId,
+          definition: typeof found === "object" ? found : lookalike.definition,
+        })
+        .onConflictDoNothing();
+      share = await seedShare(lookalike, snapshot.id);
+    }
+  }
+  if (share.status === "shared" && input.target)
+    await attachSeedAsset(
+      {
+        snapshotId: snapshot.id,
+        platformAudienceId: share.sharedPlatformAudienceId!,
+        target: input.target,
+      },
+      actor,
+    );
+  return {
+    ...share,
+    detected,
+    attached: share.status === "shared" && !!input.target,
+    next:
+      share.status === "shared"
+        ? null
+        : `Not visible in ${share.clientAdAccountId} yet. In Ads Manager (${share.adsManagerUrl}) share audience ${share.metaAudienceId} with ${share.clientAdAccountId}, then check again; pass confirmShared if Meta still does not list it.`,
+  };
+}
+
+/** readSeed plus each delivered lookalike's share state; DB only. */
+export async function readSeedDelivery(
+  input: { seedListId: string },
+  actor: SeedActor,
+) {
+  const read = await readSeed(input, actor);
+  const seedSnapshot = new Map(
+    read.assets.flatMap((a) =>
+      a.seedSnapshotId ? [[a.id, a.seedSnapshotId] as const] : [],
+    ),
+  );
+  const lookalikes = read.assets.filter(
+    (a) =>
+      a.parentPlatformAudienceId &&
+      seedSnapshot.has(a.parentPlatformAudienceId),
+  );
+  const rows = lookalikes.length
+    ? await db.query.platformAudienceTable.findMany({
+        where: inArray(
+          platformAudienceTable.id,
+          lookalikes.map((l) => l.id),
+        ),
+      })
+    : [];
+  const shares = await Promise.all(
+    rows
+      .filter((r) => r.forBrandId)
+      .map((r) => seedShare(r, seedSnapshot.get(r.parentPlatformAudienceId!)!)),
+  );
+  return { ...read, shares };
+}
+
 export async function attachSeedAsset(
   input: {
     snapshotId: string;
     platformAudienceId: string;
-    target: { type: "campaign_audience" | "persona"; id: string };
+    target: SeedTarget;
   },
   actor: SeedActor,
 ) {
@@ -408,29 +625,33 @@ export async function attachSeedAsset(
     ),
   });
   if (!asset) throw new Error("Platform audience not found on this brand");
-  const parent = asset.parentPlatformAudienceId
-    ? await db.query.platformAudienceTable.findFirst({
+  // A client targets its own account's copy of the lookalike; its lineage is
+  // the Wander-side lookalike with the same Meta ID, built from this snapshot.
+  const delivered = asset.externalId
+    ? await db.query.platformAudienceTable.findMany({
         where: and(
-          eq(platformAudienceTable.id, asset.parentPlatformAudienceId),
-          eq(platformAudienceTable.brandId, brand.id),
+          eq(platformAudienceTable.externalId, asset.externalId),
+          eq(platformAudienceTable.forBrandId, brand.id),
         ),
+        columns: { parentPlatformAudienceId: true },
       })
-    : null;
-  const seed =
-    asset.seedSnapshotId === snapshot.id
-      ? asset
-      : parent?.seedSnapshotId === snapshot.id
-        ? parent
-        : null;
+    : [];
+  const parentIds = [asset, ...delivered].flatMap((a) =>
+    a.parentPlatformAudienceId ? [a.parentPlatformAudienceId] : [],
+  );
+  const parents = parentIds.length
+    ? await db.query.platformAudienceTable.findMany({
+        where: inArray(platformAudienceTable.id, parentIds),
+      })
+    : [];
+  const seed = [asset, ...parents].find(
+    (a) => a.seedSnapshotId === snapshot.id,
+  );
   if (seed?.seedMetadata?.status !== "ready")
     throw new Error(
-      "Choose an uploaded seed or its lookalike from this snapshot",
+      "Choose an uploaded seed, its lookalike, or the client's shared copy from this snapshot",
     );
-  await destination(
-    brand,
-    actor,
-    (await requireMetaAudienceAccount(seed)).externalId,
-  );
+  await requireMetaAudienceAccount(asset);
   if (input.target.type === "campaign_audience")
     await linkPlatformAudience({
       platformAudienceId: asset.id,

@@ -23,6 +23,7 @@ import { CopySuggestionsCard } from "./CopySuggestionsCard";
 import { ChatNextOptions } from "./ChatNextOptions";
 import { GrowthResultSummary } from "./GrowthResultSummary";
 import { growthSummaryTools } from "@/lib/growth-result-summary";
+import { SeedShareCard } from "./SeedShareCard";
 import { SocialPostSummary } from "./SocialPostSummary";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
@@ -74,7 +75,7 @@ import {
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { toast } from "@/components/ui/toast";
 import { ThinkingOrb, capabilityOrbState } from "@/components/thinking-orb";
-import { orpc } from "@/orpc/client";
+import { type RouterOutputs, orpc } from "@/orpc/client";
 import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
 import { isApprovalSuperseded } from "@/lib/chat-approval-state";
 import { formatResolvedPublishingTime } from "@/lib/scheduling-time";
@@ -1789,6 +1790,40 @@ export function renderToolPart(
       return <MentionsCard key={key} output={output as MentionsOutput} />;
     case "adsRead.scope":
       return <AdsScopeCard key={key} output={output as AdsScopeOutput} />;
+    case "seedWrite.lookalike":
+      return (
+        <SeedShareCard
+          key={key}
+          share={(output as RouterOutputs["seed"]["lookalike"]).share}
+        />
+      );
+    case "seedWrite.share":
+      return (
+        <SeedShareCard
+          key={key}
+          share={output as RouterOutputs["seed"]["share"]}
+        />
+      );
+    case "seedRead.get": {
+      const { shares } = output as RouterOutputs["seed"]["get"];
+      if (shares.length)
+        return (
+          <div key={key} className="space-y-2">
+            {shares.map((share) => (
+              <SeedShareCard key={share.platformAudienceId} share={share} />
+            ))}
+          </div>
+        );
+      return (
+        <GenericToolCard
+          key={key}
+          name={toolName}
+          label={toolLabel(toolName, action)}
+          action={outputAction}
+          output={output}
+        />
+      );
+    }
     case "adsRead.top":
       return <AdsRankedCard key={key} output={output as AdsRankedOutput} />;
     case "contentWrite.createIdea":

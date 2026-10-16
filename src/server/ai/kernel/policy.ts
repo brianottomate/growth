@@ -69,6 +69,8 @@ export const growthActionPolicies = {
   seedWrite: {
     save: write(),
     compile: write(),
+    fillContacts: write({ consequence: "provider-read", idempotent: true }),
+    share: write({ consequence: "provider-read", idempotent: true }),
     attach: write({ idempotent: true }),
     upload: write({
       consequence: "provider-write",

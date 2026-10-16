@@ -10,6 +10,8 @@ import {
   uploadSeedAction,
   seedAssetStatusAction,
   seedLookalikeAction,
+  shareSeedLookalikeAction,
+  fillSeedContactsAction,
   attachSeedAssetAction,
 } from "./seeds";
 import {
@@ -886,12 +888,14 @@ export const seedRead = growthDomainTool({
 });
 export const seedWrite = growthDomainTool({
   description:
-    "Save seed recipes, freeze membership, upload seeds, create lookalikes and attach assets to their intended campaign/persona.",
+    "Seed delivery: save a recipe, compile members with contacts, upload them to Wander's Meta account, build a 1% lookalike there, then confirm the operator shared the lookalike with the client account and attach the client's copy to its campaign/persona.",
   actions: {
     save: saveSeedAction,
     compile: compileSeedAction,
+    fillContacts: fillSeedContactsAction,
     upload: uploadSeedAction,
     lookalike: seedLookalikeAction,
+    share: shareSeedLookalikeAction,
     attach: attachSeedAssetAction,
   },
 });

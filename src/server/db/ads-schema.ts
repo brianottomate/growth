@@ -939,6 +939,14 @@ export const platformAudienceTable = pgTable(
       }),
     /** The asset this one was derived from (lookalike seed, etc.). */
     sourceId: t.text(),
+    /**
+     * The client brand a seed asset in Wander's account was built for. Its
+     * lookalike reaches that brand only by an Ads Manager share, after which
+     * the client account's own mirror row carries the same externalId.
+     */
+    forBrandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "set null" }),
 
     name: t.text().notNull(),
     type: audienceTypeEnum().notNull(),

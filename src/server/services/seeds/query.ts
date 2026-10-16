@@ -5,7 +5,8 @@ const A = "wander-9fc9c.analytics";
 const W = "wander-9fc9c.wos_datastream";
 export const seedEligibleProfilesSql = `profiles AS (
  SELECT id_user,LOWER(TRIM(email)) email,UPPER(TRIM(country)) country,
- COALESCE(is_deleted,FALSE) deleted,COALESCE(is_banned,FALSE) banned
+ COALESCE(is_deleted,FALSE) deleted,COALESCE(is_banned,FALSE) banned,
+ wos_phone,phone,first_name,last_name,city,state,postal_code
  FROM \`${A}.customer_profiles\`
  QUALIFY ROW_NUMBER() OVER(PARTITION BY id_user ORDER BY ts_updated DESC,ts_created DESC,email)=1
 ), eligible AS (
@@ -109,7 +110,8 @@ export function buildWanderSeedQuery(d: SeedDefinition, asOf: string) {
 }
 
 export const seedClientUsersSql = `users AS (
- SELECT id,LOWER(TRIM(email)) email,COALESCE(deleted,FALSE) deleted,deletedAt
+ SELECT id,LOWER(TRIM(email)) email,COALESCE(deleted,FALSE) deleted,deletedAt,
+ firstName,lastName,phoneNumber
  FROM \`${W}.public_User\` QUALIFY ROW_NUMBER() OVER(PARTITION BY id ORDER BY updatedAt DESC)=1
 )`;
 export function buildClientSeedQuery(websiteId: string, asOf: string) {
@@ -127,3 +129,12 @@ export function buildClientSeedQuery(websiteId: string, asOf: string) {
  AND NOT u.deleted AND u.deletedAt IS NULL AND REGEXP_CONTAINS(u.email,r'^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$') GROUP BY 1`,
   };
 }
+
+/** Contact fields for already-selected members; never widens membership. */
+export const seedWanderContactsSql = `WITH ${seedEligibleProfilesSql}
+ SELECT e.email_hash,e.email,e.country,p.wos_phone,p.phone,p.first_name,p.last_name,p.city,p.state,p.postal_code
+ FROM eligible e JOIN profiles p USING(id_user) WHERE e.email_hash IN UNNEST(@hashes)`;
+export const seedClientContactsSql = `WITH ${seedClientUsersSql}
+ SELECT LOWER(TO_HEX(SHA256(email))) email_hash,ANY_VALUE(email) email,
+ ANY_VALUE(firstName) first_name,ANY_VALUE(lastName) last_name,ANY_VALUE(phoneNumber) phone
+ FROM users WHERE NOT deleted AND deletedAt IS NULL AND LOWER(TO_HEX(SHA256(email))) IN UNNEST(@hashes) GROUP BY 1`;

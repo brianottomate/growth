@@ -55,6 +55,8 @@ export const seedSnapshotTable = pgTable(
           bytesProcessed: string | null;
         }[];
         queries: { sql: string; params: SeedQueryParams }[];
+        /** Members with an email or phone stored; absent on pre-contact builds. */
+        contacts?: { identifiable: number; phones: number };
       }>()
       .notNull(),
     createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -62,7 +64,10 @@ export const seedSnapshotTable = pgTable(
   (t) => [index("seed_snapshot_list_idx").on(t.seedListId, t.createdAt)],
 );
 
-/** Normalized identity is email SHA-256. No raw Wander emails in the seed store. */
+/**
+ * Identity is the normalized email's SHA-256. Contact fields are frozen with the
+ * build so delivery uploads exactly what was reviewed; Zernio hashes on receipt.
+ */
 export const seedMemberTable = pgTable(
   "seed_member",
   (t) => ({
@@ -73,6 +78,15 @@ export const seedMemberTable = pgTable(
     emailHash: t.text().notNull(),
     score: t.integer().notNull(),
     evidence: jsonb().$type<SeedEvidence[]>().notNull(),
+    email: t.text(),
+    /** E.164. */
+    phone: t.text(),
+    firstName: t.text(),
+    lastName: t.text(),
+    city: t.text(),
+    state: t.text(),
+    postalCode: t.text(),
+    country: t.text(),
   }),
   (t) => [primaryKey({ columns: [t.snapshotId, t.emailHash] })],
 );

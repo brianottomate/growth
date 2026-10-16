@@ -8,6 +8,7 @@ import {
   saveSeed,
   previewSeed,
   compileSeed,
+  fillSeedContacts,
   seedMembers,
 } from "@/server/services/seeds/service";
 import {
@@ -15,6 +16,8 @@ import {
   seedLookalike,
   seedAssetStatus,
   attachSeedAsset,
+  shareSeedLookalike,
+  readSeedDelivery,
 } from "@/server/services/seeds/delivery";
 import {
   seedPropertyOptions,
@@ -26,7 +29,8 @@ const actor = (ctx: { orgId: string; userId: string; runId: string }) => ({
   userId: ctx.userId,
   runId: ctx.runId,
 });
-// Domain output contracts are shared by the app and MCP. No plaintext recipients.
+// Domain output contracts are shared by the app and MCP. Contacts are stored
+// for upload to Wander's Meta account but never returned to a model.
 const record = z.record(z.string(), z.json());
 const evidence = z.object({
   source: z.string(),
@@ -59,6 +63,9 @@ const diagnostics = z.object({
   excludedCount: z.number(),
   sources: z.array(source),
   queries: z.array(z.object({ sql: z.string(), params: record })),
+  contacts: z
+    .object({ identifiable: z.number(), phones: z.number() })
+    .optional(),
 });
 const snapshot = z.object({
   id: z.string(),
@@ -69,6 +76,7 @@ const snapshot = z.object({
   diagnostics,
   createdAt: z.string(),
   downloadUrl: z.string(),
+  warning: z.string().nullable(),
 });
 const metadata = z.object({
   source: z.enum(["csv", "bigquery", "seed"]),
@@ -85,8 +93,28 @@ const asset = z.object({
   seedSnapshotId: z.string().nullable(),
   parentPlatformAudienceId: z.string().nullable(),
   externalId: z.string().nullable(),
+  forBrandId: z.string().nullable(),
   seedMetadata: metadata.nullable(),
 });
+const share = z.object({
+  snapshotId: z.string(),
+  platformAudienceId: z.string(),
+  lookalikeName: z.string(),
+  metaAudienceId: z.string().nullable(),
+  sourceAdAccountId: z.string(),
+  adsManagerUrl: z.string(),
+  clientBrandId: z.string(),
+  clientBrandName: z.string(),
+  clientAdAccountId: z.string().nullable(),
+  clientAdAccountName: z.string().nullable(),
+  status: z.enum(["no_client_account", "not_shared", "shared"]),
+  sharedPlatformAudienceId: z.string().nullable(),
+  sharedAt: z.string().nullable(),
+});
+const target = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("campaign_audience"), id: z.string().min(1) }),
+  z.object({ type: z.literal("persona"), id: z.string().min(1) }),
+]);
 export const listSeedsAction = growthAction({
   description:
     "List reusable brand seed recipes, independent of campaigns, personas and provider audiences.",
@@ -96,14 +124,15 @@ export const listSeedsAction = growthAction({
 });
 export const readSeedAction = growthAction({
   description:
-    "Read a seed recipe, frozen builds and attached platform assets. Source and provider counts are separate.",
+    "Read a seed recipe, frozen builds, its assets in Wander's Meta account and each lookalike's share state toward the client account. Source and provider counts are separate.",
   inputSchema: z.object({ seedListId: z.string().min(1) }),
   outputSchema: z.object({
     list: seed,
     snapshots: z.array(snapshot),
     assets: z.array(asset),
+    shares: z.array(share),
   }),
-  execute: (i, c) => readSeed(i, actor(c)),
+  execute: (i, c) => readSeedDelivery(i, actor(c)),
 });
 export const previewSeedAction = growthAction({
   description:
@@ -134,14 +163,14 @@ export const saveSeedAction = growthAction({
 });
 export const compileSeedAction = growthAction({
   description:
-    "Freeze a saved seed recipe into immutable hashed membership with per-contact evidence and source query receipts. New bookings appear on refresh, never silently change a delivered snapshot. No provider writes or sends.",
+    "Freeze a saved seed recipe into immutable membership with per-contact evidence, stored contact fields (email, E.164 phone, name, city, state, postal code, country) and source query receipts. Check `warning`: a seed needs at least 1,000 entries with an email or phone to upload. New bookings appear on refresh, never silently change a delivered snapshot. No provider writes or sends.",
   inputSchema: z.object({ seedListId: z.string().min(1) }),
   outputSchema: snapshot,
   execute: (i, c) => compileSeed(i, actor(c)),
 });
 export const seedMembersAction = growthAction({
   description:
-    "Page a frozen seed's SHA-256 email identities and evidence for export or inspection. These are prehashed identities, not inputs to Zernio's plaintext email API. No raw emails returned.",
+    "Page a frozen seed's SHA-256 email identities and evidence for inspection. Contact fields stay in Growth and go only to Wander's Meta account on upload; none are returned here.",
   inputSchema: z.object({
     snapshotId: z.string().min(1),
     afterHash: z
@@ -200,26 +229,40 @@ export const suggestSeedsAction = growthAction({
   ),
   execute: (i, c) => suggestSeeds(i, actor(c)),
 });
+export const fillSeedContactsAction = growthAction({
+  description:
+    "Fill stored contact fields on a snapshot frozen before Growth kept them, from that snapshot's own sources. Membership never changes. Refused once an upload of the snapshot exists. No provider writes.",
+  inputSchema: z.object({ snapshotId: z.string().min(1) }),
+  outputSchema: z.object({
+    snapshotId: z.string(),
+    memberCount: z.number(),
+    identifiable: z.number(),
+    phones: z.number(),
+  }),
+  execute: (i, c) => fillSeedContacts(i, actor(c)),
+});
 export const uploadSeedAction = growthAction({
   description:
-    "Create and populate a customer-list audience from a reviewed seed snapshot in the brand's allowlisted Meta destination. Explicit approval, no spend. Plaintext is resolved transiently and Zernio hashes once; hashed exports are never double-hashed. Creation is not idempotent: never auto-retry. To resume, reuse returned platformAudienceId. No 1,000-person gate.",
+    "Step 2 of seed delivery: create a customer list in WANDER's Meta ad account (the Wander brand's pinned destination), whichever brand owns the seed, and upload every member with an email or phone (email + phone; Zernio hashes). Wander's customer data never goes to a client account. Needs at least 1,000 uploadable entries. Explicit approval, no spend. Creation is not idempotent: never auto-retry; to resume, pass the returned platformAudienceId. matchedSize is Meta's figure, information only.",
   inputSchema: z.object({
     snapshotId: z.string().min(1),
-    adAccountId: z.string().min(1).optional(),
     platformAudienceId: z.string().min(1).optional(),
     name: z.string().min(1).max(160).optional(),
     approved: z.literal(true),
   }),
   outputSchema: z.object({
     platformAudienceId: z.string(),
+    adAccountId: z.string(),
     uploaded: z.number(),
-    total: z.number(),
+    entries: z.number(),
+    memberCount: z.number(),
+    matchedSize: z.number().nullable(),
   }),
   execute: (i, c) => uploadSeed(i, actor(c)),
 });
 export const seedAssetStatusAction = growthAction({
   description:
-    "Read fresh provider matching/processing status for an uploaded snapshot asset. Source membership and upload completion do not imply Meta match count or lookalike eligibility.",
+    "Read fresh provider processing status and Meta's matched size for an uploaded seed in Wander's account. Matched size is information only; the 1,000 minimum applies to uploaded entries.",
   inputSchema: z.object({
     snapshotId: z.string().min(1),
     platformAudienceId: z.string().min(1),
@@ -227,37 +270,56 @@ export const seedAssetStatusAction = growthAction({
   outputSchema: z.object({
     platformAudienceId: z.string(),
     sourceCount: z.number(),
+    entries: z.number().nullable(),
     uploadStatus: z.string().nullable(),
+    matchedSize: z.number().nullable(),
     provider: record.nullable(),
   }),
   execute: (i, c) => seedAssetStatus(i, actor(c)),
 });
 export const seedLookalikeAction = growthAction({
   description:
-    "Create a lookalike from an uploaded seed asset in that same allowlisted Meta account. Explicit approval, no spend. Meta owns matching/eligibility; we impose no arbitrary source size. Never auto-retry a failed creation; inspect provider state first.",
+    "Step 3: create a lookalike (default 1% US) from an uploaded seed in Wander's account, recorded as built for the seed's brand. Meta builds it from matched members; surface any Meta error verbatim. Explicit approval, no spend. Never auto-retry. Returns `share`: give the operator the lookalike name and Meta audience ID, the client ad account ID and the Ads Manager link to share it.",
   inputSchema: z.object({
     snapshotId: z.string().min(1),
     seedPlatformAudienceId: z.string().min(1),
-    country: z.string().regex(/^[A-Z]{2}$/),
+    country: z
+      .string()
+      .regex(/^[A-Z]{2}$/)
+      .default("US"),
     ratio: z.number().min(0.01).max(0.2).default(0.01),
     approved: z.literal(true),
   }),
   outputSchema: z.object({
     platformAudienceId: z.string(),
     parentPlatformAudienceId: z.string(),
+    share,
   }),
   execute: (i, c) => seedLookalike(i, actor(c)),
 });
-export const attachSeedAssetAction = growthAction({
+export const shareSeedLookalikeAction = growthAction({
   description:
-    "Attach a ready seed or its lookalike to this brand's campaign audience or persona using existing targeting relationships. Local only; no campaign is pushed or launched.",
+    "Step 4, after the operator shares the LOOKALIKE (never the seed) with the client account in Ads Manager: check the client account's audiences and, once it appears, record the client's copy and optionally attach it to the client's campaign audience or persona. If Meta does not list it, ask the operator and pass confirmShared only on their word. No provider writes.",
   inputSchema: z.object({
     snapshotId: z.string().min(1),
     platformAudienceId: z.string().min(1),
-    target: z.discriminatedUnion("type", [
-      z.object({ type: z.literal("campaign_audience"), id: z.string().min(1) }),
-      z.object({ type: z.literal("persona"), id: z.string().min(1) }),
-    ]),
+    confirmShared: z.boolean().optional(),
+    target: target.optional(),
+  }),
+  outputSchema: share.extend({
+    detected: z.enum(["provider", "operator", "same_account"]).nullable(),
+    attached: z.boolean(),
+    next: z.string().nullable(),
+  }),
+  execute: (i, c) => shareSeedLookalike(i, actor(c)),
+});
+export const attachSeedAssetAction = growthAction({
+  description:
+    "Attach this brand's own copy of a delivered lookalike (sharedPlatformAudienceId from share) to its campaign audience or persona. For a client brand, the Wander-side seed and lookalike are not targetable; share first. Local only; no campaign is pushed or launched.",
+  inputSchema: z.object({
+    snapshotId: z.string().min(1),
+    platformAudienceId: z.string().min(1),
+    target,
   }),
   outputSchema: z.object({
     platformAudienceId: z.string(),

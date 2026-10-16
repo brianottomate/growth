@@ -25,6 +25,14 @@ import {
 } from "@/lib/seed-definition";
 import { getWanderMembership } from "@/server/wander-workspace";
 import { buildClientSeedQuery, buildWanderSeedQuery } from "./query";
+import {
+  resolveSeedContacts,
+  SEED_CONTACT_FIELDS,
+  type SeedContact,
+} from "./contacts";
+
+/** Meta's practical floor for a useful seed, counted on uploaded entries. */
+export const SEED_MIN_ENTRIES = 1000;
 
 export type SeedActor = { organizationId: string; userId: string };
 export const seedEmailHash = (email: string) =>
@@ -71,6 +79,12 @@ export const seedSnapshotSummary = (
   s: typeof seedSnapshotTable.$inferSelect,
 ) => ({
   ...s,
+  warning:
+    s.diagnostics.contacts === undefined
+      ? "Built before contacts were stored: fill contacts before uploading."
+      : s.diagnostics.contacts.identifiable < SEED_MIN_ENTRIES
+        ? `Only ${s.diagnostics.contacts.identifiable} uploadable entries; upload needs at least ${SEED_MIN_ENTRIES}.`
+        : null,
   downloadUrl: `/api/seeds/${s.id}`,
   asOf: s.asOf.toISOString(),
   createdAt: s.createdAt.toISOString(),
@@ -104,6 +118,7 @@ export async function readSeed(
         parentPlatformAudienceId:
           platformAudienceTable.parentPlatformAudienceId,
         externalId: platformAudienceTable.externalId,
+        forBrandId: platformAudienceTable.forBrandId,
         seedMetadata: platformAudienceTable.seedMetadata,
       })
       .from(platformAudienceTable)
@@ -115,12 +130,10 @@ export async function readSeed(
   ]);
   const lookalikes = assets.length
     ? await db.query.platformAudienceTable.findMany({
-        where: and(
-          eq(platformAudienceTable.brandId, list.brandId),
-          inArray(
-            platformAudienceTable.parentPlatformAudienceId,
-            assets.map((a) => a.id),
-          ),
+        // Seed assets live in Wander's account; the snapshot link scopes them.
+        where: inArray(
+          platformAudienceTable.parentPlatformAudienceId,
+          assets.map((a) => a.id),
         ),
         columns: {
           id: true,
@@ -129,6 +142,7 @@ export async function readSeed(
           seedSnapshotId: true,
           parentPlatformAudienceId: true,
           externalId: true,
+          forBrandId: true,
           seedMetadata: true,
         },
       })
@@ -322,6 +336,10 @@ export async function compileSeed(
     { brandId: list.brandId, definition: list.definition },
     actor,
   );
+  const contacts = await resolveSeedContacts(
+    result.members.map((m) => m.emailHash),
+    result.definition,
+  );
   // Membership and its count appear atomically; an interrupted build leaves no partial snapshot.
   const snapshot = await withTransaction(async (tx) => {
     const [saved] = await tx
@@ -338,21 +356,86 @@ export async function compileSeed(
           excludedCount: result.excludedCount,
           sources: result.sources,
           queries: result.queries,
+          contacts: contactCounts(contacts.values()),
         },
       })
       .returning();
     for (let i = 0; i < result.members.length; i += 1000)
-      await tx
-        .insert(seedMemberTable)
-        .values(
-          result.members
-            .slice(i, i + 1000)
-            .map((m) => ({ ...m, snapshotId: saved!.id })),
-        );
+      await tx.insert(seedMemberTable).values(
+        result.members.slice(i, i + 1000).map((m) => ({
+          ...m,
+          ...contacts.get(m.emailHash),
+          snapshotId: saved!.id,
+        })),
+      );
     return saved!;
   });
   return seedSnapshotSummary(snapshot);
 }
+const contactCounts = (contacts: Iterable<SeedContact>) => {
+  let identifiable = 0,
+    phones = 0;
+  for (const c of contacts) {
+    if (c.email || c.phone) identifiable += 1;
+    if (c.phone) phones += 1;
+  }
+  return { identifiable, phones };
+};
+
+/**
+ * Store contact fields on a snapshot frozen before Growth kept them. Membership
+ * is unchanged; only fields still empty are filled, from the snapshot's own
+ * definition. Refuses a snapshot whose upload has started, since resuming one
+ * relies on the identifiable set staying put.
+ */
+export async function fillSeedContacts(
+  input: { snapshotId: string },
+  actor: SeedActor,
+) {
+  const { snapshot } = await requireSeedSnapshot(input.snapshotId, actor);
+  if (snapshot.definition.wander) await requireWanderSeedSource(actor);
+  const started = await db.query.platformAudienceTable.findFirst({
+    where: eq(platformAudienceTable.seedSnapshotId, snapshot.id),
+    columns: { id: true },
+  });
+  if (started)
+    throw new Error(
+      `Snapshot already has upload ${started.id}; compile a new snapshot instead`,
+    );
+  const members = await db.query.seedMemberTable.findMany({
+    where: eq(seedMemberTable.snapshotId, snapshot.id),
+  });
+  const contacts = await resolveSeedContacts(
+    members.map((m) => m.emailHash),
+    snapshot.definition,
+  );
+  const merged = members.map((m) => {
+    const found = contacts.get(m.emailHash);
+    const contact = Object.fromEntries(
+      SEED_CONTACT_FIELDS.map((k) => [k, m[k] ?? found?.[k] ?? null]),
+    ) as SeedContact;
+    return { emailHash: m.emailHash, contact };
+  });
+  const counts = contactCounts(merged.map((m) => m.contact));
+  await withTransaction(async (tx) => {
+    for (const m of merged)
+      await tx
+        .update(seedMemberTable)
+        .set(m.contact)
+        .where(
+          and(
+            eq(seedMemberTable.snapshotId, snapshot.id),
+            eq(seedMemberTable.emailHash, m.emailHash),
+          ),
+        );
+    await tx
+      .update(seedSnapshotTable)
+      .set({ diagnostics: { ...snapshot.diagnostics, contacts: counts } })
+      .where(eq(seedSnapshotTable.id, snapshot.id));
+  });
+  return { snapshotId: snapshot.id, memberCount: members.length, ...counts };
+}
+
 export async function seedMembers(
   input: { snapshotId: string; afterHash?: string; limit?: number },
   actor: SeedActor,

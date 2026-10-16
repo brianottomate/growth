@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { expect, test } from "bun:test";
-import { uploadSeedBatches } from "./upload-batches";
+import { pickSeedDestination, uploadSeedBatches } from "./upload-batches";
 
 test("a failed upload resumes the frozen membership prefix without creating or double-hashing users", async () => {
   const hashes = Array.from({ length: 27584 }, (_, i) =>
@@ -10,19 +10,16 @@ test("a failed upload resumes the frozen membership prefix without creating or d
     const start = after ? hashes.indexOf(after) + 1 : 0;
     const rows = hashes.slice(start, start + 10000);
     return {
-      hashes: rows,
+      users: rows.map((h) => ({ email: `contact-${h}@example.invalid` })),
       nextAfterHash: start + rows.length < hashes.length ? rows.at(-1)! : null,
     };
   };
-  const resolve = async (rows: string[]) =>
-    rows.map((h) => ({ email: `contact-${h}@example.invalid` }));
   let confirmed = 0,
     calls = 0;
   await assert.rejects(
     uploadSeedBatches({
       alreadyUploaded: 0,
       page,
-      resolve,
       send: async (users) => {
         if (++calls === 2) throw new Error("transport failed");
         return { numReceived: users.length, numInvalid: 0 };
@@ -38,9 +35,8 @@ test("a failed upload resumes the frozen membership prefix without creating or d
   await uploadSeedBatches({
     alreadyUploaded: confirmed,
     page,
-    resolve,
     send: async (users) => {
-      resumed.push(...users.map((u) => u.email));
+      resumed.push(...users.map((u) => u.email!));
       return { numReceived: users.length, numInvalid: 0 };
     },
     progress: async (n) => {
@@ -62,8 +58,10 @@ test("invalid, partial or missing provider acknowledgments never advance upload 
     await assert.rejects(
       uploadSeedBatches({
         alreadyUploaded: 0,
-        page: async () => ({ hashes: ["a".repeat(64)], nextAfterHash: null }),
-        resolve: async () => [{ email: "contact@example.invalid" }],
+        page: async () => ({
+          users: [{ email: "contact@example.invalid" }],
+          nextAfterHash: null,
+        }),
         send: async () => response,
         progress: async (n) => {
           confirmed = n;
@@ -72,4 +70,40 @@ test("invalid, partial or missing provider acknowledgments never advance upload 
     );
     expect(confirmed).toBe(0);
   }
+});
+test("a client brand's seed uploads to the Wander brand's row for Wander's account, never the client's", () => {
+  const wanderAccount = {
+    connectionAccountId: "conn_w",
+    adAccountId: "act_885",
+  };
+  const picked = pickSeedDestination({
+    wanderBrandId: "brand_wander",
+    listed: [wanderAccount],
+    allowed: [
+      { id: "adacct_client_own", brandId: "brand_30a", externalId: "act_951" },
+      {
+        id: "adacct_client_wander",
+        brandId: "brand_30a",
+        externalId: "act_885",
+      },
+      { id: "adacct_wander", brandId: "brand_wander", externalId: "885" },
+    ],
+  });
+  expect(picked).toEqual({
+    ...wanderAccount,
+    localAdAccountId: "adacct_wander",
+  });
+  expect(() =>
+    pickSeedDestination({
+      wanderBrandId: "brand_wander",
+      listed: [wanderAccount],
+      allowed: [
+        {
+          id: "adacct_client_wander",
+          brandId: "brand_30a",
+          externalId: "act_885",
+        },
+      ],
+    }),
+  ).toThrow();
 });
