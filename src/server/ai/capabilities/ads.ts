@@ -967,6 +967,13 @@ export const replaceAdCardAction = growthAction({
   },
 });
 
+/** Audience geography is residence intent, never the homes' destinations. */
+const audienceGeographyInput = deliveryGeographySchema
+  .nullish()
+  .describe(
+    "Where the people to reach live, never where the homes are. Default to whole US states; infer origin markets from destinations (e.g. drive-to states) and say so in the description. Cities are qualified 'City, ST' and need no separate state.",
+  );
+
 export const addAudienceAction = growthAction({
   nativeOutputSchema: addAudienceActionNativeResultSchema,
   outputSchema: addAudienceActionOutputSchema,
@@ -977,7 +984,7 @@ export const addAudienceAction = growthAction({
     name: z.string().trim().min(1).max(300),
     description: z.string().max(4000).nullish(),
     personaId: z.string().min(1).nullish(),
-    geography: deliveryGeographySchema.nullish(),
+    geography: audienceGeographyInput,
     ...audienceAgeSchema.shape,
   }),
   execute: async (input, ctx) =>
@@ -993,7 +1000,7 @@ export const updateAudienceAction = growthAction({
     name: z.string().trim().min(1).max(300).optional(),
     description: z.string().max(4000).nullish(),
     personaId: z.string().min(1).nullish(),
-    geography: deliveryGeographySchema.nullish(),
+    geography: audienceGeographyInput,
     ...audienceAgeSchema.shape,
   }),
   execute: async (input, ctx) =>

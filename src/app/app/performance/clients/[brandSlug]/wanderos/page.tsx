@@ -1,5 +1,10 @@
 import { HomeGroupsWorkspace } from "@/app/app/brands/[brandSlug]/homes/HomeGroupsWorkspace";
 import { DestinationsCard } from "../DestinationsCard";
+import { SeedListsCard } from "../SeedListsCard";
+import { listSeedDeliveries } from "@/server/services/seeds/delivery";
+import { db } from "@/server/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { emailListTable, personaTable } from "@/server/db/schema";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -36,9 +41,24 @@ export default async function PerformanceWanderOsPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [rows, committed] = await Promise.all([
+  const [rows, committed, seeds, personas, emailLists] = await Promise.all([
     listAllBrandHomes(brand.id),
     listBrandHomes(brand.id),
+    listSeedDeliveries(
+      { brandId: brand.id },
+      { organizationId: org.id, userId: session.user.id },
+    ),
+    db.query.personaTable.findMany({
+      where: and(
+        eq(personaTable.brandId, brand.id),
+        isNull(personaTable.deletedAt),
+      ),
+      columns: { id: true, name: true },
+    }),
+    db.query.emailListTable.findMany({
+      where: eq(emailListTable.brandId, brand.id),
+      columns: { id: true, name: true, memberCount: true },
+    }),
   ]);
   const slug = brand.slug ?? brand.id;
   const connected = Boolean(brand.wanderOsEnabled && brand.wanderOsWebsiteId);
@@ -130,6 +150,17 @@ export default async function PerformanceWanderOsPage({
                 ].map(([town, homes]) => ({ town, homes }))}
               />
             }
+          />
+          <SeedListsCard
+            brandName={brand.name}
+            seeds={seeds}
+            context={{
+              brandId: brand.id,
+              hasBookingSite: Boolean(brand.wanderOsWebsiteId),
+              hasHomes: rows.length > 0,
+              personas,
+              emailLists,
+            }}
           />
           <AllHomesCard
             brandId={brand.id}

@@ -1,13 +1,9 @@
 import "server-only";
-import { inArray } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/server/db";
-import { emailListMemberTable } from "@/server/db/schema";
 import { getBigQueryClient } from "@/server/clients/bigquery.client";
 import { toE164 } from "@/lib/phone";
 import type { SeedDefinition } from "@/lib/seed-definition";
 import { seedClientContactsSql, seedWanderContactsSql } from "./query";
-import { seedEmailHash } from "./service";
 
 export type SeedContact = {
   email: string | null;
@@ -29,9 +25,6 @@ const emptyContact: SeedContact = {
   postalCode: null,
   country: null,
 };
-export const SEED_CONTACT_FIELDS = Object.keys(
-  emptyContact,
-) as (keyof SeedContact)[];
 const text = z
   .string()
   .nullish()
@@ -51,8 +44,8 @@ const row = z.object({
 
 /**
  * Contact fields for members a build already selected, from the same sources
- * the definition reads. Earlier sources win per field: uploaded lists carry
- * what the operator supplied, then the client's own guests, then Wander.
+ * the recipe reads. Earlier sources win per field: the client's own guests,
+ * then Wander.
  */
 export async function resolveSeedContacts(hashes: string[], d: SeedDefinition) {
   const contacts = new Map<string, SeedContact>();
@@ -70,21 +63,6 @@ export async function resolveSeedContacts(hashes: string[], d: SeedDefinition) {
   };
   if (!hashes.length) return contacts;
   const wanted = new Set(hashes);
-  if (d.uploadedListIds.length) {
-    const rows = await db.query.emailListMemberTable.findMany({
-      where: inArray(emailListMemberTable.listId, d.uploadedListIds),
-      columns: { email: true, firstName: true, lastName: true },
-    });
-    for (const r of rows) {
-      const hash = seedEmailHash(r.email);
-      if (wanted.has(hash))
-        merge(hash, {
-          email: r.email.trim().toLowerCase(),
-          firstName: r.firstName?.trim() || null,
-          lastName: r.lastName?.trim() || null,
-        });
-    }
-  }
   const queries = [
     ...(d.clientBookers ? [seedClientContactsSql] : []),
     ...(d.wander ? [seedWanderContactsSql] : []),

@@ -1,18 +1,51 @@
 # Reusable seed audiences
 
-A seed is a reusable brand-owned selection, not a campaign audience, email send
-permission or a Meta object. The first implementation is API-first: oRPC `seed.*`
-and the same canonical `seedRead` / `seedWrite` actions over assistant/MCP.
-It does not introduce a separate audience uploader or another delivery engine.
+A seed list is a brand's reusable list of people for paid seeds. It is not a
+campaign audience, an email list, email send permission or a Meta object, and it
+is not tied to Meta: a platform plan delivers it.
+
+A seed list is made from a starting point (`SEED_TEMPLATES`) and built at once.
+The list keeps only which starting point made it (`seed_list.origin`); each build
+(`seed_snapshot`) keeps the exact filters and queries it ran. There is no separate
+recipe to edit or approve.
+
+| Template | Who | Lands in |
+| --- | --- | --- |
+| `past_bookers` | Confirmed direct bookings on the brand's WanderOS site | Brand's own account |
+| `email_list` | A one-time copy of one of the brand's email lists | Brand's own account |
+| `destinations` | Wander travelers with activity on homes in the brand's towns | Wander's account, lookalike shared |
+| `similar_homes` | Wander travelers drawn to homes the size of the brand's | Wander's account, lookalike shared |
+| `persona` | A persona turned into home filters once, with AI | Wander's account, lookalike shared |
+| `described` | A description turned into home filters once, with AI | Wander's account, lookalike shared |
+
+Rebuild makes a new build: fixed templates run on today's homes and data, persona
+and described lists reuse the last build's filters so counts stay comparable, and
+an email list copy copies again. An email list copy never follows later changes
+to the email list by itself. Email lists and seed lists stay separate stores;
+email consent and opt-outs stay with email. Personas stay general brand context:
+a seed reads a persona, never the reverse.
+
+Where the people go on Meta depends on whose data they are. A build with Wander
+signals uploads to Wander's ad account, and only its lookalike reaches the client,
+shared in Ads Manager: Wander's customers never land in a client account. Every
+other build uploads straight to the brand's own pinned account, where its
+lookalike is already the brand's.
+
+"New seed list" uses the shared start-from dialog (`StartFromDialog`, also used by
+email "From template"). It sits on the WanderOS tab's Seed lists card and in each
+Meta ad set's **seed slot**, which shows the asset the ad set's campaign audience
+targets and the next delivery step (upload, lookalike, share, use). The push
+compiler sends that asset as the ad set's custom audience. Chat and MCP use the
+same `seedWrite.build` action, so Shape can build too.
 
 ## Existing versus new
 
 | Existing | New in this change |
 | --- | --- |
-| `email.list` / `email.list_member`: immutable client uploads | Reuse them as source inputs; no second raw contact store |
-| `email_audience` / `email_audience_snapshot`: email-oriented warehouse rules and recipient tables | `seed_list`: typed, reusable advertising seed recipe, independent of campaigns |
+| `email.list` / `email.list_member`: immutable client uploads | Copied explicitly into a seed list build; never read live |
+| `email_audience` / `email_audience_snapshot`: email-oriented warehouse rules and recipient tables | `seed_list`: a brand's reusable advertising seed and the template that made it, independent of campaigns |
 | A campaign-only past-bookers preparation path and transient CSV uploads | `seed_snapshot`: frozen definition, cutoff, source/query receipts, expansion diagnostics and count |
-| Zernio customer-list creation, additive member uploads, lookalike creation and provider reads | `seed_member`: exact SHA-256 email membership and observed evidence per frozen snapshot |
+| Zernio customer-list creation, additive member uploads, lookalike creation and provider reads | `seed_member`: exact SHA-256 email membership, observed evidence and the contact fields uploaded, per frozen snapshot |
 | `platform_audience`: mirrored provider assets, legacy JSON source metadata | Typed FKs to the seed snapshot, parent platform audience and existing `ad_account` registry |
 | Campaign audience asset links and persona asset assignments | Reuse those relationships to attach a ready seed or lookalike; no fake campaign/persona required |
 | New Performance booking attribution ingestion | Next build reads new identified warehouse booking contacts; attribution rows themselves contain no guest email |
@@ -27,15 +60,21 @@ provider JSON. Old email consent and sending protections remain email-specific.
 
 ## Database model
 
-- `seed_list`: brand FK, name, typed definition, timestamps. Edits are last-write-wins.
+- `seed_list`: brand FK, name, `origin` (the template and its persona, description
+  or email list), timestamps.
 - `seed_snapshot`: list FK, copied definition, `as_of`, member count, diagnostics.
   A refresh creates a new snapshot; neither old membership nor Meta is updated.
 - `seed_member`: primary key `(snapshot_id, email_hash)`, ordinal evidence score,
   source/search evidence. Same email across searches/sources is one member.
+  Compile also stores email, E.164 phone, first/last name, city, state, postal
+  code and country from the snapshot's own sources, so the upload sends what the
+  operator reviewed rather than re-resolving identities later.
 - `platform_audience.seed_snapshot_id`: exact membership uploaded for a seed.
 - `platform_audience.parent_platform_audience_id`: local parent of a lookalike.
 - `platform_audience.ad_account_id`: FK to the existing brand-scoped allowlist row.
   API destination arguments remain external IDs (`act_…`); this FK is `adacct_…`.
+- `platform_audience.for_brand_id`: the client brand a Wander-side seed or
+  lookalike was built for. The asset itself belongs to the Wander brand.
 
 An uploaded seed can serve several campaigns through the existing asset link table.
 A lookalike derives membership from its parent, rather than copying a second seed
@@ -46,8 +85,11 @@ of acknowledged uploads. Provider approximate/matched size is separate.
 
 ## Selection and size
 
-There is no minimum of 1,000, 500 or any other application-level source count, and
-no random sample-size default. Size is not evidence of conversion quality.
+Selection has no minimum source count and no random sample-size default. Size is
+not evidence of conversion quality. About 1,000 uploadable entries (members with
+an email or phone) is a guideline for a useful lookalike
+(`SEED_GUIDELINE_ENTRIES`): builds and uploads below it carry a `warning`, but
+nothing is refused. Meta's own errors are authoritative.
 `minScore` is an explicit, adjustable evidence floor:
 
 | Observed evidence | Score |
@@ -60,7 +102,7 @@ no random sample-size default. Size is not evidence of conversion quality.
 
 These are ordinal heuristics, not learned probabilities. A member's score is the
 strongest qualifying source/search evidence, not a sum of overlapping searches.
-The recipe selects `wanderSignals: ["bookers"]`, `["intent"]` or their union,
+A build's filters select `wanderSignals: ["bookers"]`, `["intent"]` or their union,
 independently of the score floor, so bookers and dates/checkout can stay separate
 experiments.
 
@@ -82,10 +124,10 @@ Countries filter Wander profile countries, not uploaded-list/own-guest coverage.
 Destination state/city/radius describe where people showed travel interest, not
 where they live. Unknown landscapes do not satisfy a landscape constraint.
 
-The initial 1,000 number came from the starting brief, not evidence that it was an
-optimum. A 500-contact or smaller cohort is a legitimate candidate. Meta's eventual
-matching, processing and eligibility remain provider facts; source count never
-stands in for matched people. No presumed match rate or hard-coded lookalike floor.
+Do not lower the evidence floor or widen searches only to reach the guideline. Meta's
+matching, processing and eligibility remain provider facts; `matchedSize` is
+information only, and source count never stands in for matched people. No
+presumed match rate or hard-coded lookalike floor.
 
 ## AI proposals
 
@@ -106,24 +148,38 @@ No AI judgment can grant account access or authorize a provider write.
 
 ## API workflow
 
-The authenticated app uses `seed.list/get/preview/save/compile/members/propertyOptions/
-suggest/upload/assetStatus/lookalike/attach`. MCP/assistant expose those same actions:
+App, chat and MCP share the same actions: `seedRead.list/get/members/assetStatus`
+and `seedWrite.build/rebuild/upload/lookalike/share/attach`.
 
-1. `seedRead.suggest({ brandId, steer? })` or construct a typed definition.
-2. `seedRead.preview({ brandId, definition })`; iterate criteria and optional radius.
-3. `seedWrite.save({ brandId, name, definition })` returns `seed_…`.
-4. `seedWrite.compile({ seedListId })` returns `ssnap_…`, receipts, count and CSV URL.
-5. `seedRead.members({ snapshotId, limit?, afterHash? })` pages hashes/evidence.
+1. `seedWrite.build({ brandId, template, personaId?, steer?, emailListId?, name? })`
+   creates the list and its first build. Check `warning` for small builds.
+2. `seedWrite.rebuild({ seedListId })` adds a new build as described above.
+3. `seedRead.members({ snapshotId, limit?, afterHash? })` pages hashes/evidence.
    Signed-in CSV download: `GET /api/seeds/{snapshotId}`. Always `EMAIL_SHA256`.
-6. `seedWrite.upload({ snapshotId, approved: true, adAccountId? })` creates the seed
-   in exactly one selected/allowlisted destination. With an ambiguous destination,
-   choose explicitly; the API does not select the first available account.
-7. `seedRead.assetStatus({ snapshotId, platformAudienceId })` checks fresh provider
+4. `seedWrite.upload({ snapshotId, approved: true, platformAudienceId?, name? })`
+   creates a customer list in the owner's account (above) and uploads every
+   member with an email or phone. There is no destination argument: the owner
+   brand must pin exactly one allowlisted Meta destination. The asset is recorded
+   under the owner brand with `for_brand_id` set to the seed's brand.
+5. `seedRead.assetStatus({ snapshotId, platformAudienceId })` checks fresh provider
    processing/matching. Known pending/processing seeds wait before lookalike creation.
-8. `seedWrite.lookalike({ snapshotId, seedPlatformAudienceId, country: 'US',
-   ratio: 0.01, approved: true })`. Provider eligibility/failure is authoritative.
-9. `seedWrite.attach({ snapshotId, platformAudienceId,
+6. `seedWrite.lookalike({ snapshotId, seedPlatformAudienceId, country: 'US',
+   ratio: 0.01, approved: true })` builds the lookalike in the same account.
+   Provider eligibility/failure is authoritative. In Wander's account the
+   result's `share` gives the lookalike name, Meta audience ID, the client's ad
+   account ID and an Ads Manager link; in the brand's own account it is already
+   shared.
+7. Wander's account only: the operator shares the lookalike (never the seed) with
+   the client's ad account in Ads Manager. `seedWrite.share({ snapshotId,
+   platformAudienceId, confirmShared?, target? })` then reads the client account's
+   audiences. When Meta lists the lookalike there, or the operator confirms with
+   `confirmShared`, it records the client brand's own `platform_audience` copy.
+   The client brand needs a pinned, allowlisted Meta destination and a Meta Ads
+   channel. No provider writes.
+8. `seedWrite.attach({ snapshotId, platformAudienceId,
    target: { type: 'campaign_audience', id: 'aud_…' } })`, or target a `persona`.
+   A client brand attaches its own copy; a Wander-side seed or lookalike is not
+   targetable for it. `share` can attach in the same call via `target`.
    Attaching changes local targeting relationships; it does not launch a campaign.
 
 Uploads/lookalikes use the existing operator-approval policy over app/MCP; no spend.
@@ -133,13 +189,14 @@ passing `platformAudienceId` with the same snapshot/account. Keep the partial as
 rather than deleting it and hiding the recovery state. Provider-add acknowledgments
 are not matched counts. No lookalike or attachment is automatic on upload failure.
 
-The seed store and export contain email hashes only. Zernio's documented upload API
-accepts plaintext and hashes server-side; delivery resolves only the snapshot's
-identities from their approved sources transiently, then sends batches of 10,000.
-Never pass an exported hash through that plaintext endpoint and hash it twice.
-If source identities can no longer be resolved, stop and refresh instead of silently
-changing membership. Source changes after upload do not remove provider members;
-a new snapshot/upload is a separate version, not silent in-place replacement.
+The CSV export contains email hashes only. The seed store keeps the contact fields
+captured at compile time, and delivery sends each member's stored email and phone
+in batches of 10,000. Zernio's documented upload API accepts plaintext and hashes
+server-side. Never pass an exported hash through that plaintext endpoint and hash
+it twice. A resume is refused if the uploadable count no longer matches the count
+the upload started with; compile a new snapshot instead. Source changes after
+upload do not remove provider members; a new snapshot/upload is a separate
+version, not silent in-place replacement.
 
 ## Validation and current limits
 
@@ -157,7 +214,8 @@ Client bookers are confirmed non-cancelled direct website bookings, not the full
 PMS/OTA guest population. Warehouse source latency still applies. New identified
 bookings enter a subsequent build; no extra ingestion table or recurring cron added.
 Builds run on demand, with a 20GB-per-query warehouse scan ceiling; no source row cap.
-The current seed identity is normalized email, not phone-only records. Provider
+The current seed identity is normalized email, not phone-only records; phone is an
+extra uploaded identifier on an email member. Provider
 member removal, replacing a live audience in place and scheduled refresh are not
 implemented in this iteration. Create/upload, status, lookalike and targeting
 attachment are implemented; live provider mutations were not exercised by the

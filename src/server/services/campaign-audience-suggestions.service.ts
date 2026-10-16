@@ -21,7 +21,11 @@ const suggestionSchema = z.strictObject({
 });
 export type AudienceSuggestion = z.infer<typeof suggestionSchema>;
 
-/** General reasoning never fetches inventory or booking analytics implicitly. */
+/**
+ * General reasoning from the brand's own story, personas and campaign intent.
+ * Inventory and booking analytics stay with WanderOS; they reach this call only
+ * as explicitly supplied `context`.
+ */
 export async function suggestCampaignAudiences(input: {
   organizationId: string;
   campaignId: string;
@@ -36,7 +40,14 @@ export async function suggestCampaignAudiences(input: {
   const [brand, personas, current] = await Promise.all([
     db.query.brandTable.findFirst({
       where: eq(brandTable.id, owned.id),
-      columns: { name: true, story: true, creativeDirection: true },
+      columns: {
+        name: true,
+        tagline: true,
+        description: true,
+        website: true,
+        story: true,
+        creativeDirection: true,
+      },
     }),
     db.query.personaTable.findMany({
       where: and(

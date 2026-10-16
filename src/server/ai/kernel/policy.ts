@@ -60,17 +60,13 @@ export const growthActionPolicies = {
   seedRead: {
     list: read(),
     get: read(),
-    preview: read("provider-read"),
     members: read(),
-    propertyOptions: read("provider-read"),
-    suggest: read("model-read"),
     assetStatus: read("provider-read"),
     deliveries: read(),
   },
   seedWrite: {
-    save: write(),
-    compile: write(),
-    fillContacts: write({ consequence: "provider-read", idempotent: true }),
+    build: write({ consequence: "provider-read" }),
+    rebuild: write({ consequence: "provider-read" }),
     share: write({ consequence: "provider-read", idempotent: true }),
     attach: write({ idempotent: true }),
     upload: write({

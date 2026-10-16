@@ -77,7 +77,7 @@ test("a client brand's seed uploads to the Wander brand's row for Wander's accou
     adAccountId: "act_885",
   };
   const picked = pickSeedDestination({
-    wanderBrandId: "brand_wander",
+    owner: { id: "brand_wander", name: "Wander" },
     listed: [wanderAccount],
     allowed: [
       { id: "adacct_client_own", brandId: "brand_30a", externalId: "act_951" },
@@ -95,7 +95,7 @@ test("a client brand's seed uploads to the Wander brand's row for Wander's accou
   });
   expect(() =>
     pickSeedDestination({
-      wanderBrandId: "brand_wander",
+      owner: { id: "brand_wander", name: "Wander" },
       listed: [wanderAccount],
       allowed: [
         {

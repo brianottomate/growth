@@ -5,6 +5,7 @@ import {
   type CampaignWorkspace,
 } from "@/lib/campaign-navigation";
 import { MetaPlatformCard } from "./MetaPlatformCard";
+import type { NewSeedListContext } from "@/app/app/performance/clients/[brandSlug]/NewSeedList";
 import type { Ad, DeliveryGeography } from "@/server/db/ads-schema";
 import Link from "next/link";
 
@@ -54,6 +55,7 @@ export async function PlatformSection({
   campaignEndAt,
   draftAds,
   audiences,
+  seedContext,
 }: {
   brandSlug: string;
   workspace?: CampaignWorkspace;
@@ -76,6 +78,7 @@ export async function PlatformSection({
     name: string;
     metaTargetName?: string;
   }[];
+  seedContext?: NewSeedListContext;
 }) {
   const deliveryAudiences = (platformCampaign.deliveryGroups ?? []).map(
     (group) => {
@@ -147,6 +150,7 @@ export async function PlatformSection({
         platformCampaign={platformCampaign}
         ads={draftAds}
         audiences={deliveryAudiences}
+        seedContext={seedContext}
       />
     );
   }

@@ -43,9 +43,18 @@ The app, assistant and MCP share oRPC-backed canonical actions:
 
 ## Explicit industry research
 
-General persona and audience suggestions read the brand story, existing personas
-and campaign intent. They never fetch inventory or BigQuery automatically. Optional
-`context` carries explicitly supplied research into the same general schemas.
+General persona and audience suggestions read the brand story, description,
+existing personas and campaign intent. They never fetch inventory or BigQuery
+automatically. Optional `context` carries explicitly supplied research into the
+same general schemas.
+
+Campaign audience suggestions still propose an age range and where the people
+live: whole US states by default, inferred from the story when nothing more is
+supplied (for example drive-to states around a destination), with the inference
+named in the explanation. A city is stored qualified ("Seattle, WA") and never
+needs its state listed too. Views read the parent state from the city (the
+coverage map shades it as selected locations only), while `states` stays
+whole-state intent. Each platform plan compiles cities and states its own way.
 
 The WanderOS page exposes `personaRead.wanderOsContext`: prepare owned inventory
 context, optionally include aggregate booking evidence, edit/review that input, then

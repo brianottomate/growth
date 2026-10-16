@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { orpc } from "@/orpc/client";
 
 const STAGE_LABEL = {
-  recipe: "Recipe",
-  compiled: "Compiled",
+  not_built: "Not built",
+  built: "Built",
   uploading: "Uploading",
   uploaded: "Uploaded to Wander",
   lookalike: "Needs sharing",

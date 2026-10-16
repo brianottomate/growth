@@ -38,10 +38,11 @@ export const seedSearchSchema = z.object({
   exclude: z.boolean().default(false),
   filter: seedPropertyFilterSchema,
 });
+/** The filters one build ran over WanderOS bookings and Wander's own signals. */
 export const seedDefinitionSchema = z
   .object({
+    kind: z.literal("query").default("query"),
     version: z.literal(1).default(1),
-    uploadedListIds: z.array(z.string().min(1)).max(20).default([]),
     clientBookers: z.boolean().default(false),
     wander: z.boolean().default(false),
     wanderSignals: z
@@ -58,7 +59,7 @@ export const seedDefinitionSchema = z
       .max(50)
       .default(["US"])
       .describe(
-        "Wander profile countries only; uploaded lists and client guests keep their source country coverage.",
+        "Wander profile countries only; client guests keep their source country coverage.",
       ),
     bookingDays: z.number().int().min(1).max(3650).default(730),
     intentDays: z.number().int().min(1).max(730).default(180),
@@ -80,7 +81,7 @@ export const seedDefinitionSchema = z
       .default([]),
   })
   .superRefine((v, ctx) => {
-    if (!v.wander && !v.clientBookers && !v.uploadedListIds.length)
+    if (!v.wander && !v.clientBookers)
       ctx.addIssue({ code: "custom", message: "Choose at least one source" });
     if (v.wander && !v.searches.some((s) => !s.exclude))
       ctx.addIssue({
@@ -91,6 +92,118 @@ export const seedDefinitionSchema = z
       ctx.addIssue({ code: "custom", message: "Search keys must be unique" });
   });
 export type SeedDefinition = z.infer<typeof seedDefinitionSchema>;
+
+/** People copied once from an email list; the copy does not follow its source. */
+export const seedCopySchema = z.object({
+  kind: z.literal("copy"),
+  from: z.object({
+    type: z.literal("email_list"),
+    listId: z.string().min(1),
+    listName: z.string(),
+  }),
+  copiedAt: z.string(),
+});
+export type SeedCopy = z.infer<typeof seedCopySchema>;
+
+/** What one frozen build ran: filters over warehouse data, or a copy. */
+export const seedSourceSchema = z.discriminatedUnion("kind", [
+  seedDefinitionSchema,
+  seedCopySchema,
+]);
+export type SeedSource = z.infer<typeof seedSourceSchema>;
+
+/**
+ * Wander's own customers may only reach Meta through Wander's ad account. A
+ * build without them belongs to the brand and uploads to the brand's account.
+ */
+export const seedUsesWanderData = (source: SeedSource) =>
+  source.kind !== "copy" && source.wander;
+
+/** Starting points for a seed list. A list keeps which one built it. */
+export const SEED_TEMPLATES = [
+  {
+    id: "past_bookers",
+    label: "Past bookers",
+    category: "The brand's own people",
+    summary:
+      "Confirmed direct bookings on the brand's WanderOS site. Uploads to the brand's own Meta account.",
+  },
+  {
+    id: "email_list",
+    label: "Copy an email list",
+    category: "The brand's own people",
+    summary:
+      "Copies an email list's people once. Later changes to the email list do not follow; rebuild to copy again.",
+  },
+  {
+    id: "destinations",
+    label: "Interested in these destinations",
+    category: "Wander travelers",
+    summary:
+      "Wander travelers who booked, searched dates, checked out or kept viewing homes in the brand's towns. Uploads to Wander's account; the lookalike is shared with the brand.",
+  },
+  {
+    id: "similar_homes",
+    label: "Likes homes like these",
+    category: "Wander travelers",
+    summary:
+      "Wander travelers drawn to homes with as many bedrooms and guests as the brand's, anywhere. Uploads to Wander's account; the lookalike is shared.",
+  },
+  {
+    id: "persona",
+    label: "From a persona",
+    category: "Wander travelers",
+    summary:
+      "Turns one of the brand's personas into home filters, once, with AI. Rebuilds reuse those filters.",
+  },
+  {
+    id: "described",
+    label: "Describe it",
+    category: "Wander travelers",
+    summary:
+      "Say who you want; AI turns it into home filters once. Rebuilds reuse those filters.",
+  },
+] as const;
+export type SeedTemplateId = (typeof SEED_TEMPLATES)[number]["id"];
+export const SEED_TEMPLATE_IDS = SEED_TEMPLATES.map((t) => t.id) as [
+  SeedTemplateId,
+  ...SeedTemplateId[],
+];
+
+/** Which starting point built a seed list. */
+export const seedOriginSchema = z.discriminatedUnion("template", [
+  z.object({ template: z.literal("past_bookers") }),
+  z.object({ template: z.literal("destinations") }),
+  z.object({ template: z.literal("similar_homes") }),
+  z.object({
+    template: z.literal("persona"),
+    personaId: z.string(),
+    personaName: z.string(),
+  }),
+  z.object({ template: z.literal("described"), steer: z.string() }),
+  z.object({
+    template: z.literal("email_list"),
+    listId: z.string(),
+    listName: z.string(),
+  }),
+]);
+export type SeedOrigin = z.infer<typeof seedOriginSchema>;
+
+export function seedOriginLabel(origin: SeedOrigin) {
+  switch (origin.template) {
+    case "persona":
+      return `Persona: ${origin.personaName}`;
+    case "described":
+      return `Described: ${origin.steer}`;
+    case "email_list":
+      return `Copied from ${origin.listName}`;
+    default:
+      return SEED_TEMPLATES.find((t) => t.id === origin.template)!.label;
+  }
+}
+
+/** Guideline, not a gate: Meta builds weak lookalikes from smaller lists. */
+export const SEED_GUIDELINE_ENTRIES = 1000;
 export type SeedSearch = z.infer<typeof seedSearchSchema>;
 export type SeedEvidence = {
   source: string;

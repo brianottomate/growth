@@ -5,6 +5,7 @@ import { hasDeliveryLocations } from "@/lib/platform-delivery";
 import type { DeliveryGroupConfiguration } from "@/lib/platform-delivery";
 
 import { DeliveryTargetingSummary } from "./DeliveryTargetingSummary";
+import type { NewSeedListContext } from "@/app/app/performance/clients/[brandSlug]/NewSeedList";
 import { PlatformAdSelection } from "./PlatformAdSelection";
 import { selectPlatformAds } from "@/lib/platform-ad-plan";
 
@@ -72,6 +73,7 @@ export function MetaPlatformCard({
   platformCampaign: pc,
   ads,
   audiences,
+  seedContext,
 }: {
   destination?: {
     connectionAccountId: string;
@@ -90,6 +92,7 @@ export function MetaPlatformCard({
   platformCampaign: PlatformCampaign;
   ads: Ad[];
   audiences: Audience[];
+  seedContext?: NewSeedListContext;
 }) {
   const saved = pc.settings?.meta;
   const [editingSetup, setEditingSetup] = useState(false);
@@ -326,6 +329,7 @@ export function MetaPlatformCard({
                         campaignId={campaignId}
                         campaignName={campaignName}
                         campaignAudienceId={audience.audienceId}
+                        seedContext={seedContext}
                       />
                     )}
                   </div>

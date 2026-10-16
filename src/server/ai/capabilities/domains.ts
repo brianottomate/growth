@@ -1,18 +1,14 @@
 import {
   listSeedsAction,
+  buildSeedAction,
+  rebuildSeedAction,
   readSeedAction,
-  previewSeedAction,
-  saveSeedAction,
-  compileSeedAction,
   seedMembersAction,
-  seedPropertyOptionsAction,
-  suggestSeedsAction,
   uploadSeedAction,
   seedAssetStatusAction,
   seedLookalikeAction,
   shareSeedLookalikeAction,
   seedDeliveriesAction,
-  fillSeedContactsAction,
   attachSeedAssetAction,
 } from "./seeds";
 import {
@@ -876,25 +872,21 @@ export const reviewWrite = growthDomainTool({
 
 export const seedRead = growthDomainTool({
   description:
-    "Read, research and preview reusable seed audiences without exposing raw contacts.",
+    "Read a brand's seed lists, what built them, their frozen builds and Meta delivery state without exposing raw contacts.",
   actions: {
     list: listSeedsAction,
     get: readSeedAction,
-    preview: previewSeedAction,
     members: seedMembersAction,
-    propertyOptions: seedPropertyOptionsAction,
-    suggest: suggestSeedsAction,
     assetStatus: seedAssetStatusAction,
     deliveries: seedDeliveriesAction,
   },
 });
 export const seedWrite = growthDomainTool({
   description:
-    "Seed delivery: save a recipe, compile members with contacts, upload them to Wander's Meta account, build a 1% lookalike there, then confirm the operator shared the lookalike with the client account and attach the client's copy to its campaign/persona.",
+    "Seed delivery: build a seed list from a template (past bookers, an email list copy, destinations, similar homes, a persona or a description), upload a build to its owner's Meta account (Wander's for seeds with Wander data, otherwise the brand's own), build a lookalike, record a share when the lookalike sits in Wander's account, then attach it to a campaign audience or persona.",
   actions: {
-    save: saveSeedAction,
-    compile: compileSeedAction,
-    fillContacts: fillSeedContactsAction,
+    build: buildSeedAction,
+    rebuild: rebuildSeedAction,
     upload: uploadSeedAction,
     lookalike: seedLookalikeAction,
     share: shareSeedLookalikeAction,

@@ -11,23 +11,28 @@ import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, orpc } from "@/orpc/client";
 import { AskAssistantButton } from "./AskAssistantButton";
+import {
+  NewSeedList,
+  type NewSeedListContext,
+} from "@/app/app/performance/clients/[brandSlug]/NewSeedList";
 
 type Delivery = RouterOutputs["seed"]["deliveries"][number];
 
-const MIN_ENTRIES = 1000;
-const STEPS = [
-  "Compiled",
-  "Uploaded to Wander",
-  "Lookalike created",
-  "Shared with client",
-  "Linked to this ad set",
-] as const;
+const GUIDELINE_ENTRIES = 1000;
+const steps = (wanderData: boolean, brandName: string) =>
+  [
+    "Built",
+    wanderData ? "Uploaded to Wander" : `Uploaded to ${brandName}`,
+    "Lookalike created",
+    wanderData ? "Shared with client" : `In ${brandName}'s account`,
+    "Linked to this ad set",
+  ] as const;
 
 function reached(d: Delivery) {
   if (d.linkedToCampaignAudience) return 5;
   return {
-    recipe: 0,
-    compiled: 1,
+    not_built: 0,
+    built: 1,
     uploading: 1,
     uploaded: 2,
     lookalike: 3,
@@ -77,9 +82,10 @@ function Confirm({
 }
 
 /**
- * The ad set's lookalike from Wander data: a seed list uploaded to Wander's
- * Meta account, its 1% lookalike shared to the client's account, and that
- * shared copy targeted by this campaign audience.
+ * The ad set's seed lookalike: a seed list uploaded to its owner's Meta
+ * account (Wander's when it holds Wander data, otherwise the brand's own), its
+ * 1% lookalike in the client's account, and that copy targeted by this
+ * campaign audience.
  */
 export function SeedLookalikeStep({
   brandId,
@@ -87,12 +93,14 @@ export function SeedLookalikeStep({
   campaignId,
   campaignName,
   campaignAudienceId,
+  seedContext,
 }: {
   brandId: string;
   brandName: string;
   campaignId: string;
   campaignName: string;
   campaignAudienceId: string;
+  seedContext?: NewSeedListContext;
 }) {
   const queryClient = useQueryClient();
   const deliveries = useQuery(
@@ -107,8 +115,7 @@ export function SeedLookalikeStep({
     onSuccess: () => void refresh(),
     onError: (error: Error) => toast.error(error.message),
   };
-  const compile = useMutation(orpc.seed.compile.mutationOptions(options));
-  const fill = useMutation(orpc.seed.fillContacts.mutationOptions(options));
+  const rebuild = useMutation(orpc.seed.rebuild.mutationOptions(options));
   const upload = useMutation(orpc.seed.upload.mutationOptions(options));
   const lookalike = useMutation(orpc.seed.lookalike.mutationOptions(options));
   const attach = useMutation(orpc.seed.attach.mutationOptions(options));
@@ -121,60 +128,50 @@ export function SeedLookalikeStep({
     rows[0];
   const step = d ? reached(d) : 0;
   const entries = d?.snapshot?.entries ?? null;
+  const wanderData = d?.wanderData === true;
+  const account = wanderData
+    ? "Wander's ad account"
+    : `${brandName}'s ad account`;
+  const STEPS = steps(wanderData, brandName);
 
   let action: React.ReactNode = null;
-  if (d && !d.snapshot)
+  if (d && (!d.snapshot || entries === null))
     action = (
       <Button
         size="sm"
-        disabled={compile.isPending}
-        onClick={() => compile.mutate({ seedListId: d.seedListId })}
+        disabled={rebuild.isPending}
+        onClick={() => rebuild.mutate({ seedListId: d.seedListId })}
       >
-        {compile.isPending ? "Compiling…" : "Compile"}
+        {rebuild.isPending ? "Building…" : d.snapshot ? "Rebuild" : "Build"}
       </Button>
     );
-  else if (d?.snapshot && entries === null)
+  else if (d?.snapshot && (d.stage === "built" || d.stage === "uploading"))
     action = (
-      <Button
-        size="sm"
-        disabled={fill.isPending}
-        onClick={() => fill.mutate({ snapshotId: d.snapshot!.id })}
-      >
-        {fill.isPending ? "Filling…" : "Fill contacts"}
-      </Button>
+      <Confirm
+        label={
+          d.seed
+            ? "Resume upload"
+            : `Upload ${entries!.toLocaleString()} to Meta`
+        }
+        title={`Upload seed to ${account}`}
+        body={`${entries!.toLocaleString()} people (email and phone) from “${d.seedListName}” go to ${account}.${wanderData ? ` ${brandName} never receives them.` : ""}${entries! < GUIDELINE_ENTRIES ? ` Below about ${GUIDELINE_ENTRIES.toLocaleString()}, Meta's lookalikes are weak.` : ""}`}
+        pending={upload.isPending}
+        onConfirm={() =>
+          upload.mutateAsync({
+            snapshotId: d.snapshot!.id,
+            ...(d.seed
+              ? { platformAudienceId: d.seed.platformAudienceId }
+              : {}),
+            approved: true,
+          })
+        }
+      />
     );
-  else if (d?.snapshot && (d.stage === "compiled" || d.stage === "uploading"))
-    action =
-      (entries ?? 0) < MIN_ENTRIES ? (
-        <p className="text-xs text-muted-foreground">
-          {entries} entries; upload needs {MIN_ENTRIES.toLocaleString()}.
-        </p>
-      ) : (
-        <Confirm
-          label={
-            d.seed
-              ? "Resume upload"
-              : `Upload ${entries!.toLocaleString()} to Wander`
-          }
-          title="Upload seed to Wander's Meta account"
-          body={`${entries!.toLocaleString()} people (email and phone) from “${d.seedListName}” go to Wander's ad account. ${brandName} never receives them.`}
-          pending={upload.isPending}
-          onConfirm={() =>
-            upload.mutateAsync({
-              snapshotId: d.snapshot!.id,
-              ...(d.seed
-                ? { platformAudienceId: d.seed.platformAudienceId }
-                : {}),
-              approved: true,
-            })
-          }
-        />
-      );
   else if (d?.stage === "uploaded" && d.seed && d.snapshot)
     action = (
       <Confirm
         label="Create 1% US lookalike"
-        title="Create lookalike in Wander's account"
+        title={`Create lookalike in ${account}`}
         body={`Meta builds a 1% US lookalike from “${d.seed.name}”, recorded as built for ${brandName}.`}
         pending={lookalike.isPending}
         onConfirm={() =>
@@ -216,7 +213,7 @@ export function SeedLookalikeStep({
   return (
     <section className="space-y-3 border-t pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-medium">Lookalike from Wander data</h4>
+        <h4 className="text-sm font-medium">Seed lookalike</h4>
         {rows.length > 1 && (
           <select
             aria-label="Seed list"
@@ -235,19 +232,25 @@ export function SeedLookalikeStep({
       {deliveries.isPending ? (
         <p className="text-xs text-muted-foreground">Loading…</p>
       ) : !d ? (
-        <AskAssistantButton
-          brandId={brandId}
-          brandName={brandName}
-          campaignId={campaignId}
-          campaignName={campaignName}
-          focus="platforms"
-          label="Draft a seed list in chat"
-          ask={`Propose and save a seed list for ${brandName} from Wander bookers and intent near its homes, preview its size, then compile it. Stop before uploading.`}
-        />
+        <div className="flex flex-wrap gap-2">
+          {seedContext && <NewSeedList context={seedContext} />}
+          <AskAssistantButton
+            brandId={brandId}
+            brandName={brandName}
+            campaignId={campaignId}
+            campaignName={campaignName}
+            focus="platforms"
+            label="Draft a seed list in chat"
+            ask={`Build a seed list for ${brandName} with seedWrite.build from the template that fits this campaign best, and tell me its size. Stop before uploading.`}
+          />
+        </div>
       ) : (
         <>
           {rows.length === 1 && (
-            <p className="text-xs text-muted-foreground">{d.seedListName}</p>
+            <p className="text-xs text-muted-foreground">
+              {d.seedListName}
+              {d.builtFrom !== d.seedListName ? ` · ${d.builtFrom}` : ""}
+            </p>
           )}
           <ol className="grid grid-cols-1 gap-1">
             {STEPS.map((label, i) => {

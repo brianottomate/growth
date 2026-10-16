@@ -2,12 +2,16 @@ import { index, jsonb, pgTable, primaryKey } from "drizzle-orm/pg-core";
 import { brandTable } from "./brand-schema";
 import { createId } from "./utils";
 import type {
-  SeedDefinition,
+  SeedOrigin,
+  SeedSource,
   SeedEvidence,
   SeedQueryParams,
 } from "@/lib/seed-definition";
 
-/** Reusable selection intent. Neither a campaign nor a provider audience. */
+/**
+ * A brand's reusable list of people for paid seeds, separate from email lists.
+ * Neither a campaign nor a provider audience; platform plans deliver it.
+ */
 export const seedListTable = pgTable(
   "seed_list",
   (t) => ({
@@ -20,7 +24,8 @@ export const seedListTable = pgTable(
       .notNull()
       .references(() => brandTable.id, { onDelete: "cascade" }),
     name: t.text().notNull(),
-    definition: jsonb().$type<SeedDefinition>().notNull(),
+    /** Which starting point built it; each build keeps the filters it ran. */
+    origin: jsonb().$type<SeedOrigin>().notNull(),
     createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
   }),
@@ -39,7 +44,7 @@ export const seedSnapshotTable = pgTable(
       .text()
       .notNull()
       .references(() => seedListTable.id, { onDelete: "restrict" }),
-    definition: jsonb().$type<SeedDefinition>().notNull(),
+    definition: jsonb().$type<SeedSource>().notNull(),
     asOf: t.timestamp({ withTimezone: true }).notNull(),
     memberCount: t.integer().notNull(),
     diagnostics: jsonb()

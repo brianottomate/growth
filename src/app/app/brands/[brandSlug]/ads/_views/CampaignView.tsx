@@ -14,7 +14,13 @@ import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { Images, Radio, Users, ChartNoAxesCombined } from "lucide-react";
 
 import { db } from "@/server/db";
-import { homeTable, platformAdTable } from "@/server/db/schema";
+import {
+  brandTable,
+  emailListTable,
+  homeTable,
+  personaTable,
+  platformAdTable,
+} from "@/server/db/schema";
 import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
 import { getSession } from "@/server/better-auth/server";
 import { platformLabel } from "@/components/channel-logos";
@@ -86,6 +92,30 @@ export async function CampaignView({
   // Their homes, for binding an ad to one. Empty for a brand whose WanderOS
   // site is not connected, in which case a home is a name typed on the tile.
   const orderedHomes = await listBrandHomes(brand.id);
+  const [emailLists, seedPersonas, bookingSite] = await Promise.all([
+    db.query.emailListTable.findMany({
+      where: eq(emailListTable.brandId, brand.id),
+      columns: { id: true, name: true, memberCount: true },
+    }),
+    db.query.personaTable.findMany({
+      where: and(
+        eq(personaTable.brandId, brand.id),
+        isNull(personaTable.deletedAt),
+      ),
+      columns: { id: true, name: true },
+    }),
+    db.query.brandTable.findFirst({
+      where: eq(brandTable.id, brand.id),
+      columns: { wanderOsWebsiteId: true },
+    }),
+  ]);
+  const seedContext = {
+    brandId: brand.id,
+    hasBookingSite: Boolean(bookingSite?.wanderOsWebsiteId),
+    hasHomes: orderedHomes.length > 0,
+    personas: seedPersonas,
+    emailLists,
+  };
   const adHomeIds = [
     ...new Set(ads.flatMap((ad) => (ad.homeId ? [ad.homeId] : []))),
   ];
@@ -396,6 +426,7 @@ export async function CampaignView({
                     draftAdCount={ads.length}
                     audienceCount={audiences.length}
                     brandUrl={campaign.landingUrl ?? brand.website ?? null}
+                    seedContext={seedContext}
                   />
                 ))}
               </div>

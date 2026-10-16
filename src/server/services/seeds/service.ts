@@ -7,6 +7,8 @@ import {
   brandTable,
   emailListTable,
   emailListMemberTable,
+  homeTable,
+  personaTable,
   seedListTable,
   seedMemberTable,
   seedSnapshotTable,
@@ -14,6 +16,7 @@ import {
 } from "@/server/db/schema";
 import { getBigQueryClient } from "@/server/clients/bigquery.client";
 import {
+  SEED_GUIDELINE_ENTRIES,
   seedDefinitionSchema,
   seedEvidenceScore,
   seedEvidenceCounts,
@@ -21,18 +24,16 @@ import {
   type SeedCandidate,
   type SeedDefinition,
   type SeedEvidence,
+  type SeedSource,
+  type SeedOrigin,
+  type SeedTemplateId,
   type SeedQueryParams,
+  seedOriginLabel,
 } from "@/lib/seed-definition";
 import { getWanderMembership } from "@/server/wander-workspace";
 import { buildClientSeedQuery, buildWanderSeedQuery } from "./query";
-import {
-  resolveSeedContacts,
-  SEED_CONTACT_FIELDS,
-  type SeedContact,
-} from "./contacts";
-
-/** Meta's practical floor for a useful seed, counted on uploaded entries. */
-export const SEED_MIN_ENTRIES = 1000;
+import { resolveSeedContacts, type SeedContact } from "./contacts";
+import { suggestSeeds } from "./suggestions";
 
 export type SeedActor = { organizationId: string; userId: string };
 export const seedEmailHash = (email: string) =>
@@ -81,9 +82,9 @@ export const seedSnapshotSummary = (
   ...s,
   warning:
     s.diagnostics.contacts === undefined
-      ? "Built before contacts were stored: fill contacts before uploading."
-      : s.diagnostics.contacts.identifiable < SEED_MIN_ENTRIES
-        ? `Only ${s.diagnostics.contacts.identifiable} uploadable entries; upload needs at least ${SEED_MIN_ENTRIES}.`
+      ? "Built before contacts were stored: rebuild before uploading."
+      : s.diagnostics.contacts.identifiable < SEED_GUIDELINE_ENTRIES
+        ? `${s.diagnostics.contacts.identifiable} uploadable ${s.diagnostics.contacts.identifiable === 1 ? "entry" : "entries"}; Meta usually needs about ${SEED_GUIDELINE_ENTRIES.toLocaleString("en-US")} for a useful lookalike.`
         : null,
   downloadUrl: `/api/seeds/${s.id}`,
   asOf: s.asOf.toISOString(),
@@ -162,46 +163,7 @@ async function validateSources(
   if (d.wander) await requireWanderSeedSource(actor);
   if (d.clientBookers && !brand.wanderOsWebsiteId)
     throw new Error("This brand has no WanderOS website");
-  if (d.uploadedListIds.length) {
-    const lists = await db.query.emailListTable.findMany({
-      where: inArray(emailListTable.id, d.uploadedListIds),
-      columns: { id: true, brandId: true },
-    });
-    if (
-      lists.length !== new Set(d.uploadedListIds).size ||
-      lists.some((l) => l.brandId !== brandId)
-    )
-      throw new Error("Choose uploaded lists belonging to this brand");
-  }
   return brand;
-}
-export async function saveSeed(
-  input: {
-    brandId: string;
-    id?: string;
-    name: string;
-    definition: SeedDefinition;
-  },
-  actor: SeedActor,
-) {
-  const definition = seedDefinitionSchema.parse(input.definition);
-  await validateSources(definition, input.brandId, actor);
-  if (input.id) {
-    const { list } = await requireSeedList(input.id, actor);
-    if (list.brandId !== input.brandId)
-      throw new Error("Seed list belongs to a different brand");
-    const [r] = await db
-      .update(seedListTable)
-      .set({ name: input.name, definition, updatedAt: new Date() })
-      .where(eq(seedListTable.id, list.id))
-      .returning();
-    return listSummary(r!);
-  }
-  const [r] = await db
-    .insert(seedListTable)
-    .values({ brandId: input.brandId, name: input.name, definition })
-    .returning();
-  return listSummary(r!);
 }
 const signal = z.object({
   email_hash: z.string().regex(/^[a-f0-9]{64}$/),
@@ -228,34 +190,6 @@ export async function collectSeed(
     bytesProcessed: string | null;
   }[] = [];
   const queries: { sql: string; params: SeedQueryParams }[] = [];
-  for (const listId of new Set(d.uploadedListIds)) {
-    const rows = await db.query.emailListMemberTable.findMany({
-      where: eq(emailListMemberTable.listId, listId),
-      columns: { email: true },
-    });
-    for (const r of rows)
-      candidates.push({
-        emailHash: seedEmailHash(r.email),
-        evidence: [
-          {
-            source: `uploaded:${listId}`,
-            search: null,
-            score: 100,
-            ring: 0,
-            bookings: 0,
-            views: 0,
-            dates: 0,
-            checkouts: 0,
-          },
-        ],
-      });
-    sources.push({
-      name: `uploaded:${listId}`,
-      rows: rows.length,
-      jobId: null,
-      bytesProcessed: null,
-    });
-  }
   const requested = [
     ...(d.clientBookers
       ? [
@@ -319,21 +253,14 @@ export async function collectSeed(
   const selected = selectSeedCandidates(candidates, d);
   return { ...selected, asOf, definition: d, sources, queries };
 }
-export async function previewSeed(
-  input: { brandId: string; definition: SeedDefinition },
+/** Freeze one build of a list from the filters given; contacts are stored with it. */
+async function freezeQueryBuild(
+  list: { id: string; brandId: string },
+  definition: SeedDefinition,
   actor: SeedActor,
 ) {
-  const { members, ...result } = await collectSeed(input, actor);
-  const evidenceCounts = seedEvidenceCounts(members);
-  return { ...result, memberCount: members.length, evidenceCounts };
-}
-export async function compileSeed(
-  input: { seedListId: string },
-  actor: SeedActor,
-) {
-  const { list } = await requireSeedList(input.seedListId, actor);
   const result = await collectSeed(
-    { brandId: list.brandId, definition: list.definition },
+    { brandId: list.brandId, definition },
     actor,
   );
   const contacts = await resolveSeedContacts(
@@ -341,7 +268,7 @@ export async function compileSeed(
     result.definition,
   );
   // Membership and its count appear atomically; an interrupted build leaves no partial snapshot.
-  const snapshot = await withTransaction(async (tx) => {
+  return withTransaction(async (tx) => {
     const [saved] = await tx
       .insert(seedSnapshotTable)
       .values({
@@ -370,8 +297,287 @@ export async function compileSeed(
       );
     return saved!;
   });
+}
+
+/** Copy an email list's people into one frozen build; later list changes do not follow. */
+async function freezeCopyBuild(
+  list: { id: string; brandId: string },
+  emailListId: string,
+) {
+  const source = await db.query.emailListTable.findFirst({
+    where: and(
+      eq(emailListTable.id, emailListId),
+      eq(emailListTable.brandId, list.brandId),
+    ),
+  });
+  if (!source) throw new Error("Email list not found on this brand");
+  const rows = await db.query.emailListMemberTable.findMany({
+    where: eq(emailListMemberTable.listId, source.id),
+    columns: { email: true, firstName: true, lastName: true },
+  });
+  const copiedAt = new Date();
+  const definition: SeedSource = {
+    kind: "copy",
+    from: { type: "email_list", listId: source.id, listName: source.name },
+    copiedAt: copiedAt.toISOString(),
+  };
+  const members = [
+    ...new Map(
+      rows.map((r) => {
+        const email = r.email.trim().toLowerCase();
+        return [
+          seedEmailHash(email),
+          {
+            email,
+            firstName: r.firstName?.trim() || null,
+            lastName: r.lastName?.trim() || null,
+          },
+        ] as const;
+      }),
+    ),
+  ];
+  const evidence: SeedEvidence[] = [
+    {
+      source: `email_list:${source.id}`,
+      search: null,
+      score: 100,
+      ring: 0,
+      bookings: 0,
+      views: 0,
+      dates: 0,
+      checkouts: 0,
+    },
+  ];
+  return withTransaction(async (tx) => {
+    const [snapshot] = await tx
+      .insert(seedSnapshotTable)
+      .values({
+        seedListId: list.id,
+        definition,
+        asOf: copiedAt,
+        memberCount: members.length,
+        diagnostics: {
+          expansion: [],
+          goalMet: null,
+          candidateCount: rows.length,
+          excludedCount: 0,
+          sources: [
+            {
+              name: `email_list:${source.id}`,
+              rows: rows.length,
+              jobId: null,
+              bytesProcessed: null,
+            },
+          ],
+          queries: [],
+          contacts: { identifiable: members.length, phones: 0 },
+        },
+      })
+      .returning();
+    for (let i = 0; i < members.length; i += 1000)
+      await tx.insert(seedMemberTable).values(
+        members.slice(i, i + 1000).map(([emailHash, contact]) => ({
+          snapshotId: snapshot!.id,
+          emailHash,
+          score: 100,
+          evidence,
+          ...contact,
+        })),
+      );
+    return snapshot!;
+  });
+}
+
+const median = (values: number[]) => {
+  const sorted = values.filter((v) => v > 0).sort((a, b) => a - b);
+  return sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)]! : null;
+};
+
+/** The filters a fixed template runs for this brand today. */
+async function templateQuery(
+  origin: SeedOrigin,
+  brand: { id: string; name: string },
+  actor: SeedActor,
+): Promise<SeedDefinition> {
+  if (origin.template === "past_bookers")
+    return seedDefinitionSchema.parse({ clientBookers: true, minScore: 100 });
+  if (origin.template === "persona" || origin.template === "described") {
+    const steer =
+      origin.template === "persona"
+        ? await personaSteer(origin.personaId, brand.id)
+        : origin.steer;
+    const [proposal] = await suggestSeeds(
+      { brandId: brand.id, steer: `Propose exactly one seed. ${steer}` },
+      actor,
+    );
+    if (!proposal) throw new Error("No seed filters could be made from that");
+    return proposal.definition;
+  }
+  if (origin.template === "email_list")
+    throw new Error("An email list copy has no filters");
+  const homes = await db.query.homeTable.findMany({
+    where: and(eq(homeTable.brandId, brand.id), isNull(homeTable.deletedAt)),
+    columns: { city: true, state: true, bedrooms: true, guests: true },
+  });
+  if (!homes.length) throw new Error(`${brand.name} has no homes yet`);
+  const filter =
+    origin.template === "destinations"
+      ? {
+          cities: [...new Set(homes.flatMap((h) => (h.city ? [h.city] : [])))],
+          states: [
+            ...new Set(homes.flatMap((h) => (h.state ? [h.state] : []))),
+          ],
+        }
+      : {
+          minBedrooms: median(homes.map((h) => h.bedrooms ?? 0)),
+          minOccupancy: median(homes.map((h) => h.guests ?? 0)),
+        };
+  return seedDefinitionSchema.parse({
+    wander: true,
+    minScore: 45,
+    searches: [
+      {
+        key: origin.template,
+        why:
+          origin.template === "destinations"
+            ? `Travelers interested in ${brand.name}'s towns`
+            : `Travelers drawn to homes the size of ${brand.name}'s`,
+        filter,
+      },
+    ],
+  });
+}
+
+async function personaSteer(personaId: string, brandId: string) {
+  const persona = await db.query.personaTable.findFirst({
+    where: and(
+      eq(personaTable.id, personaId),
+      eq(personaTable.brandId, brandId),
+      isNull(personaTable.deletedAt),
+    ),
+    columns: { name: true, description: true },
+  });
+  if (!persona) throw new Error("Persona not found on this brand");
+  return `Find travelers who fit this persona. ${persona.name}: ${persona.description ?? ""}`;
+}
+
+async function resolveOrigin(
+  input: {
+    template: SeedTemplateId;
+    personaId?: string;
+    steer?: string;
+    emailListId?: string;
+  },
+  brandId: string,
+): Promise<SeedOrigin> {
+  switch (input.template) {
+    case "persona": {
+      if (!input.personaId) throw new Error("Choose a persona");
+      const persona = await db.query.personaTable.findFirst({
+        where: and(
+          eq(personaTable.id, input.personaId),
+          eq(personaTable.brandId, brandId),
+          isNull(personaTable.deletedAt),
+        ),
+        columns: { id: true, name: true },
+      });
+      if (!persona) throw new Error("Persona not found on this brand");
+      return {
+        template: "persona",
+        personaId: persona.id,
+        personaName: persona.name,
+      };
+    }
+    case "described":
+      if (!input.steer?.trim()) throw new Error("Describe who the seed is for");
+      return { template: "described", steer: input.steer.trim() };
+    case "email_list": {
+      if (!input.emailListId) throw new Error("Choose an email list");
+      const list = await db.query.emailListTable.findFirst({
+        where: and(
+          eq(emailListTable.id, input.emailListId),
+          eq(emailListTable.brandId, brandId),
+        ),
+        columns: { id: true, name: true },
+      });
+      if (!list) throw new Error("Email list not found on this brand");
+      return { template: "email_list", listId: list.id, listName: list.name };
+    }
+    default:
+      return { template: input.template };
+  }
+}
+
+/** Make a seed list from a starting point and build it straight away. */
+export async function buildSeed(
+  input: {
+    brandId: string;
+    template: SeedTemplateId;
+    personaId?: string;
+    steer?: string;
+    emailListId?: string;
+    name?: string;
+  },
+  actor: SeedActor,
+) {
+  const brand = await requireSeedBrand(input.brandId, actor);
+  const origin = await resolveOrigin(input, brand.id);
+  const definition =
+    origin.template === "email_list"
+      ? null
+      : await templateQuery(origin, brand, actor);
+  const [list] = await db
+    .insert(seedListTable)
+    .values({
+      brandId: brand.id,
+      name: input.name?.trim() || seedOriginLabel(origin),
+      origin,
+    })
+    .returning();
+  const snapshot =
+    origin.template === "email_list"
+      ? await freezeCopyBuild(list!, origin.listId)
+      : await freezeQueryBuild(list!, definition!, actor);
+  return { list: listSummary(list!), snapshot: seedSnapshotSummary(snapshot) };
+}
+
+/**
+ * Build a list again. Fixed templates run against today's homes and data; AI
+ * origins reuse the last build's filters so counts stay comparable; a copy
+ * copies its email list again.
+ */
+export async function rebuildSeed(
+  input: { seedListId: string },
+  actor: SeedActor,
+) {
+  const { list, brand } = await requireSeedList(input.seedListId, actor);
+  const origin = list.origin;
+  let snapshot;
+  if (origin.template === "email_list")
+    snapshot = await freezeCopyBuild(list, origin.listId);
+  else {
+    const last = await db.query.seedSnapshotTable.findFirst({
+      where: eq(seedSnapshotTable.seedListId, list.id),
+      orderBy: desc(seedSnapshotTable.createdAt),
+    });
+    const reuse =
+      (origin.template === "persona" || origin.template === "described") &&
+      last?.definition.kind !== "copy"
+        ? last?.definition
+        : undefined;
+    snapshot = await freezeQueryBuild(
+      list,
+      reuse ?? (await templateQuery(origin, brand, actor)),
+      actor,
+    );
+  }
+  await db
+    .update(seedListTable)
+    .set({ updatedAt: new Date() })
+    .where(eq(seedListTable.id, list.id));
   return seedSnapshotSummary(snapshot);
 }
+
 const contactCounts = (contacts: Iterable<SeedContact>) => {
   let identifiable = 0,
     phones = 0;
@@ -381,60 +587,6 @@ const contactCounts = (contacts: Iterable<SeedContact>) => {
   }
   return { identifiable, phones };
 };
-
-/**
- * Store contact fields on a snapshot frozen before Growth kept them. Membership
- * is unchanged; only fields still empty are filled, from the snapshot's own
- * definition. Refuses a snapshot whose upload has started, since resuming one
- * relies on the identifiable set staying put.
- */
-export async function fillSeedContacts(
-  input: { snapshotId: string },
-  actor: SeedActor,
-) {
-  const { snapshot } = await requireSeedSnapshot(input.snapshotId, actor);
-  if (snapshot.definition.wander) await requireWanderSeedSource(actor);
-  const started = await db.query.platformAudienceTable.findFirst({
-    where: eq(platformAudienceTable.seedSnapshotId, snapshot.id),
-    columns: { id: true },
-  });
-  if (started)
-    throw new Error(
-      `Snapshot already has upload ${started.id}; compile a new snapshot instead`,
-    );
-  const members = await db.query.seedMemberTable.findMany({
-    where: eq(seedMemberTable.snapshotId, snapshot.id),
-  });
-  const contacts = await resolveSeedContacts(
-    members.map((m) => m.emailHash),
-    snapshot.definition,
-  );
-  const merged = members.map((m) => {
-    const found = contacts.get(m.emailHash);
-    const contact = Object.fromEntries(
-      SEED_CONTACT_FIELDS.map((k) => [k, m[k] ?? found?.[k] ?? null]),
-    ) as SeedContact;
-    return { emailHash: m.emailHash, contact };
-  });
-  const counts = contactCounts(merged.map((m) => m.contact));
-  await withTransaction(async (tx) => {
-    for (const m of merged)
-      await tx
-        .update(seedMemberTable)
-        .set(m.contact)
-        .where(
-          and(
-            eq(seedMemberTable.snapshotId, snapshot.id),
-            eq(seedMemberTable.emailHash, m.emailHash),
-          ),
-        );
-    await tx
-      .update(seedSnapshotTable)
-      .set({ diagnostics: { ...snapshot.diagnostics, contacts: counts } })
-      .where(eq(seedSnapshotTable.id, snapshot.id));
-  });
-  return { snapshotId: snapshot.id, memberCount: members.length, ...counts };
-}
 
 export async function seedMembers(
   input: { snapshotId: string; afterHash?: string; limit?: number },

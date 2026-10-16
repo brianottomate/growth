@@ -4,16 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LayoutTemplate, Loader2 } from "lucide-react";
 
+import { StartFromDialog } from "@/components/start-from-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/components/ui/lib/utils";
@@ -111,28 +104,27 @@ export function NewsletterTemplateStart({
     ["viewedHome", "savedHome", "checkout", "newHome", "upgrade"].includes(key),
   );
 
+  const reset = (id: NewsletterTemplateId) => {
+    setTemplate(id);
+    setAngle("");
+    setContext({});
+    setHomeId("");
+  };
+
   return (
-    <>
-      <Button
-        variant={primary ? "default" : "outline"}
-        size="sm"
-        onClick={() => setOpen(true)}
-      >
-        <LayoutTemplate className="size-4" />{" "}
-        {onDrafted || initialTemplate === "season-ahead"
-          ? "From template"
-          : "Use this template"}
-      </Button>
-      <Dialog
-        open={open}
-        onOpenChange={(value) => {
-          if (!draft.isPending) setOpen(value);
-        }}
-      >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Start from a template</DialogTitle>
-          </DialogHeader>
+    <StartFromDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger={{
+        label:
+          onDrafted || initialTemplate === "season-ahead"
+            ? "From template"
+            : "Use this template",
+        primary,
+      }}
+      title="Start from a template"
+      intro={
+        <>
           <p className="text-sm text-muted-foreground">
             Choose a shared recipe. Your draft uses this brand’s voice, homes
             and email styling.
@@ -144,253 +136,190 @@ export function NewsletterTemplateStart({
               Browse the template wall
             </Link>
           </Button>
-
-          <div className="space-y-3">
-            <div className="flex gap-2" aria-label="Template groups">
-              {["Blasts", "Sequence emails"].map((value) => (
-                <Button
-                  key={value}
-                  variant={group === value ? "secondary" : "outline"}
-                  size="sm"
-                  disabled={draft.isPending}
-                  aria-pressed={group === value}
-                  onClick={() => {
-                    setGroup(value);
-                    setTemplate(
-                      NEWSLETTER_TEMPLATES.find(
-                        (item) => recipeGroup(item.category) === value,
-                      )!.id,
-                    );
-                    setAngle("");
-                    setContext({});
-                    setHomeId("");
-                  }}
-                >
-                  {value}
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Groups describe common uses; an individual recipe can work in
-              either. Each recipe creates one email.
-            </p>
-            <Label htmlFor="email-recipe">Email recipe</Label>
-            <select
-              id="email-recipe"
-              value={template}
+          <p className="text-xs text-muted-foreground">
+            Groups describe common uses; an individual recipe can work in
+            either. Each recipe creates one email.
+          </p>
+        </>
+      }
+      groups={["Blasts", "Sequence emails"]}
+      group={group}
+      onGroupChange={(value) => {
+        setGroup(value);
+        reset(
+          NEWSLETTER_TEMPLATES.find(
+            (item) => recipeGroup(item.category) === value,
+          )!.id,
+        );
+      }}
+      options={NEWSLETTER_TEMPLATES.map((item) => ({
+        id: item.id,
+        label: item.label,
+        category: item.category,
+        group: recipeGroup(item.category),
+      }))}
+      value={template}
+      onValueChange={reset}
+      selectLabel="Email recipe"
+      submitLabel="Draft email"
+      busyLabel="Writing draft"
+      busy={draft.isPending}
+      canSubmit={
+        !noHomes && !missingContext && !(needsSpecificHomes && !homeId)
+      }
+      onSubmit={() =>
+        draft.mutate({
+          brandId,
+          seriesId,
+          template,
+          brief: brief.trim() || undefined,
+          homeIds: homeId ? [homeId] : undefined,
+          verifiedContext: Object.fromEntries(
+            Object.entries(context).filter(([, value]) => value.trim()),
+          ),
+          angle: angle.trim() || undefined,
+          offer: offer.trim() || undefined,
+          plannedAt:
+            !onDrafted && sendAt ? new Date(sendAt).toISOString() : undefined,
+        })
+      }
+    >
+      <p className="text-sm text-muted-foreground">{chosen.summary}</p>
+      {"trigger" in chosen && (
+        <p className="text-xs text-muted-foreground">
+          Intended use: {chosen.trigger}. Delivery stays inactive.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-1">
+        {chosen.structure.map((part) => (
+          <span
+            key={part}
+            className="rounded-md bg-muted px-1.5 py-0.5 text-xs"
+          >
+            {part}
+          </span>
+        ))}
+      </div>
+      {chosen.requiredContext
+        .filter((key) => key !== "offer")
+        .map((key) => (
+          <div key={key} className="space-y-1">
+            <Label htmlFor={`recipe-${key}`}>
+              {RECIPE_CONTEXT_LABELS[key] ?? key}
+            </Label>
+            <Textarea
+              id={`recipe-${key}`}
+              value={context[key] ?? ""}
               disabled={draft.isPending}
-              className="w-full rounded-md border bg-background p-2 text-sm"
-              onChange={(event) => {
-                setTemplate(event.target.value as NewsletterTemplateId);
-                setAngle("");
-                setContext({});
-                setHomeId("");
-              }}
-            >
-              {[
-                ...new Set(
-                  NEWSLETTER_TEMPLATES.filter(
-                    (item) => recipeGroup(item.category) === group,
-                  ).map((item) => item.category),
-                ),
-              ].map((category) => (
-                <optgroup key={category} label={category}>
-                  {NEWSLETTER_TEMPLATES.filter(
-                    (item) => item.category === category,
-                  ).map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <p className="text-sm text-muted-foreground">{chosen.summary}</p>
-            {"trigger" in chosen && (
-              <p className="text-xs text-muted-foreground">
-                Intended use: {chosen.trigger}. Delivery stays inactive.
-              </p>
-            )}
-            <div className="flex flex-wrap gap-1">
-              {chosen.structure.map((part) => (
-                <span
-                  key={part}
-                  className="rounded-md bg-muted px-1.5 py-0.5 text-xs"
-                >
-                  {part}
-                </span>
-              ))}
-            </div>
-            {chosen.requiredContext
-              .filter((key) => key !== "offer")
-              .map((key) => (
-                <div key={key} className="space-y-1">
-                  <Label htmlFor={`recipe-${key}`}>
-                    {RECIPE_CONTEXT_LABELS[key] ?? key}
-                  </Label>
-                  <Textarea
-                    id={`recipe-${key}`}
-                    value={context[key] ?? ""}
-                    disabled={draft.isPending}
-                    placeholder={
-                      key.endsWith("Url")
-                        ? "https://…"
-                        : "Facts approved for this email"
-                    }
-                    onChange={(event) =>
-                      setContext((current) => ({
-                        ...current,
-                        [key]: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              ))}
-            {needsSpecificHomes && (
-              <div className="space-y-1">
-                <Label htmlFor="recipe-home">Home</Label>
-                <select
-                  id="recipe-home"
-                  value={homeId}
-                  onChange={(event) => setHomeId(event.target.value)}
-                  disabled={draft.isPending}
-                  className="w-full rounded-md border bg-background p-2 text-sm"
-                >
-                  <option value="">Choose the home this email is about</option>
-                  {options.data?.homes.map((home) => (
-                    <option key={home.id} value={home.id}>
-                      {home.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="space-y-1">
-              <Label htmlFor="recipe-brief">Direction</Label>
-              <Textarea
-                id="recipe-brief"
-                value={brief}
-                onChange={(event) => setBrief(event.target.value)}
-                disabled={draft.isPending}
-                placeholder="What this email should say, and what to leave out"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="template-angle">{chosen.angleLabel}</Label>
-            <Input
-              id="template-angle"
-              value={angle}
-              disabled={draft.isPending}
-              placeholder={`${chosen.anglePlaceholder}, or leave empty`}
-              onChange={(event) => setAngle(event.target.value)}
+              placeholder={
+                key.endsWith("Url")
+                  ? "https://…"
+                  : "Facts approved for this email"
+              }
+              onChange={(event) =>
+                setContext((current) => ({
+                  ...current,
+                  [key]: event.target.value,
+                }))
+              }
             />
-            {suggestions.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((suggestion) => (
-                  <button
-                    key={suggestion.label}
-                    type="button"
-                    disabled={draft.isPending}
-                    onClick={() => setAngle(suggestion.label)}
-                    className={cn(
-                      "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                      angle === suggestion.label
-                        ? "border-foreground bg-accent/40"
-                        : "text-muted-foreground hover:bg-accent/40",
-                    )}
-                  >
-                    {suggestion.label}
-                    <span className="ml-1 opacity-60">{suggestion.hint}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="template-offer">Offer</Label>
-              <Input
-                id="template-offer"
-                value={offer}
+        ))}
+      {needsSpecificHomes && (
+        <div className="space-y-1">
+          <Label htmlFor="recipe-home">Home</Label>
+          <select
+            id="recipe-home"
+            value={homeId}
+            onChange={(event) => setHomeId(event.target.value)}
+            disabled={draft.isPending}
+            className="w-full rounded-md border bg-background p-2 text-sm"
+          >
+            <option value="">Choose the home this email is about</option>
+            {options.data?.homes.map((home) => (
+              <option key={home.id} value={home.id}>
+                {home.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="space-y-1">
+        <Label htmlFor="recipe-brief">Direction</Label>
+        <Textarea
+          id="recipe-brief"
+          value={brief}
+          onChange={(event) => setBrief(event.target.value)}
+          disabled={draft.isPending}
+          placeholder="What this email should say, and what to leave out"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="template-angle">{chosen.angleLabel}</Label>
+        <Input
+          id="template-angle"
+          value={angle}
+          disabled={draft.isPending}
+          placeholder={`${chosen.anglePlaceholder}, or leave empty`}
+          onChange={(event) => setAngle(event.target.value)}
+        />
+        {suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion.label}
+                type="button"
                 disabled={draft.isPending}
-                placeholder="$50 off 3+ nights, code FALL50"
-                onChange={(event) => setOffer(event.target.value)}
-              />
-            </div>
-            {!onDrafted && (
-              <div className="space-y-1.5">
-                <Label htmlFor="template-send">Send</Label>
-                <Input
-                  id="template-send"
-                  type="datetime-local"
-                  value={sendAt}
-                  disabled={draft.isPending}
-                  onChange={(event) => setSendAt(event.target.value)}
-                />
-              </div>
-            )}
+                onClick={() => setAngle(suggestion.label)}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                  angle === suggestion.label
+                    ? "border-foreground bg-accent/40"
+                    : "text-muted-foreground hover:bg-accent/40",
+                )}
+              >
+                {suggestion.label}
+                <span className="ml-1 opacity-60">{suggestion.hint}</span>
+              </button>
+            ))}
           </div>
-          {onDrafted && (
-            <p className="text-sm text-muted-foreground">
-              This creates an unscheduled email for this step. Save the sequence
-              draft to keep its assignment; the sequence controls timing.
-            </p>
-          )}
-
-          {noHomes && (
-            <p className="text-sm text-destructive">
-              No homes with photos yet. Refresh homes on Setup first.
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="template-offer">Offer</Label>
+          <Input
+            id="template-offer"
+            value={offer}
+            disabled={draft.isPending}
+            placeholder="$50 off 3+ nights, code FALL50"
+            onChange={(event) => setOffer(event.target.value)}
+          />
+        </div>
+        {!onDrafted && (
+          <div className="space-y-1.5">
+            <Label htmlFor="template-send">Send</Label>
+            <Input
+              id="template-send"
+              type="datetime-local"
+              value={sendAt}
               disabled={draft.isPending}
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={
-                draft.isPending ||
-                noHomes ||
-                missingContext ||
-                (needsSpecificHomes && !homeId)
-              }
-              onClick={() =>
-                draft.mutate({
-                  brandId,
-                  seriesId,
-                  template,
-                  brief: brief.trim() || undefined,
-                  homeIds: homeId ? [homeId] : undefined,
-                  verifiedContext: Object.fromEntries(
-                    Object.entries(context).filter(([, value]) => value.trim()),
-                  ),
-                  angle: angle.trim() || undefined,
-                  offer: offer.trim() || undefined,
-                  plannedAt:
-                    !onDrafted && sendAt
-                      ? new Date(sendAt).toISOString()
-                      : undefined,
-                })
-              }
-            >
-              {draft.isPending ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" /> Writing draft
-                </>
-              ) : (
-                "Draft email"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+              onChange={(event) => setSendAt(event.target.value)}
+            />
+          </div>
+        )}
+      </div>
+      {onDrafted && (
+        <p className="text-sm text-muted-foreground">
+          This creates an unscheduled email for this step. Save the sequence
+          draft to keep its assignment; the sequence controls timing.
+        </p>
+      )}
+      {noHomes && (
+        <p className="text-sm text-destructive">
+          No homes with photos yet. Refresh homes on Setup first.
+        </p>
+      )}
+    </StartFromDialog>
   );
 }

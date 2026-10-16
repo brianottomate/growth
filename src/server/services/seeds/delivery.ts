@@ -49,9 +49,14 @@ import {
   requireSeedSnapshot,
   seedSnapshotSummary,
   requireWanderSeedSource,
-  SEED_MIN_ENTRIES,
   type SeedActor,
 } from "./service";
+import {
+  SEED_GUIDELINE_ENTRIES,
+  seedOriginLabel,
+  seedUsesWanderData,
+  type SeedSource,
+} from "@/lib/seed-definition";
 
 type DeliveryActor = SeedActor & { runId: string };
 type Asset = typeof platformAudienceTable.$inferSelect;
@@ -72,18 +77,32 @@ async function requireWanderBrand(actor: SeedActor) {
   return brand;
 }
 
-/** Wander's account receives every seed; the client sees only the shared lookalike. */
-async function seedDestination(actor: SeedActor) {
-  const wander = await requireWanderBrand(actor);
+type SeedBrand = { id: string; slug: string | null; name: string };
+
+/**
+ * The brand whose Meta account holds a snapshot's assets. Wander's customers
+ * stay in Wander's account and reach the client as a shared lookalike; a seed
+ * of the brand's own people goes straight to the brand's account.
+ */
+async function seedOwner(
+  source: SeedSource,
+  brand: SeedBrand,
+  actor: SeedActor,
+): Promise<SeedBrand> {
+  return seedUsesWanderData(source) ? requireWanderBrand(actor) : brand;
+}
+
+async function seedDestination(owner: SeedBrand, actor: SeedActor) {
+  if (!owner.slug) throw new Error(`${owner.name} has no brand slug`);
   const [listed, allowed] = await Promise.all([
     listAdsWriteDestinations({
       organizationId: actor.organizationId,
-      brandSlug: WANDER_BRAND_SLUG,
+      brandSlug: owner.slug,
       platform: "meta",
     }),
     db.query.adAccountTable.findMany({
       where: and(
-        eq(adAccountTable.brandId, wander.id),
+        eq(adAccountTable.brandId, owner.id),
         eq(adAccountTable.platform, "facebook"),
         eq(adAccountTable.isAllowed, true),
       ),
@@ -91,9 +110,9 @@ async function seedDestination(actor: SeedActor) {
     }),
   ]);
   return {
-    wander,
+    owner,
     ...pickSeedDestination({
-      wanderBrandId: wander.id,
+      owner,
       listed: listed.destinations,
       allowed,
     }),
@@ -149,17 +168,16 @@ async function matchedSize(asset: Asset) {
   return typeof size === "number" ? size : null;
 }
 
-/** Seed assets of a snapshot live under the Wander brand; never trust the client brand id. */
+/** A snapshot's assets live under its owner brand; never trust a caller's brand id. */
 async function requireSeedAsset(
   id: string,
   snapshotId: string,
-  actor: SeedActor,
+  owner: SeedBrand,
 ) {
-  const wander = await requireWanderBrand(actor);
   const asset = await db.query.platformAudienceTable.findFirst({
     where: and(
       eq(platformAudienceTable.id, id),
-      eq(platformAudienceTable.brandId, wander.id),
+      eq(platformAudienceTable.brandId, owner.id),
       eq(platformAudienceTable.seedSnapshotId, snapshotId),
     ),
   });
@@ -182,15 +200,21 @@ export async function uploadSeed(
     input.snapshotId,
     actor,
   );
-  if (snapshot.definition.wander) await requireWanderSeedSource(actor);
+  if (seedUsesWanderData(snapshot.definition))
+    await requireWanderSeedSource(actor);
   const entries = await uploadableEntries(snapshot.id);
-  if (entries < SEED_MIN_ENTRIES)
+  if (!entries)
     throw new Error(
-      `${entries} of ${snapshot.memberCount} members have an email or phone; a seed upload needs at least ${SEED_MIN_ENTRIES} entries.${snapshot.diagnostics.contacts ? "" : " This snapshot predates stored contacts: fill its contacts first."}`,
+      `None of ${snapshot.memberCount} members has an email or phone.${snapshot.diagnostics.contacts ? "" : " This build predates stored contacts: rebuild the list first."}`,
     );
-  const target = await seedDestination(actor);
+  const warning =
+    entries < SEED_GUIDELINE_ENTRIES
+      ? `${entries} ${entries === 1 ? "entry" : "entries"}; Meta usually needs about ${SEED_GUIDELINE_ENTRIES.toLocaleString("en-US")} for a useful lookalike.`
+      : null;
+  const owner = await seedOwner(snapshot.definition, brand, actor);
+  const target = await seedDestination(owner, actor);
   let asset = input.platformAudienceId
-    ? await requireSeedAsset(input.platformAudienceId, snapshot.id, actor)
+    ? await requireSeedAsset(input.platformAudienceId, snapshot.id, owner)
     : null;
   if (
     asset &&
@@ -199,7 +223,7 @@ export async function uploadSeed(
       asset.forBrandId !== brand.id)
   )
     throw new Error(
-      "Resume an audience created from this snapshot in Wander's ad account",
+      `Resume an audience created from this snapshot in ${owner.name}'s ad account`,
     );
   if (asset && asset.seedMetadata?.count !== entries)
     throw new Error(
@@ -213,11 +237,12 @@ export async function uploadSeed(
       entries,
       memberCount: snapshot.memberCount,
       matchedSize: await matchedSize(asset),
+      warning,
     };
   if (!asset) {
     const created = await createSeedAudience(
       {
-        brandSlug: WANDER_BRAND_SLUG,
+        brandSlug: owner.slug!,
         connectionAccountId: target.connectionAccountId,
         adAccountId: target.adAccountId,
         type: "customer_list",
@@ -312,6 +337,7 @@ export async function uploadSeed(
     entries,
     memberCount: snapshot.memberCount,
     matchedSize: await matchedSize(audience),
+    warning,
   };
 }
 
@@ -319,11 +345,14 @@ export async function seedAssetStatus(
   input: { snapshotId: string; platformAudienceId: string },
   actor: SeedActor,
 ) {
-  const { snapshot } = await requireSeedSnapshot(input.snapshotId, actor);
+  const { snapshot, brand } = await requireSeedSnapshot(
+    input.snapshotId,
+    actor,
+  );
   const asset = await requireSeedAsset(
     input.platformAudienceId,
     snapshot.id,
-    actor,
+    await seedOwner(snapshot.definition, brand, actor),
   );
   // Recheck allowlisting even for reads; permission may have changed after upload.
   await requireMetaAudienceAccount(asset);
@@ -435,10 +464,11 @@ export async function seedLookalike(
     input.snapshotId,
     actor,
   );
+  const owner = await seedOwner(snapshot.definition, brand, actor);
   const seed = await requireSeedAsset(
     input.seedPlatformAudienceId,
     snapshot.id,
-    actor,
+    owner,
   );
   if (
     !seed.externalId ||
@@ -448,9 +478,9 @@ export async function seedLookalike(
     throw new Error(
       "Choose a fully uploaded customer-list asset for this snapshot",
     );
-  const target = await seedDestination(actor);
+  const target = await seedDestination(owner, actor);
   if (seed.adAccountId !== target.localAdAccountId)
-    throw new Error("This seed is not in Wander's ad account");
+    throw new Error(`This seed is not in ${owner.name}'s ad account`);
   const status = (await getZernioAdAudience(providerId(seed))).audience?.status;
   if (status === "pending" || status === "processing")
     throw new Error(
@@ -459,7 +489,7 @@ export async function seedLookalike(
   // Meta's own error (e.g. an unsupported country) surfaces as thrown.
   const created = await createSeedAudience(
     {
-      brandSlug: WANDER_BRAND_SLUG,
+      brandSlug: owner.slug!,
       connectionAccountId: target.connectionAccountId,
       adAccountId: target.adAccountId,
       type: "lookalike",
@@ -489,13 +519,12 @@ export async function seedLookalike(
 async function requireDeliveredLookalike(
   id: string,
   snapshotId: string,
-  actor: SeedActor,
+  owner: SeedBrand,
 ) {
-  const wander = await requireWanderBrand(actor);
   const lookalike = await db.query.platformAudienceTable.findFirst({
     where: and(
       eq(platformAudienceTable.id, id),
-      eq(platformAudienceTable.brandId, wander.id),
+      eq(platformAudienceTable.brandId, owner.id),
     ),
   });
   const parent = lookalike?.parentPlatformAudienceId
@@ -531,7 +560,7 @@ export async function shareSeedLookalike(
   const lookalike = await requireDeliveredLookalike(
     input.platformAudienceId,
     snapshot.id,
-    actor,
+    await seedOwner(snapshot.definition, brand, actor),
   );
   if (lookalike.forBrandId !== brand.id)
     throw new Error("This lookalike was built for a different brand");
@@ -708,8 +737,8 @@ export async function attachSeedAsset(
 }
 
 export type SeedDeliveryStage =
-  | "recipe"
-  | "compiled"
+  | "not_built"
+  | "built"
   | "uploading"
   | "uploaded"
   | "lookalike"
@@ -748,6 +777,7 @@ export async function listSeedDeliveries(
     .select({
       id: seedListTable.id,
       name: seedListTable.name,
+      origin: seedListTable.origin,
       brandId: brandTable.id,
       brandName: brandTable.name,
       brandSlug: brandTable.slug,
@@ -816,11 +846,13 @@ export async function listSeedDeliveries(
               : seed
                 ? "uploading"
                 : snapshot
-                  ? "compiled"
-                  : "recipe";
+                  ? "built"
+                  : "not_built";
       return {
         seedListId: list.id,
         seedListName: list.name,
+        builtFrom: seedOriginLabel(list.origin),
+        wanderData: snapshot ? seedUsesWanderData(snapshot.definition) : null,
         brandId: list.brandId,
         brandName: list.brandName,
         brandSlug: list.brandSlug,
@@ -859,3 +891,6 @@ export async function listSeedDeliveries(
     }),
   );
 }
+export type SeedDelivery = Awaited<
+  ReturnType<typeof listSeedDeliveries>
+>[number];

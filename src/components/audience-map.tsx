@@ -145,7 +145,8 @@ export function AudienceMap({
                 ? "Intended geography"
                 : "Targeted"}
           </span>
-          {view === "world" && (
+          {(view === "world" ||
+            targets.some((target) => target.cityStates.size > 0)) && (
             <span className="flex items-center gap-1.5">
               <span className="size-2.5 rounded-sm bg-foreground opacity-55" />
               Selected locations
