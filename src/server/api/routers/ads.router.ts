@@ -5,11 +5,6 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { audienceTable, campaignAudienceAssetTable } from "@/server/db/schema";
 import { requireOwnedCampaign } from "@/server/services/ads-draft.service";
-import {
-  prepareCampaignSeed,
-  campaignSeedSnapshot,
-  buildCampaignLookalike,
-} from "@/server/services/campaign-seed.service";
 import { adAuthoringScopeSchema } from "@/lib/ad-authoring";
 import { after } from "next/server";
 import { starterGenerationSchema } from "@/lib/starter-ad-generation";
@@ -112,43 +107,6 @@ export const adsRouter = {
         );
       return { unlinked: true };
     }),
-
-  prepareSeed: workspaceProcedure
-    .input(z.object({ audienceId: z.string().min(1) }))
-    .handler(({ input, context: ctx }) =>
-      prepareCampaignSeed(input, {
-        organizationId: ctx.workspace.orgId,
-        userId: ctx.session.user.id,
-      }),
-    ),
-  seedSnapshot: workspaceProcedure
-    .input(
-      z.object({
-        audienceId: z.string().min(1),
-        snapshotId: z.string().min(1),
-      }),
-    )
-    .handler(({ input, context: ctx }) =>
-      campaignSeedSnapshot(input, {
-        organizationId: ctx.workspace.orgId,
-        userId: ctx.session.user.id,
-      }),
-    ),
-  buildLookalike: workspaceProcedure
-    .input(
-      z.object({
-        audienceId: z.string().min(1),
-        seedPlatformAudienceId: z.string().min(1),
-        country: z.string().regex(/^[A-Z]{2}$/),
-        approved: z.literal(true),
-      }),
-    )
-    .handler(({ input, context: ctx }) =>
-      buildCampaignLookalike(input, {
-        organizationId: ctx.workspace.orgId,
-        userId: ctx.session.user.id,
-      }),
-    ),
 
   // The /overview top-ads card refetches here when its controls change, with
   // no model round-trip.

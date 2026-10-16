@@ -83,7 +83,7 @@ export function SeedShareDialog({
   );
   const run = (confirmShared?: boolean) =>
     check.mutate({
-      snapshotId: share.snapshotId,
+      seedListId: share.seedListId,
       platformAudienceId: share.platformAudienceId,
       ...(confirmShared ? { confirmShared } : {}),
     });

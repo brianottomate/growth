@@ -1,9 +1,7 @@
 import {
   listSeedsAction,
   buildSeedAction,
-  rebuildSeedAction,
-  readSeedAction,
-  seedMembersAction,
+  refreshSeedAction,
   uploadSeedAction,
   seedAssetStatusAction,
   seedLookalikeAction,
@@ -872,21 +870,19 @@ export const reviewWrite = growthDomainTool({
 
 export const seedRead = growthDomainTool({
   description:
-    "Read a brand's seed lists, what built them, their frozen builds and Meta delivery state without exposing raw contacts.",
+    "Read a brand's seed lists, what built them and where each stands on Meta, without exposing contacts.",
   actions: {
     list: listSeedsAction,
-    get: readSeedAction,
-    members: seedMembersAction,
-    assetStatus: seedAssetStatusAction,
     deliveries: seedDeliveriesAction,
+    assetStatus: seedAssetStatusAction,
   },
 });
 export const seedWrite = growthDomainTool({
   description:
-    "Seed delivery: build a seed list from a template (past bookers, an email list copy, destinations, similar homes, a persona or a description), upload a build to its owner's Meta account (Wander's for seeds with Wander data, otherwise the brand's own), build a lookalike, record a share when the lookalike sits in Wander's account, then attach it to a campaign audience or persona.",
+    "Seed lists: build one from a template (the brand's own past bookers or an email list; Wander travelers by towns, similar homes, a persona or a description), upload it to Meta (Wander's account for Wander travelers, otherwise the brand's own), build a lookalike, record the share with the client's account, then attach it to a campaign audience or persona.",
   actions: {
     build: buildSeedAction,
-    rebuild: rebuildSeedAction,
+    refresh: refreshSeedAction,
     upload: uploadSeedAction,
     lookalike: seedLookalikeAction,
     share: shareSeedLookalikeAction,

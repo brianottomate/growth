@@ -89,33 +89,10 @@ platform-neutral. Actual provider IDs remain in the mirror, not authored plans.
 
 ## Seeds
 
-Inside a campaign audience, choose an existing Meta asset or create a customer
-list. Sources are custom CSV and the predefined past-bookers selection for the
-brand's linked WanderOS website. The warehouse selection uses the existing
-email-audience snapshot mechanism, with bookers only and no click filter.
-Prepare the selection, wait for compilation, inspect its count, then explicitly
-confirm advertising permission and upload. This assertion is separate from
-email-sending eligibility. Unsupported brands must connect a WanderOS website
-or use CSV. Lists are limited to 50,000 recipients; CSV input is limited to 8 MB.
-
-CSV parsing takes place in the browser. The authenticated, same-origin upload
-endpoint passes identifiers to Zernio in 10,000-row batches; Zernio hashes them
-for Meta. Warehouse uploads read the private BigQuery snapshot in bounded
-pages. Growth stores source/count/status and snapshot/provider references only.
-It does not save CSV blobs, recipient rows, or identifiers in action receipts.
-Raw recipient upload actions are removed from the assistant catalog.
-
-Seed upload and creation of a 1% lookalike in a chosen country are separate
-operator actions. They do not launch ads. New assets become reusable and are
-selected for that campaign audience. There is no automatic retry or resume UI.
-A failed attempt tries to delete only its own newly created provider asset.
-A cleanup failure leaves a visibly failed local record when possible and names
-the leftover audience for manual removal. Creation failures without a returned
-provider ID require inspection before retrying. Rejected member identifiers fail
-the upload rather than treating a partial list as ready.
-
-Provider deletion is documented at
-https://docs.zernio.com/ad-audiences/delete-ad-audience.
+Seed lists and their lookalikes are built and delivered as described in
+[seed-audiences.md](seed-audiences.md). A delivered lookalike attaches to a
+campaign audience through `campaign_audience_asset`, and the Meta plan sends it
+as that audience's ad sets' custom audience.
 
 ## Validation
 

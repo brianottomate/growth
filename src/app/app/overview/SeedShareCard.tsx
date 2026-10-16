@@ -42,7 +42,7 @@ export function SeedShareCard({ share: initial }: { share: SeedShare }) {
   );
   const run = (confirmShared?: boolean) =>
     check.mutate({
-      snapshotId: share.snapshotId,
+      seedListId: share.seedListId,
       platformAudienceId: share.platformAudienceId,
       ...(confirmShared ? { confirmShared } : {}),
     });

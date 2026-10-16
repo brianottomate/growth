@@ -136,7 +136,6 @@ import {
 import {
   adAccountTable,
   seedListTable,
-  seedSnapshotTable,
   adTable,
   audienceTable,
   platformDeliveryGroupTable,
@@ -1308,8 +1307,8 @@ export type CreateAdAudienceInput = {
   name: string;
   description?: string;
   /** Internal lineage, validated before the provider call and stored with the mirror. */
-  seedSnapshotId?: string;
-  /** Client brand a seed asset in another brand's account is built for; owns the snapshot. */
+  seedListId?: string;
+  /** Client brand a seed asset in another brand's account is built for; owns the list. */
   forBrandId?: string;
   parentPlatformAudienceId?: string;
   sourceAudienceId?: string;
@@ -1662,25 +1661,21 @@ export async function createAdAudience(
     });
     if (!forBrand) throw new Error("The seed's brand is not in this workspace");
   }
-  const [seedSnapshot] = input.seedSnapshotId
+  const [seedList] = input.seedListId
     ? await db
-        .select({ count: seedSnapshotTable.memberCount })
-        .from(seedSnapshotTable)
-        .innerJoin(
-          seedListTable,
-          eq(seedListTable.id, seedSnapshotTable.seedListId),
-        )
+        .select({ count: seedListTable.memberCount })
+        .from(seedListTable)
         .where(
           and(
-            eq(seedSnapshotTable.id, input.seedSnapshotId),
+            eq(seedListTable.id, input.seedListId),
             eq(seedListTable.brandId, input.forBrandId ?? destination.brand.id),
           ),
         )
         .limit(1)
     : [];
-  if (input.seedSnapshotId && (!seedSnapshot || input.type !== "customer_list"))
+  if (input.seedListId && (!seedList || input.type !== "customer_list"))
     throw new Error(
-      "Choose a seed snapshot belonging to this brand for a customer list",
+      "Choose a seed list belonging to this brand for a customer list",
     );
   const parent =
     input.type === "lookalike"
@@ -1728,16 +1723,11 @@ export async function createAdAudience(
         id: createId("paud"),
         channelId: channel.id,
         adAccountId: destination.localAdAccountId,
-        seedSnapshotId: input.seedSnapshotId ?? null,
+        seedListId: input.seedListId ?? null,
         parentPlatformAudienceId: parent?.id ?? null,
         forBrandId: input.forBrandId ?? null,
-        seedMetadata: seedSnapshot
-          ? {
-              source: "seed",
-              count: seedSnapshot.count,
-              uploadedCount: 0,
-              status: "uploading",
-            }
+        seedMetadata: seedList
+          ? { count: seedList.count, status: "uploading" }
           : null,
         brandId: destination.brand.id,
         audienceId: input.planAudienceId ?? null,

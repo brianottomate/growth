@@ -206,14 +206,12 @@ See [delivery semantics](lifecycle-execution.md).
 
 ## Reusable audience seeds
 
-Over MCP and chat, `seedRead` lists seed lists, reads their builds and Meta
-delivery state, pages hashed members and reads fresh provider status. `seedWrite`
-builds seed lists from templates, uploads a build to its owner's Meta account
-(Wander's for seeds with Wander data, otherwise the brand's own), builds a
-lookalike there, records a client's shared copy and attaches it to campaign
-audiences or personas. `seedWrite.build` makes a list from a template (past
-bookers, an email list copy, destinations, similar homes, a persona or a
-description) and builds it at once; `rebuild` builds it again. Upload and lookalike creation require operator
-approval and never start spend. About 1,000 entries with an email or phone is a
-guideline for a useful lookalike, not a gate. Same action definitions
+`seedRead` lists a brand's seed lists and where each stands on Meta, and reads
+Meta's processing status. `seedWrite` builds a list from a template (the brand's
+own past bookers or an email list; Wander travelers by towns, similar homes, a
+persona or a description), refreshes it, uploads it to its owner's Meta account
+(Wander's for Wander travelers, otherwise the brand's own), builds a lookalike,
+records the client's shared copy and attaches it to campaign audiences or
+personas. Upload and lookalike creation require operator approval and never
+spend. About 1,000 people is a guideline for a useful lookalike, not a gate. Same action definitions
 serve `seed.*` oRPC. See [model, existing-versus-new and workflow](seed-audiences.md).

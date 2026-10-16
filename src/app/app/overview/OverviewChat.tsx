@@ -1804,8 +1804,10 @@ export function renderToolPart(
           share={output as RouterOutputs["seed"]["share"]}
         />
       );
-    case "seedRead.get": {
-      const { shares } = output as RouterOutputs["seed"]["get"];
+    case "seedRead.deliveries": {
+      const shares = (output as RouterOutputs["seed"]["deliveries"]).flatMap(
+        (row) => (row.share ? [row.share] : []),
+      );
       if (shares.length)
         return (
           <div key={key} className="space-y-2">

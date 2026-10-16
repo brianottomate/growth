@@ -10,10 +10,9 @@ import { ShapeBrandButton } from "./ShapeBrandButton";
 import { useWorkspaceMutation } from "./useWorkspaceMutation";
 
 const STAGE_LABEL = {
-  not_built: "Not built",
   built: "Not on Meta",
-  uploading: "Uploading to Meta",
   uploaded: "On Meta",
+  failed: "Upload failed",
   lookalike: "Lookalike, not shared",
   shared: "Lookalike ready",
 } as const;
@@ -58,7 +57,7 @@ export function SeedListsCard({
       ) : (
         <div className="space-y-2">
           {seeds.map((seed) => (
-            <SeedRow key={seed.seedListId} seed={seed} />
+            <SeedRow key={seed.id} seed={seed} />
           ))}
         </div>
       )}
@@ -67,20 +66,21 @@ export function SeedListsCard({
 }
 
 function SeedRow({ seed }: { seed: SeedDelivery }) {
-  const rebuild = useWorkspaceMutation(orpc.seed.rebuild.mutationOptions());
-  const build = seed.snapshot;
+  const refresh = useWorkspaceMutation(orpc.seed.refresh.mutationOptions());
   return (
     <article className="flex flex-col gap-3 rounded-lg border bg-card p-4 @xl:flex-row @xl:items-center @xl:justify-between">
       <div className="min-w-0 space-y-1">
-        <h3 className="font-medium">{seed.seedListName}</h3>
+        <h3 className="font-medium">{seed.name}</h3>
         <p className="text-sm text-muted-foreground">
-          {seed.seedListName === seed.builtFrom ? "" : `${seed.builtFrom} · `}
-          {build
-            ? `${build.memberCount.toLocaleString("en-US")} people · built ${new Date(build.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-            : "not built yet"}
+          {seed.name === seed.builtFrom ? "" : `${seed.builtFrom} · `}
+          {seed.memberCount.toLocaleString("en-US")} people · built{" "}
+          {new Date(seed.builtAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })}
         </p>
-        {build?.warning && (
-          <p className="text-xs text-muted-foreground">{build.warning}</p>
+        {seed.warning && (
+          <p className="text-xs text-muted-foreground">{seed.warning}</p>
         )}
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -88,10 +88,10 @@ function SeedRow({ seed }: { seed: SeedDelivery }) {
         <Button
           size="sm"
           variant="outline"
-          loading={rebuild.isPending}
-          onClick={() => rebuild.mutate({ seedListId: seed.seedListId })}
+          loading={refresh.isPending}
+          onClick={() => refresh.mutate({ seedListId: seed.id })}
         >
-          Rebuild
+          Refresh
         </Button>
       </div>
     </article>

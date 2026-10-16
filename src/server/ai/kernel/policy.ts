@@ -59,14 +59,12 @@ const write = (
 export const growthActionPolicies = {
   seedRead: {
     list: read(),
-    get: read(),
-    members: read(),
-    assetStatus: read("provider-read"),
     deliveries: read(),
+    assetStatus: read("provider-read"),
   },
   seedWrite: {
     build: write({ consequence: "provider-read" }),
-    rebuild: write({ consequence: "provider-read" }),
+    refresh: write({ consequence: "provider-read" }),
     share: write({ consequence: "provider-read", idempotent: true }),
     attach: write({ idempotent: true }),
     upload: write({

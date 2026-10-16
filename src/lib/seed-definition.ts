@@ -16,154 +16,180 @@ export const seedPropertyFilterSchema = z.object({
   minBedrooms: z.number().int().min(0).max(30).nullable().default(null),
   minOccupancy: z.number().int().min(1).max(100).nullable().default(null),
   petsAllowed: z.boolean().nullable().default(null),
-  near: z
-    .object({
-      latitude: z.number().min(-90).max(90),
-      longitude: z.number().min(-180).max(180),
-      radiiKm: z
-        .array(z.number().positive().max(20000))
-        .min(1)
-        .max(8)
-        .refine(
-          (v) => v.every((n, i) => i === 0 || n > v[i - 1]!),
-          "Radii must increase",
-        ),
-    })
-    .nullable()
-    .default(null),
 });
 export const seedSearchSchema = z.object({
   key: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,59}$/),
   why: z.string().trim().min(1).max(1500),
-  exclude: z.boolean().default(false),
   filter: seedPropertyFilterSchema,
 });
-/** The filters one build ran over WanderOS bookings and Wander's own signals. */
+
+/** The filters a list's build runs over WanderOS bookings and Wander's own signals. */
 export const seedDefinitionSchema = z
   .object({
-    kind: z.literal("query").default("query"),
-    version: z.literal(1).default(1),
     clientBookers: z.boolean().default(false),
     wander: z.boolean().default(false),
     wanderSignals: z
       .array(z.enum(["bookers", "intent"]))
       .min(1)
       .max(2)
-      .default(["bookers", "intent"])
-      .describe(
-        "Select bookers, property intent, or their union independently of the evidence score.",
-      ),
+      .default(["bookers", "intent"]),
     countries: z
       .array(z.string().regex(/^[A-Z]{2}$/))
       .min(1)
       .max(50)
       .default(["US"])
-      .describe(
-        "Wander profile countries only; client guests keep their source country coverage.",
-      ),
+      .describe("Wander profile countries only."),
     bookingDays: z.number().int().min(1).max(3650).default(730),
     intentDays: z.number().int().min(1).max(730).default(180),
     minScore: z.number().int().min(1).max(100).default(45),
-    targetCount: z
-      .number()
-      .int()
-      .positive()
-      .max(1000000)
-      .nullable()
-      .default(null)
-      .describe(
-        "Optional expansion goal, never a minimum, cap or padding rule.",
-      ),
     searches: z.array(seedSearchSchema).max(12).default([]),
-    excludedHashes: z
-      .array(z.string().regex(/^[a-f0-9]{64}$/))
-      .max(10000)
-      .default([]),
   })
   .superRefine((v, ctx) => {
     if (!v.wander && !v.clientBookers)
       ctx.addIssue({ code: "custom", message: "Choose at least one source" });
-    if (v.wander && !v.searches.some((s) => !s.exclude))
+    if (v.wander && !v.searches.length)
       ctx.addIssue({
         code: "custom",
-        message: "Wander sources require an inclusion search",
+        message: "Wander sources require a property search",
       });
-    if (new Set(v.searches.map((s) => s.key)).size !== v.searches.length)
-      ctx.addIssue({ code: "custom", message: "Search keys must be unique" });
   });
 export type SeedDefinition = z.infer<typeof seedDefinitionSchema>;
+export type SeedQueryParams = Record<
+  string,
+  string | number | boolean | string[] | number[]
+>;
 
-/** People copied once from an email list; the copy does not follow its source. */
-export const seedCopySchema = z.object({
-  kind: z.literal("copy"),
-  from: z.object({
-    type: z.literal("email_list"),
-    listId: z.string().min(1),
-    listName: z.string(),
-  }),
-  copiedAt: z.string(),
-});
-export type SeedCopy = z.infer<typeof seedCopySchema>;
+export type SeedSignal = {
+  emailHash: string;
+  bookings: number;
+  views: number;
+  dates: number;
+  checkouts: number;
+};
 
-/** What one frozen build ran: filters over warehouse data, or a copy. */
-export const seedSourceSchema = z.discriminatedUnion("kind", [
-  seedDefinitionSchema,
-  seedCopySchema,
-]);
-export type SeedSource = z.infer<typeof seedSourceSchema>;
+/** Transparent evidence tiers; ordinal heuristics, not conversion probabilities. */
+export function seedEvidenceScore(signal: Omit<SeedSignal, "emailHash">) {
+  if (signal.bookings > 0) return 100;
+  if (signal.checkouts > 0) return 80;
+  if (signal.dates > 0) return 65;
+  if (signal.views >= 2) return 45;
+  return signal.views > 0 ? 25 : 0;
+}
+
+/** Everyone whose combined activity reaches the evidence floor, once each. */
+export function selectSeedMembers(signals: SeedSignal[], minScore: number) {
+  const byHash = new Map<string, Omit<SeedSignal, "emailHash">>();
+  for (const s of signals) {
+    const prior = byHash.get(s.emailHash);
+    byHash.set(s.emailHash, {
+      bookings: (prior?.bookings ?? 0) + s.bookings,
+      views: (prior?.views ?? 0) + s.views,
+      dates: (prior?.dates ?? 0) + s.dates,
+      checkouts: (prior?.checkouts ?? 0) + s.checkouts,
+    });
+  }
+  const evidence = { bookers: 0, checkouts: 0, dates: 0, views: 0 };
+  const hashes: string[] = [];
+  for (const [hash, s] of byHash) {
+    const score = seedEvidenceScore(s);
+    if (score < minScore) continue;
+    hashes.push(hash);
+    if (score === 100) evidence.bookers += 1;
+    else if (score === 80) evidence.checkouts += 1;
+    else if (score === 65) evidence.dates += 1;
+    else evidence.views += 1;
+  }
+  return { hashes: hashes.sort(), evidence, candidates: byHash.size };
+}
+
+/** One person in a list, as uploaded to Meta (Zernio hashes on receipt). */
+export type SeedMember = {
+  emailHash: string;
+  email: string | null;
+  phone: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
+};
+
+/** What a build saw, for the list card and the operator. */
+export type SeedBuildSummary = {
+  candidates: number;
+  evidence: {
+    bookers: number;
+    checkouts: number;
+    dates: number;
+    views: number;
+  };
+  identifiable: number;
+  phones: number;
+};
 
 /**
  * Wander's own customers may only reach Meta through Wander's ad account. A
- * build without them belongs to the brand and uploads to the brand's account.
+ * list without them belongs to the brand and uploads to the brand's account.
  */
-export const seedUsesWanderData = (source: SeedSource) =>
-  source.kind !== "copy" && source.wander;
+export const seedUsesWanderData = (definition: SeedDefinition | null) =>
+  definition?.wander === true;
 
-/** Starting points for a seed list. A list keeps which one built it. */
+/** Guideline, not a gate: Meta builds weak lookalikes from smaller lists. */
+export const SEED_GUIDELINE_ENTRIES = 1000;
+
+/** Starting points for a seed list, grouped by whose people they are. */
 export const SEED_TEMPLATES = [
   {
     id: "past_bookers",
+    group: "guests",
     label: "Past bookers",
-    category: "The brand's own people",
-    summary:
-      "Confirmed direct bookings on the brand's WanderOS site. Uploads to the brand's own Meta account.",
+    summary: "Confirmed direct bookings on the brand's WanderOS site.",
   },
   {
     id: "email_list",
-    label: "Copy an email list",
-    category: "The brand's own people",
-    summary:
-      "Copies an email list's people once. Later changes to the email list do not follow; rebuild to copy again.",
+    group: "guests",
+    label: "An email list",
+    summary: "The people on one of the brand's email lists, copied in.",
   },
   {
     id: "destinations",
-    label: "Interested in these destinations",
-    category: "Wander travelers",
+    group: "wander",
+    label: "Interested in these towns",
     summary:
-      "Wander travelers who booked, searched dates, checked out or kept viewing homes in the brand's towns. Uploads to Wander's account; the lookalike is shared with the brand.",
+      "Booked, picked dates, checked out or kept viewing homes in the brand's towns.",
   },
   {
     id: "similar_homes",
-    label: "Likes homes like these",
-    category: "Wander travelers",
+    group: "wander",
+    label: "Like homes like these",
     summary:
-      "Wander travelers drawn to homes with as many bedrooms and guests as the brand's, anywhere. Uploads to Wander's account; the lookalike is shared.",
+      "Drawn to homes with as many bedrooms and guests as the brand's, anywhere.",
   },
   {
     id: "persona",
-    label: "From a persona",
-    category: "Wander travelers",
-    summary:
-      "Turns one of the brand's personas into home filters, once, with AI. Rebuilds reuse those filters.",
+    group: "wander",
+    label: "Fit a persona",
+    summary: "One of the brand's personas, turned into home filters with AI.",
   },
   {
     id: "described",
-    label: "Describe it",
-    category: "Wander travelers",
-    summary:
-      "Say who you want; AI turns it into home filters once. Rebuilds reuse those filters.",
+    group: "wander",
+    label: "Fit a description",
+    summary: "Say who you want; AI turns it into home filters.",
   },
 ] as const;
+export const SEED_TEMPLATE_GROUPS = {
+  guests: {
+    label: "Your guests",
+    summary: "Uploads to the brand's own Meta ad account.",
+  },
+  wander: {
+    label: "Wander travelers",
+    summary:
+      "Uploads to Wander's Meta ad account; the lookalike is shared with the brand.",
+  },
+} as const;
 export type SeedTemplateId = (typeof SEED_TEMPLATES)[number]["id"];
 export const SEED_TEMPLATE_IDS = SEED_TEMPLATES.map((t) => t.id) as [
   SeedTemplateId,
@@ -196,140 +222,8 @@ export function seedOriginLabel(origin: SeedOrigin) {
     case "described":
       return `Described: ${origin.steer}`;
     case "email_list":
-      return `Copied from ${origin.listName}`;
+      return `Email list: ${origin.listName}`;
     default:
       return SEED_TEMPLATES.find((t) => t.id === origin.template)!.label;
   }
-}
-
-/** Guideline, not a gate: Meta builds weak lookalikes from smaller lists. */
-export const SEED_GUIDELINE_ENTRIES = 1000;
-export type SeedSearch = z.infer<typeof seedSearchSchema>;
-export type SeedEvidence = {
-  source: string;
-  search: string | null;
-  score: number;
-  ring: number;
-  bookings: number;
-  views: number;
-  dates: number;
-  checkouts: number;
-};
-export type SeedCandidate = { emailHash: string; evidence: SeedEvidence[] };
-
-/** Transparent evidence tiers; scores are ordinal heuristics, not conversion probabilities. */
-export function seedEvidenceScore(signal: {
-  bookings: number;
-  views: number;
-  dates: number;
-  checkouts: number;
-}) {
-  if (signal.bookings > 0) return 100;
-  if (signal.checkouts > 0) return 80;
-  if (signal.dates > 0) return 65;
-  if (signal.views >= 2) return 45;
-  return signal.views > 0 ? 25 : 0;
-}
-
-export function selectSeedCandidates(
-  input: SeedCandidate[],
-  definition: SeedDefinition,
-) {
-  const excluded = new Set(definition.excludedHashes);
-  const negative = new Set(
-    definition.searches.filter((s) => s.exclude).map((s) => s.key),
-  );
-  const byHash = new Map<string, SeedEvidence[]>();
-  for (const row of input) {
-    if (!/^[a-f0-9]{64}$/.test(row.emailHash))
-      throw new Error("Invalid seed identity");
-    byHash.set(row.emailHash, [
-      ...(byHash.get(row.emailHash) ?? []),
-      ...row.evidence,
-    ]);
-  }
-  const eligible = [...byHash].filter(
-    ([h, e]) =>
-      !excluded.has(h) && !e.some((v) => v.search && negative.has(v.search)),
-  );
-  const maximumRing = Math.max(
-    0,
-    ...definition.searches
-      .filter((s) => !s.exclude)
-      .map((s) => (s.filter.near?.radiiKm.length ?? 1) - 1),
-  );
-  const expansion = [];
-  let members: {
-    emailHash: string;
-    score: number;
-    evidence: SeedEvidence[];
-  }[] = [];
-  for (let ring = 0; ring <= maximumRing; ring++) {
-    members = eligible.flatMap(([emailHash, evidence]) => {
-      const grouped = new Map<string, SeedEvidence>();
-      for (const e of evidence.filter((e) => e.ring <= ring)) {
-        const key = JSON.stringify([e.source, e.search]);
-        const previous = grouped.get(key);
-        grouped.set(
-          key,
-          previous
-            ? {
-                ...e,
-                bookings: previous.bookings + e.bookings,
-                views: previous.views + e.views,
-                dates: previous.dates + e.dates,
-                checkouts: previous.checkouts + e.checkouts,
-                score: Math.max(previous.score, e.score),
-              }
-            : { ...e },
-        );
-      }
-      const active = [...grouped.values()]
-        .map((e) => ({ ...e, score: Math.max(e.score, seedEvidenceScore(e)) }))
-        .filter((e) => e.score >= definition.minScore);
-      return active.length
-        ? [
-            {
-              emailHash,
-              score: Math.max(...active.map((e) => e.score)),
-              evidence: active,
-            },
-          ]
-        : [];
-    });
-    expansion.push({ ring, count: members.length });
-    // With no size request, preserve all relevance-qualified members within the declared bounds.
-    if (
-      definition.targetCount !== null &&
-      members.length >= definition.targetCount
-    )
-      break;
-  }
-  members.sort(
-    (a, b) => b.score - a.score || a.emailHash.localeCompare(b.emailHash),
-  );
-  return {
-    members,
-    expansion,
-    goalMet:
-      definition.targetCount === null
-        ? null
-        : members.length >= definition.targetCount,
-    candidateCount: byHash.size,
-    excludedCount: byHash.size - eligible.length,
-  };
-}
-
-export type SeedQueryParams = Record<
-  string,
-  string | number | boolean | string[] | number[]
->;
-
-/** Count people once per evidence key, including keys that shadow Object members. */
-export function seedEvidenceCounts(members: Pick<SeedCandidate, "evidence">[]) {
-  const counts = new Map<string, number>();
-  for (const member of members)
-    for (const key of new Set(member.evidence.map((e) => e.search ?? e.source)))
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-  return Object.fromEntries(counts);
 }

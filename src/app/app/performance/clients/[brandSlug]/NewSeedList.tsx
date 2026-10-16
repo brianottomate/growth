@@ -1,13 +1,19 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { UsersRound } from "lucide-react";
-import { StartFromDialog } from "@/components/start-from-dialog";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { SimpleDialog } from "@/components/ui/dialog";
+import { SimpleSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { SEED_TEMPLATES, type SeedTemplateId } from "@/lib/seed-definition";
+import { cn } from "@/components/ui/lib/utils";
+import {
+  SEED_TEMPLATE_GROUPS,
+  SEED_TEMPLATES,
+  type SeedTemplateId,
+} from "@/lib/seed-definition";
 import { orpc } from "@/orpc/client";
 
 export type NewSeedListContext = {
@@ -28,10 +34,9 @@ export function NewSeedList({
   primary?: boolean;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [template, setTemplate] = useState<SeedTemplateId>(
-    context.hasBookingSite ? "past_bookers" : "destinations",
-  );
+  const [template, setTemplate] = useState<SeedTemplateId | null>(null);
   const [personaId, setPersonaId] = useState(context.personas[0]?.id ?? "");
   const [emailListId, setEmailListId] = useState(
     context.emailLists[0]?.id ?? "",
@@ -39,12 +44,16 @@ export function NewSeedList({
   const [steer, setSteer] = useState("");
   const build = useMutation(
     orpc.seed.build.mutationOptions({
-      onSuccess: ({ list, snapshot }) => {
+      onSuccess: (list) => {
         setOpen(false);
+        setTemplate(null);
         toast.success(
-          `Built ${list.name}: ${snapshot.memberCount.toLocaleString("en-US")} people`,
+          `Built ${list.name}: ${list.memberCount.toLocaleString("en-US")} people`,
         );
-        if (snapshot.warning) toast.info(snapshot.warning);
+        if (list.warning) toast.info(list.warning);
+        void queryClient.invalidateQueries({
+          queryKey: orpc.seed.deliveries.key(),
+        });
         router.refresh();
       },
       onError: (error) => toast.error(error.message),
@@ -52,102 +61,141 @@ export function NewSeedList({
   );
   const unavailable = (id: SeedTemplateId) =>
     id === "past_bookers" && !context.hasBookingSite
-      ? "Needs a connected WanderOS booking site."
+      ? "Needs a connected WanderOS booking site"
       : id === "email_list" && !context.emailLists.length
-        ? "This brand has no email lists yet."
+        ? "No email lists yet"
         : id === "persona" && !context.personas.length
-          ? "Define a persona on Setup first."
+          ? "Define a persona on Setup first"
           : (id === "destinations" || id === "similar_homes") &&
               !context.hasHomes
-            ? "Import or add homes first."
-            : undefined;
-  const select = "w-full rounded-md border bg-background p-2 text-sm";
+            ? "Import or add homes first"
+            : null;
+  const ready =
+    template !== null &&
+    !unavailable(template) &&
+    (template !== "described" || Boolean(steer.trim()));
   return (
-    <StartFromDialog
+    <SimpleDialog
       open={open}
-      onOpenChange={setOpen}
-      trigger={{
-        label: "New seed list",
-        primary,
-        icon: <UsersRound className="size-3.5" />,
-      }}
+      onOpenChange={(next) => !build.isPending && setOpen(next)}
       title="New seed list"
-      intro={
-        <p className="text-sm text-muted-foreground">
-          Builds straight away. Each Meta ad set can then use it as a seed.
-        </p>
+      description="Builds straight away. Each Meta ad set can then use it as a seed."
+      scrollable
+      trigger={
+        <Button size="sm" variant={primary ? "default" : "outline"}>
+          <UsersRound className="size-3.5" />
+          New seed list
+        </Button>
       }
-      options={SEED_TEMPLATES.map((t) => ({
-        id: t.id,
-        label: t.label,
-        category: t.category,
-        summary: t.summary,
-        unavailable: unavailable(t.id),
-      }))}
-      value={template}
-      onValueChange={setTemplate}
-      submitLabel="Build list"
-      busyLabel="Building list"
-      busy={build.isPending}
-      canSubmit={template !== "described" || Boolean(steer.trim())}
-      onSubmit={() =>
-        build.mutate({
-          brandId: context.brandId,
-          template,
-          ...(template === "persona" ? { personaId } : {}),
-          ...(template === "email_list" ? { emailListId } : {}),
-          ...(template === "described" ? { steer } : {}),
-        })
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            disabled={build.isPending}
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={!ready}
+            loading={build.isPending}
+            onClick={() =>
+              template &&
+              build.mutate({
+                brandId: context.brandId,
+                template,
+                ...(template === "persona" ? { personaId } : {}),
+                ...(template === "email_list" ? { emailListId } : {}),
+                ...(template === "described" ? { steer } : {}),
+              })
+            }
+          >
+            {build.isPending ? "Building…" : "Build list"}
+          </Button>
+        </div>
       }
     >
-      {template === "persona" && (
-        <div className="space-y-1">
-          <Label htmlFor="seed-persona">Persona</Label>
-          <select
-            id="seed-persona"
-            className={select}
-            value={personaId}
-            disabled={build.isPending}
-            onChange={(event) => setPersonaId(event.target.value)}
-          >
-            {context.personas.map((persona) => (
-              <option key={persona.id} value={persona.id}>
-                {persona.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      {template === "email_list" && (
-        <div className="space-y-1">
-          <Label htmlFor="seed-email-list">Email list</Label>
-          <select
-            id="seed-email-list"
-            className={select}
-            value={emailListId}
-            disabled={build.isPending}
-            onChange={(event) => setEmailListId(event.target.value)}
-          >
-            {context.emailLists.map((list) => (
-              <option key={list.id} value={list.id}>
-                {list.name} · {list.memberCount.toLocaleString("en-US")}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      {template === "described" && (
-        <div className="space-y-1">
-          <Label htmlFor="seed-steer">Who it is for</Label>
-          <Textarea
-            id="seed-steer"
-            value={steer}
-            disabled={build.isPending}
-            placeholder="Families who searched big mountain homes for summer"
-            onChange={(event) => setSteer(event.target.value)}
-          />
-        </div>
-      )}
-    </StartFromDialog>
+      <div className="space-y-5">
+        {(["guests", "wander"] as const).map((group) => (
+          <section key={group} className="space-y-2">
+            <div>
+              <h3 className="text-sm font-medium">
+                {SEED_TEMPLATE_GROUPS[group].label}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {SEED_TEMPLATE_GROUPS[group].summary}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {SEED_TEMPLATES.filter((t) => t.group === group).map((t) => {
+                const blocked = unavailable(t.id);
+                const chosen = template === t.id;
+                return (
+                  <div
+                    key={t.id}
+                    className={cn(
+                      "rounded-lg border p-3",
+                      chosen && "border-foreground",
+                      blocked && "opacity-60",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      disabled={Boolean(blocked) || build.isPending}
+                      aria-pressed={chosen}
+                      onClick={() => setTemplate(t.id)}
+                      className="w-full text-left"
+                    >
+                      <span className="block text-sm font-medium">
+                        {t.label}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {blocked ?? t.summary}
+                      </span>
+                    </button>
+                    {chosen && t.id === "persona" && (
+                      <div className="mt-3">
+                        <SimpleSelect
+                          value={personaId}
+                          onValueChange={setPersonaId}
+                          disabled={build.isPending}
+                          options={context.personas.map((p) => ({
+                            value: p.id,
+                            label: p.name,
+                          }))}
+                        />
+                      </div>
+                    )}
+                    {chosen && t.id === "email_list" && (
+                      <div className="mt-3">
+                        <SimpleSelect
+                          value={emailListId}
+                          onValueChange={setEmailListId}
+                          disabled={build.isPending}
+                          options={context.emailLists.map((l) => ({
+                            value: l.id,
+                            label: `${l.name} · ${l.memberCount.toLocaleString("en-US")}`,
+                          }))}
+                        />
+                      </div>
+                    )}
+                    {chosen && t.id === "described" && (
+                      <Textarea
+                        className="mt-3"
+                        aria-label="Who the seed is for"
+                        value={steer}
+                        disabled={build.isPending}
+                        placeholder="Families who searched big mountain homes for summer"
+                        onChange={(event) => setSteer(event.target.value)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </SimpleDialog>
   );
 }

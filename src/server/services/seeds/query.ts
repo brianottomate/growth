@@ -26,7 +26,6 @@ export function buildWanderSeedQuery(d: SeedDefinition, asOf: string) {
     const f = s.filter,
       key = `s${i}`,
       conditions: string[] = [];
-    params[`${key}_key`] = s.key;
     for (const field of ["states", "cities", "landscapes"] as const) {
       if (!f[field].length) continue;
       const column = {
@@ -58,18 +57,7 @@ export function buildWanderSeedQuery(d: SeedDefinition, asOf: string) {
       params[`${key}_pets`] = f.petsAllowed;
       conditions.push(`p.is_pet_allowed=@${key}_pets`);
     }
-    let ring = "0";
-    if (f.near) {
-      params[`${key}_lat`] = f.near.latitude;
-      params[`${key}_lon`] = f.near.longitude;
-      params[`${key}_radii`] = f.near.radiiKm;
-      const distance = `ST_DISTANCE(SAFE.ST_GEOGPOINT(SAFE_CAST(p.longitude AS FLOAT64),SAFE_CAST(p.latitude AS FLOAT64)),ST_GEOGPOINT(@${key}_lon,@${key}_lat))/1000`;
-      ring = `(SELECT MIN(off) FROM UNNEST(@${key}_radii) radius WITH OFFSET off WHERE ${distance}<=radius)`;
-      conditions.push(
-        `${distance}<= (SELECT MAX(radius) FROM UNNEST(@${key}_radii) radius)`,
-      );
-    }
-    return `SELECT p.id_unit,@${key}_key search,${ring} ring FROM properties p WHERE ${conditions.join(" AND ") || "TRUE"}`;
+    return `SELECT p.id_unit FROM properties p WHERE ${conditions.join(" AND ") || "TRUE"}`;
   });
   if (!matches.length)
     throw new Error("Choose property searches before querying Wander");
@@ -82,19 +70,19 @@ export function buildWanderSeedQuery(d: SeedDefinition, asOf: string) {
  SELECT alias,p.id_unit FROM properties p,UNNEST([p.id_unit,p.id_unit_new]) alias WHERE alias IS NOT NULL
  GROUP BY alias,p.id_unit
  QUALIFY COUNT(*) OVER(PARTITION BY alias)=1
-), matches AS (${matches.join(" UNION ALL ")}), bookings AS (
+), matches AS (SELECT DISTINCT id_unit FROM (${matches.join(" UNION ALL ")})), bookings AS (
  SELECT * FROM \`${A}.bookings\` WHERE ts_created<TIMESTAMP(@asOf)
  QUALIFY ROW_NUMBER() OVER(PARTITION BY id_booking ORDER BY ts_created DESC)=1
 ), signals AS (
- SELECT p.email_hash,m.search,m.ring,'wander_bookers' source,
+ SELECT p.email_hash,
  COUNT(DISTINCT b.id_booking) bookings,0 views,0 dates,0 checkouts
  FROM bookings b JOIN eligible p USING(id_user) JOIN aliases a ON a.alias=b.id_unit JOIN matches m ON m.id_unit=a.id_unit
  WHERE ${d.wanderSignals.includes("bookers") ? "TRUE" : "FALSE"} AND b.status='confirmed' AND b.ts_canceled IS NULL
  AND b.ts_confirmed>=TIMESTAMP_SUB(TIMESTAMP(@asOf),INTERVAL @bookingDays DAY) AND b.ts_confirmed<TIMESTAMP(@asOf)
  AND NOT COALESCE(b.is_wander_saas,FALSE) AND COALESCE(b.is_direct_booking,FALSE) AND NOT COALESCE(b.is_manual_booking,FALSE)
- AND p.country IN UNNEST(@countries) GROUP BY 1,2,3
+ AND p.country IN UNNEST(@countries) GROUP BY 1
  UNION ALL
- SELECT p.email_hash,m.search,m.ring,'wander_intent' source,0 bookings,
+ SELECT p.email_hash,0 bookings,
  COUNT(DISTINCT IF(f.event_type='property_page_view',f.id_event,NULL)) views,
  COUNT(DISTINCT IF(f.event_type IN ('property_dates_selected','property_dates_updated'),f.id_event,NULL)) dates,
  COUNT(DISTINCT IF(f.event_type IN ('checkout_previewed','checkout_started','payment_info_entered'),f.id_event,NULL)) checkouts
@@ -104,7 +92,7 @@ export function buildWanderSeedQuery(d: SeedDefinition, asOf: string) {
  AND NOT COALESCE(f.is_bot_event,FALSE) AND NOT COALESCE(f.is_ai_bot_event,FALSE) AND NOT COALESCE(f.is_automation_event,FALSE)
  AND f.event_source IN ('website','app')
  AND f.event_type IN ('property_page_view','property_dates_selected','property_dates_updated','checkout_previewed','checkout_started','payment_info_entered')
- GROUP BY 1,2,3
+ GROUP BY 1
 ) SELECT * FROM signals`,
   };
 }

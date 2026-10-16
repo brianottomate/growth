@@ -1,0 +1,2 @@
+ALTER TABLE "platform_audience" ADD COLUMN "seed_list_id" text;--> statement-breakpoint
+ALTER TABLE "platform_audience" ADD CONSTRAINT "platform_audience_seed_list_id_seed_list_id_fk" FOREIGN KEY ("seed_list_id") REFERENCES "public"."seed_list"("id") ON DELETE set null ON UPDATE no action;

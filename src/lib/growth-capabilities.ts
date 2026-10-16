@@ -5,8 +5,8 @@
  * handling all key off this one public ID/action map.
  */
 export const GROWTH_CAPABILITY_ACTIONS = {
-  seedRead: ["list", "get", "members", "assetStatus", "deliveries"],
-  seedWrite: ["build", "rebuild", "upload", "lookalike", "share", "attach"],
+  seedRead: ["list", "deliveries", "assetStatus"],
+  seedWrite: ["build", "refresh", "upload", "lookalike", "share", "attach"],
   reviewRead: ["listComments"],
   reviewWrite: ["addComment", "deleteComment"],
   creativeRead: ["list", "get"],

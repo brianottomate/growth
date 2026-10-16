@@ -260,6 +260,20 @@
       "when": 1792175824918,
       "tag": "0035_seed_origins",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792183038987,
+      "tag": "0036_seed_list_builds",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792183055259,
+      "tag": "0037_seed_list_assets",
+      "breakpoints": true
     }
   ]
 }

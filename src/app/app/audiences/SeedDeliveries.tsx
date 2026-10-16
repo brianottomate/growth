@@ -9,10 +9,9 @@ import { Button } from "@/components/ui/button";
 import { orpc } from "@/orpc/client";
 
 const STAGE_LABEL = {
-  not_built: "Not built",
   built: "Built",
-  uploading: "Uploading",
-  uploaded: "Uploaded to Wander",
+  uploaded: "Uploaded",
+  failed: "Upload failed",
   lookalike: "Needs sharing",
   shared: "Shared",
 } as const;
@@ -64,7 +63,7 @@ export function SeedDeliveries() {
             </thead>
             <tbody>
               {rows.map((d) => (
-                <tr key={d.seedListId} className="border-b last:border-0">
+                <tr key={d.id} className="border-b last:border-0">
                   <td className="px-3 py-2">
                     {d.brandSlug ? (
                       <Link
@@ -77,13 +76,9 @@ export function SeedDeliveries() {
                       d.brandName
                     )}
                   </td>
-                  <td className="max-w-56 truncate px-3 py-2">
-                    {d.seedListName}
-                  </td>
+                  <td className="max-w-56 truncate px-3 py-2">{d.name}</td>
                   <td className="px-3 py-2 tabular-nums">
-                    {(
-                      d.snapshot?.entries ?? d.snapshot?.memberCount
-                    )?.toLocaleString() ?? "–"}
+                    {d.summary.identifiable?.toLocaleString() ?? "–"}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">
                     {d.lookalike?.metaAudienceId ?? "–"}

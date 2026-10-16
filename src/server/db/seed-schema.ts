@@ -1,16 +1,17 @@
-import { index, jsonb, pgTable, primaryKey } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable } from "drizzle-orm/pg-core";
 import { brandTable } from "./brand-schema";
 import { createId } from "./utils";
 import type {
+  SeedBuildSummary,
+  SeedDefinition,
+  SeedMember,
   SeedOrigin,
-  SeedSource,
-  SeedEvidence,
-  SeedQueryParams,
 } from "@/lib/seed-definition";
 
 /**
- * A brand's reusable list of people for paid seeds, separate from email lists.
- * Neither a campaign nor a provider audience; platform plans deliver it.
+ * A brand's list of people for paid seeds: which starting point made it, the
+ * filters its build ran and the people it found. Refresh overwrites the build;
+ * Meta keeps whatever was uploaded.
  */
 export const seedListTable = pgTable(
   "seed_list",
@@ -24,74 +25,15 @@ export const seedListTable = pgTable(
       .notNull()
       .references(() => brandTable.id, { onDelete: "cascade" }),
     name: t.text().notNull(),
-    /** Which starting point built it; each build keeps the filters it ran. */
     origin: jsonb().$type<SeedOrigin>().notNull(),
+    /** The filters the build ran; null for an email list copy. */
+    definition: jsonb().$type<SeedDefinition>(),
+    members: jsonb().$type<SeedMember[]>().notNull(),
+    memberCount: t.integer().notNull(),
+    summary: jsonb().$type<SeedBuildSummary>().notNull(),
+    builtAt: t.timestamp({ withTimezone: true }).notNull(),
     createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
   }),
   (t) => [index("seed_list_brand_idx").on(t.brandId)],
-);
-
-/** Immutable inputs and membership per build; a refresh creates another snapshot. */
-export const seedSnapshotTable = pgTable(
-  "seed_snapshot",
-  (t) => ({
-    id: t
-      .text()
-      .primaryKey()
-      .$defaultFn(() => createId("ssnap")),
-    seedListId: t
-      .text()
-      .notNull()
-      .references(() => seedListTable.id, { onDelete: "restrict" }),
-    definition: jsonb().$type<SeedSource>().notNull(),
-    asOf: t.timestamp({ withTimezone: true }).notNull(),
-    memberCount: t.integer().notNull(),
-    diagnostics: jsonb()
-      .$type<{
-        expansion: { ring: number; count: number }[];
-        goalMet: boolean | null;
-        candidateCount: number;
-        excludedCount: number;
-        sources: {
-          name: string;
-          rows: number;
-          jobId: string | null;
-          bytesProcessed: string | null;
-        }[];
-        queries: { sql: string; params: SeedQueryParams }[];
-        /** Members with an email or phone stored; absent on pre-contact builds. */
-        contacts?: { identifiable: number; phones: number };
-      }>()
-      .notNull(),
-    createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
-  }),
-  (t) => [index("seed_snapshot_list_idx").on(t.seedListId, t.createdAt)],
-);
-
-/**
- * Identity is the normalized email's SHA-256. Contact fields are frozen with the
- * build so delivery uploads exactly what was reviewed; Zernio hashes on receipt.
- */
-export const seedMemberTable = pgTable(
-  "seed_member",
-  (t) => ({
-    snapshotId: t
-      .text()
-      .notNull()
-      .references(() => seedSnapshotTable.id, { onDelete: "cascade" }),
-    emailHash: t.text().notNull(),
-    score: t.integer().notNull(),
-    evidence: jsonb().$type<SeedEvidence[]>().notNull(),
-    email: t.text(),
-    /** E.164. */
-    phone: t.text(),
-    firstName: t.text(),
-    lastName: t.text(),
-    city: t.text(),
-    state: t.text(),
-    postalCode: t.text(),
-    country: t.text(),
-  }),
-  (t) => [primaryKey({ columns: [t.snapshotId, t.emailHash] })],
 );

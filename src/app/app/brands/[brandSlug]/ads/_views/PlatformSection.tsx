@@ -31,6 +31,7 @@ import { PlatformBudget } from "./PlatformBudget";
 import { PushToPlatform } from "./PushToPlatform";
 import { MetaDeliverySummary } from "./MetaDeliverySummary";
 import { PushedMetaGroups } from "./PushedMetaGroups";
+import { SeedLookalikeStep } from "./SeedLookalikeStep";
 import { PushedSearchGroups } from "./PushedSearchGroups";
 
 /**
@@ -394,6 +395,20 @@ export async function PlatformSection({
             ads={ads}
             pc={platformCampaign}
           />
+          {/* The seed steps do not depend on the push; a pushed plan uses
+              the attached lookalike the next time it is compiled. */}
+          {(audiences ?? []).map((audience) => (
+            <SeedLookalikeStep
+              key={audience.id}
+              brandId={platformCampaign.brandId}
+              brandName={brandName}
+              campaignId={campaignId}
+              campaignName={campaignName ?? platformCampaign.name}
+              campaignAudienceId={audience.id}
+              title={`Seed lookalike · ${audience.name}`}
+              seedContext={seedContext}
+            />
+          ))}
         </div>
       ) : platform === "google_ads" &&
         platformCampaign.settings?.google?.campaignType === "search" ? (
