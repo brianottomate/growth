@@ -3,7 +3,11 @@ import { index, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 import { brandTable } from "./brand-schema";
 import { userTable } from "./auth-schema";
 import { createId } from "./utils";
-import type { TaskCategory, TaskStatus } from "@/lib/brand-task";
+import type {
+  BrandTaskDecision,
+  TaskCategory,
+  TaskStatus,
+} from "@/lib/brand-task";
 
 export const brandTaskTable = pgTable(
   "brand_task",
@@ -19,6 +23,8 @@ export const brandTaskTable = pgTable(
     templateKey: t.text(),
     title: t.text().notNull(),
     notes: t.text(),
+    /** The choice this task waits on, confirmed in one click. */
+    decision: t.jsonb().$type<BrandTaskDecision>(),
     category: t.text().$type<TaskCategory>().notNull().default("setup"),
     tags: t.text().array().notNull().default([]),
     status: t.text().$type<TaskStatus>().notNull().default("todo"),

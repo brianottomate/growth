@@ -1,0 +1,1 @@
+ALTER TABLE "brand_task" ADD COLUMN "decision" jsonb;

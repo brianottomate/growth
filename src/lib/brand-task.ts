@@ -139,3 +139,17 @@ export const DEFAULT_CLIENT_TASKS: readonly {
 export function taskSettled(status: TaskStatus) {
   return status === "done" || status === "not_applicable";
 }
+
+/**
+ * A choice a task is waiting on, with what the operator needs to make it in
+ * one click. The recommendation is advice; nothing is applied until confirmed.
+ */
+export type BrandTaskDecision = {
+  type: "meta_pixel";
+  adAccountId: string;
+  adAccountName: string | null;
+  options: { id: string; name: string; evidence: string[] }[];
+  recommendedId: string | null;
+  why: string;
+  recommendedBy: "evidence" | "model" | null;
+};

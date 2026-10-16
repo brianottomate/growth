@@ -464,6 +464,9 @@ function TaskRow({
           disabled={update.isPending}
         />
       </div>
+      {task.decision?.type === "meta_pixel" && !taskSettled(task.status) && (
+        <PixelDecision task={task} refresh={refresh} />
+      )}
       {!!task.tags.length && (
         <div className="mt-1 flex flex-wrap gap-1 pl-7">
           {task.tags.map((value, index) => (
@@ -676,5 +679,86 @@ function TaskRow({
         </AccordionItem>
       </AccordionRoot>
     </li>
+  );
+}
+
+/**
+ * A pixel task's options, the recommended one first, each one click from
+ * applied. Nothing is recorded until a person picks.
+ */
+function PixelDecision({
+  task,
+  refresh,
+}: {
+  task: BrandTaskView;
+  refresh: () => Promise<unknown>;
+}) {
+  const decision = task.decision!;
+  const confirm = useMutation(
+    orpc.brandTask.confirmPixel.mutationOptions({
+      onSuccess: async () => {
+        toast.success("Pixel saved");
+        await refresh();
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+  const options = [...decision.options].sort(
+    (a, b) =>
+      Number(b.id === decision.recommendedId) -
+      Number(a.id === decision.recommendedId),
+  );
+  return (
+    <div className="mt-2 space-y-2 pl-7">
+      <p className="text-xs text-muted-foreground">
+        {decision.adAccountName ?? decision.adAccountId}
+        {decision.recommendedId && decision.why
+          ? ` · ${decision.recommendedBy === "model" ? "Suggested from the pixel names" : "Recommended"}: ${decision.why}`
+          : " · None of these fires on the website or is tracked by a campaign yet; pick the one the site should use."}
+      </p>
+      <ul className="space-y-1.5">
+        {options.map((option) => (
+          <li
+            key={option.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2"
+          >
+            <div className="min-w-0 text-sm">
+              <p className="font-medium">
+                {option.name}
+                {option.id === decision.recommendedId && (
+                  <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                    {decision.recommendedBy === "model"
+                      ? "Suggested"
+                      : "Recommended"}
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {[option.id, ...option.evidence].join(" · ")}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={
+                option.id === decision.recommendedId &&
+                decision.recommendedBy === "evidence"
+                  ? "default"
+                  : "outline"
+              }
+              disabled={confirm.isPending}
+              onClick={() =>
+                confirm.mutate({
+                  brandId: task.brandId,
+                  id: task.id,
+                  pixelId: option.id,
+                })
+              }
+            >
+              Use this pixel
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

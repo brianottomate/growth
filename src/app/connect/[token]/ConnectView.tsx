@@ -182,9 +182,9 @@ export function ConnectView({
                     )}
                     {selectionReview && (
                       <p role="status" className="text-sm">
-                        Setup could not finish automatically. Review the status
-                        below or contact your Wander team; your account may
-                        still need Page, billing or tracking setup.
+                        {metaChoice?.selectedId
+                          ? "Your ad account is saved. Wander is finishing the rest of your setup and will confirm with you."
+                          : "We could not finish setting up this account automatically. Wander will review it and confirm with you."}
                       </p>
                     )}
                     {setupChecks.length > 0 && (

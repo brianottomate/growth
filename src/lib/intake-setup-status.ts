@@ -77,7 +77,7 @@ export function intakeSetupSummary(
           : connection.sitePixelIds === null
             ? "Your pixel is saved, but we could not verify its installation right now."
             : "Your pixel is saved. Wander needs to install and verify it on your website."
-        : "Wander needs to finish preparing your website tracking.",
+        : "Wander will confirm your website tracking.",
     },
     {
       key: "google",

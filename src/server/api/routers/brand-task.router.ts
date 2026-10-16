@@ -9,6 +9,7 @@ import {
   restoreBrandTask,
   updateBrandTask,
 } from "@/server/services/brand-task.service";
+import { confirmMetaPixel } from "@/server/services/meta-connect-setup.service";
 
 const brandInput = z.object({ brandId: z.string().min(1) });
 const taskInput = brandInput.extend({ id: z.string().min(1) });
@@ -42,6 +43,18 @@ export const brandTaskRouter = {
   remove: workspaceProcedure
     .input(taskInput)
     .handler(({ context, input }) => removeBrandTask(context.workspace, input)),
+  /** The one-click answer to a "Confirm the client's Meta pixel" task. */
+  confirmPixel: workspaceProcedure
+    .input(taskInput.extend({ pixelId: z.string().regex(/^\d+$/) }))
+    .handler(({ context, input }) =>
+      confirmMetaPixel(
+        { brandId: input.brandId, taskId: input.id, pixelId: input.pixelId },
+        {
+          organizationId: context.workspace.orgId,
+          userId: context.workspace.userId,
+        },
+      ),
+    ),
   move: workspaceProcedure
     .input(taskInput.extend({ beforeId: z.string().min(1).nullable() }))
     .handler(({ context, input }) => moveBrandTask(context.workspace, input)),
