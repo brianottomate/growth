@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { orpc } from "@/orpc/client";
@@ -40,6 +41,8 @@ const statusOptions = Object.entries(TASK_STATUSES).map(([value, label]) => ({
   value,
   label,
 }));
+const TASK_FILTERS = ["all", "open", "mine", "overdue"] as const;
+type TaskFilter = (typeof TASK_FILTERS)[number];
 const localDay = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -53,9 +56,12 @@ export function BrandTasks({ brandId }: { brandId: string }) {
   const roster = useQuery(orpc.performance.staffRoster.queryOptions());
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<TaskCategory>("setup");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useQueryState(
+    "tasks",
+    parseAsStringLiteral(TASK_FILTERS).withDefault("all"),
+  );
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [tag, setTag] = useState("");
+  const [tag, setTag] = useQueryState("tag", parseAsString.withDefault(""));
   const refresh = () =>
     queryClient.invalidateQueries({
       queryKey: orpc.brandTask.list.key({ input: { brandId } }),
@@ -129,7 +135,7 @@ export function BrandTasks({ brandId }: { brandId: string }) {
             className="w-40"
             aria-label="Filter tasks"
             value={filter}
-            onValueChange={setFilter}
+            onValueChange={(value) => void setFilter(value as TaskFilter)}
             options={[
               { value: "all", label: "All tasks" },
               { value: "open", label: "Open tasks" },
@@ -146,7 +152,7 @@ export function BrandTasks({ brandId }: { brandId: string }) {
             searchPlaceholder="Search tags…"
             emptyText="No matching tags."
             value={tag}
-            onValueChange={setTag}
+            onValueChange={(value) => void setTag(value)}
             options={[
               { value: "", label: "All tags" },
               ...[...new Set([...tags, ...(tag ? [tag] : [])])].map(

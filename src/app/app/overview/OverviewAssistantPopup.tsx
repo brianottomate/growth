@@ -58,6 +58,19 @@ import {
  * beside the workspace rather than replacing it. On `/app/next/<threadId>` the
  * same instance fills the main area and the URL decides the session.
  */
+// Next syncs history.replaceState into useSearchParams without a navigation.
+function replaceChatParam(threadId: string | null) {
+  const params = new URLSearchParams(window.location.search);
+  if (threadId) params.set("chat", threadId);
+  else params.delete("chat");
+  const query = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    query ? `${window.location.pathname}?${query}` : window.location.pathname,
+  );
+}
+
 export function OverviewAssistantPopup({
   userName,
   brands,
@@ -68,9 +81,13 @@ export function OverviewAssistantPopup({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  // `?chat=<threadId>` mirrors the open dock so a copied URL reopens the same
+  // session beside the same page. The full page carries its thread in the path.
+  const urlThreadId = searchParams.get("chat");
   const pageThreadId = assistantPageThreadId(pathname);
   const pageMode = pageThreadId !== null;
   const [open, setOpen] = useState(false);
+  const [openSettled, setOpenSettled] = useState(false);
   const [focusByThread, setFocusByThread] = useState<
     Record<
       string,
@@ -92,6 +109,8 @@ export function OverviewAssistantPopup({
     if (pageMode) router.push(`/app/next/${threadId}`);
   };
   const creatingInitialThread = useRef(false);
+  const appliedUrlThreadId = useRef<string | null>(null);
+  const resolvingUrlThread = useRef(false);
   const creatingCampaignThread = useRef(false);
   const [threadIntent, setThreadIntent] = useState<{
     threadId: string;
@@ -128,11 +147,13 @@ export function OverviewAssistantPopup({
   }, [desktop, open]);
 
   const nextMode = pathname === "/app/next" || pageMode;
+  const pageParams = new URLSearchParams(searchParams);
+  pageParams.delete("chat");
   const pageQuery = useQuery(
     orpc.creativeWork.pageContext.queryOptions({
       input: {
-        path: searchParams.size
-          ? `${pathname}?${searchParams.toString()}`
+        path: pageParams.size
+          ? `${pathname}?${pageParams.toString()}`
           : pathname,
       },
     }),
@@ -216,8 +237,33 @@ export function OverviewAssistantPopup({
     if (pageThreadId) setDockThreadId(pageThreadId);
   }, [pageThreadId]);
 
+  // Resolve a linked session through getThread rather than listThreads, which
+  // stops at 50. A private or deleted session falls back to the latest one.
   useEffect(() => {
-    if (activeThreadId || !threadsQuery.data) return;
+    if (pageMode || !urlThreadId) return;
+    if (appliedUrlThreadId.current === urlThreadId) return;
+    appliedUrlThreadId.current = urlThreadId;
+    if (urlThreadId === dockThreadId) return;
+    resolvingUrlThread.current = true;
+    queryClient
+      .fetchQuery(
+        orpc.creativeWork.getThread.queryOptions({
+          input: { threadId: urlThreadId },
+        }),
+      )
+      .then(() => setDockThreadId(urlThreadId))
+      .catch(() => {
+        toast.error("That chat is private or no longer exists.");
+        replaceChatParam(null);
+      })
+      .finally(() => {
+        resolvingUrlThread.current = false;
+      });
+  }, [dockThreadId, pageMode, queryClient, urlThreadId]);
+
+  useEffect(() => {
+    if (activeThreadId || !threadsQuery.data || resolvingUrlThread.current)
+      return;
     const latest = threadsQuery.data[0];
     if (latest) {
       setDockThreadId(latest.id);
@@ -226,17 +272,36 @@ export function OverviewAssistantPopup({
     if (creatingInitialThread.current) return;
     creatingInitialThread.current = true;
     createThread.mutate({ brandId: activeBrand?.id });
-  }, [activeBrand?.id, activeThreadId, createThread, threadsQuery.data]);
+  }, [
+    activeBrand?.id,
+    activeThreadId,
+    createThread,
+    threadsQuery.data,
+    urlThreadId,
+  ]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("growth_assistant_open");
     const preferred = stored == null ? desktop : stored === "true";
     setOpen(
-      pageMode || (desktop && shouldAutoOpenAssistant(pathname))
+      pageMode || urlThreadId || (desktop && shouldAutoOpenAssistant(pathname))
         ? true
         : preferred,
     );
-  }, [desktop, pageMode, pathname]);
+    // A shared link opens the dock, and it stays open as the reader navigates.
+    if (urlThreadId)
+      window.localStorage.setItem("growth_assistant_open", "true");
+    setOpenSettled(true);
+  }, [desktop, pageMode, pathname, urlThreadId]);
+
+  // Navigation drops the param, so re-assert it whenever the URL changes.
+  useEffect(() => {
+    if (!openSettled || pageMode) return;
+    if (!open) {
+      if (urlThreadId) replaceChatParam(null);
+    } else if (dockThreadId && urlThreadId !== dockThreadId)
+      replaceChatParam(dockThreadId);
+  }, [dockThreadId, open, openSettled, pageMode, urlThreadId]);
 
   useEffect(() => {
     const receiveIntent = (event: Event) => {
