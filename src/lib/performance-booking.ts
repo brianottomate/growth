@@ -183,10 +183,15 @@ export function classifyBookingAttribution(
 ): AttributionResult {
   const evidence = attributionSignals(attribution);
   let confidence: AttributionResult["confidence"] = "possible";
+  const eventHasUtm = Object.keys(attribution.event).some((key) =>
+    key.startsWith("utm_"),
+  );
   for (const [scope, props] of Object.entries(attribution) as [
     AttributionScope,
     Record<string, string>,
   ][]) {
+    // A booking's saved campaign wins over a profile changed by a later visit.
+    if (scope !== "event" && eventHasUtm) continue;
     const campaignIds = [
       props.utm_id,
       props.campaign_id,

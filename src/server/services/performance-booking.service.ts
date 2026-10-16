@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import {
   attributionSignals,
   classifyBookingAttribution,
@@ -13,7 +13,10 @@ import {
 } from "@/server/db/performance-schema";
 import { performanceBookingTable } from "@/server/db/performance-booking-schema";
 import { platformCampaignTable } from "@/server/db/ads-schema";
-import { messageSendTable } from "@/server/db/email-document-schema";
+import {
+  messageSendRecipientTable,
+  messageSendTable,
+} from "@/server/db/email-document-schema";
 import { platformPostTable } from "@/server/db/content-schema";
 
 export async function recordPerformanceBooking(
@@ -116,20 +119,28 @@ export async function classifyPerformanceBooking(
       .select({
         id: messageSendTable.id,
         providerBroadcastId: messageSendTable.providerBroadcastId,
-        sentAt: messageSendTable.sentAt,
+        // The first accepted page can convert while later pages are still sending.
+        sentAt: sql<Date>`min(${messageSendRecipientTable.sentAt})`.mapWith(
+          messageSendRecipientTable.sentAt,
+        ),
       })
       .from(messageSendTable)
       .innerJoin(
         platformPostTable,
         eq(platformPostTable.id, messageSendTable.platformPostId),
       )
+      .innerJoin(
+        messageSendRecipientTable,
+        eq(messageSendRecipientTable.messageSendId, messageSendTable.id),
+      )
       .where(
         and(
           eq(platformPostTable.brandId, brandId),
-          eq(messageSendTable.status, "sent"),
-          isNotNull(messageSendTable.sentAt),
+          eq(messageSendRecipientTable.status, "sent"),
+          isNotNull(messageSendRecipientTable.sentAt),
         ),
-      ),
+      )
+      .groupBy(messageSendTable.id, messageSendTable.providerBroadcastId),
   ]);
   const result = classifyBookingAttribution(
     booking.attribution,

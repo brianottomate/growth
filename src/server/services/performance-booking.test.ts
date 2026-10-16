@@ -176,6 +176,7 @@ test("only relevant client bookings persist before ack; after classifies and rep
       CREATE TABLE performance_cycle (id text primary key, account_id text);
       CREATE TABLE platform_campaign (id text primary key, external_id text, name text, brand_id text, platform text, campaign_id text, performance_cycle_id text);
       CREATE TABLE platform_post (id text primary key, brand_id text);
+      CREATE TABLE message_send_recipient (id text primary key, message_send_id text, status text, sent_at timestamp);
       CREATE TABLE message_send (id text primary key, provider_broadcast_id text, sent_at timestamp, platform_post_id text, status text);
       INSERT INTO brand VALUES ('brand-one','org-one','site-one','One','one'),('brand-two','org-two','site-two','Two','two');
       INSERT INTO performance_account VALUES ('account-one','brand-one','org-one',null),('account-two','brand-two','org-two',null);
@@ -217,7 +218,7 @@ test("only relevant client bookings persist before ack; after classifies and rep
       },
     };
     const send = (
-      event_properties = payload.event_properties,
+      event_properties: Record<string, unknown> = payload.event_properties,
       user_properties: Record<string, string> = payload.user_properties,
     ) =>
       receiveSitesOrder(
@@ -294,6 +295,27 @@ test("only relevant client bookings persist before ack; after classifies and rep
     expect(rows.find((r) => r.bookingId === "booking-two")!.confidence).toBe(
       "possible",
     );
+    await pg.exec(`
+      INSERT INTO platform_post VALUES ('email-post','brand-one');
+      INSERT INTO message_send VALUES ('msg-early','bulk-1',null,'email-post','sending');
+      INSERT INTO message_send_recipient VALUES ('recipient-1','msg-early','sent','2026-10-14T00:00:00Z');
+    `);
+    expect(
+      (
+        await send({
+          ...payload.event_properties,
+          order_id: "booking-email",
+          utm_source: "wander_performance",
+          utm_medium: "email",
+          utm_id: "msg-early",
+        })
+      ).status,
+    ).toBe(200);
+    for (const work of pending.splice(0)) await work();
+    rows = await client.select().from(performanceBookingTable);
+    expect(rows.find((r) => r.bookingId === "booking-email")!.confidence).toBe(
+      "confirmed",
+    );
     await pg.exec(
       `INSERT INTO brand VALUES ('duplicate','org-one','site-one','Duplicate','duplicate'); INSERT INTO performance_account VALUES ('duplicate-account','duplicate','org-one',null);`,
     );
@@ -302,7 +324,7 @@ test("only relevant client bookings persist before ack; after classifies and rep
         await send({ ...payload.event_properties, order_id: "booking-three" })
       ).json(),
     ).toEqual({ status: "ambiguous_client" });
-    expect(await client.select().from(performanceBookingTable)).toHaveLength(2);
+    expect(await client.select().from(performanceBookingTable)).toHaveLength(3);
   } finally {
     await pg.close();
   }

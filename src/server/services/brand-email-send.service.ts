@@ -1,5 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { toPlainText } from "@react-email/render";
+import { tagBookingLinks } from "@/server/email/booking-attribution";
+import { createId } from "@/server/db/utils";
 
 import { and, eq, inArray, lt, ne, or } from "drizzle-orm";
 
@@ -192,8 +195,31 @@ export async function prepareBrandSend(
   const { current, hash } = contentHashOf(document);
   if (!current.subject.trim() || !current.bodyMarkdown.trim())
     throw new Error("Save an email before preparing a send.");
-  const rendered = await renderForBrand(spot, current);
   const delivery = spot.brand.emailDelivery!;
+  const idempotencyKey = [
+    "email-attribution-v1",
+    spot.id,
+    hash,
+    "postmark",
+    delivery.serverId,
+    snapshot.id,
+  ].join(":");
+  const existing = await db.query.messageSendTable.findFirst({
+    where: eq(messageSendTable.idempotencyKey, idempotencyKey),
+  });
+  if (existing) return messageSendSummary(existing);
+  const sendId = createId("msg");
+  const siteUrl = spot.brand.emailSender?.siteUrl ?? spot.brand.website;
+  if (!siteUrl)
+    throw new Error(
+      "Set the brand's website URL before preparing a tracked email.",
+    );
+  const rendered = await renderForBrand(spot, current);
+  const html = tagBookingLinks(rendered.html, {
+    siteUrl,
+    sendId,
+    campaign: spot.id,
+  });
   const label = `${audience.name} (${snapshot.recipientCount ?? 0} guests)`;
   const snapshotRecord: MessageSendSnapshot = {
     schema: "wander-growth.message-send.v1",
@@ -221,24 +247,14 @@ export async function prepareBrandSend(
     preview: {
       renderer: "@wandercom/design-system-emails",
       template: "generic.html",
-      html: rendered.html,
-      text: rendered.text,
+      html,
+      text: toPlainText(html),
     },
   };
-  const idempotencyKey = [
-    spot.id,
-    hash,
-    "postmark",
-    delivery.serverId,
-    snapshot.id,
-  ].join(":");
-  const existing = await db.query.messageSendTable.findFirst({
-    where: eq(messageSendTable.idempotencyKey, idempotencyKey),
-  });
-  if (existing) return messageSendSummary(existing);
   const [created] = await db
     .insert(messageSendTable)
     .values({
+      id: sendId,
       platformPostId: spot.id,
       documentId: document.id,
       contentHash: hash,
