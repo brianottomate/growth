@@ -3199,6 +3199,7 @@ async function pushToGoogle(args: PushArgs) {
     return keepIncompletePush({
       platformName: "Google",
       managedIn: "Google Ads",
+      connectionAccountId: input.connectionAccountId,
       stoppedAt: step,
       error,
       record: record(),
@@ -3837,6 +3838,7 @@ async function pushToMeta(args: PushArgs) {
     return keepIncompletePush({
       platformName: "Meta",
       managedIn: "Ads Manager",
+      connectionAccountId: input.connectionAccountId,
       stoppedAt: step,
       error,
       record: record(),
@@ -4146,6 +4148,7 @@ async function pushToLinkedIn(args: PushArgs) {
       return keepIncompletePush({
         platformName: "LinkedIn",
         managedIn: "Campaign Manager",
+        connectionAccountId: input.connectionAccountId,
         stoppedAt: step,
         error,
         record: record(set),
@@ -4233,6 +4236,7 @@ async function pushToLinkedIn(args: PushArgs) {
     return keepIncompletePush({
       platformName: "LinkedIn",
       managedIn: "Campaign Manager",
+      connectionAccountId: input.connectionAccountId,
       stoppedAt: step,
       error,
       record: record(),
@@ -4265,13 +4269,18 @@ export async function keepIncompletePush(
     platformName: string;
     /** The platform's own UI, e.g. "Ads Manager". */
     managedIn: string;
+    /** The connection that made it, for deleting an empty shell. */
+    connectionAccountId: string;
     stoppedAt: string;
     error: unknown;
     record: CompiledCampaignRecord;
     /** False when the created ads could not be confirmed paused. */
     pauseConfirmed?: boolean;
   },
-  write = recordCompiledCampaign,
+  writes = {
+    record: recordCompiledCampaign,
+    deleteCampaign: deleteZernioCampaign,
+  },
 ): Promise<never> {
   const { platformName, managedIn, record } = input;
   const cause = errorText(input.error);
@@ -4289,9 +4298,29 @@ export async function keepIncompletePush(
       `${stopped}. ${platformName} created a campaign with ${made} but returned no campaign id, so Growth could not record it. Find it in ${managedIn} and delete it before pushing again.${note}`,
     );
   }
+  // A campaign with no ads is nothing to finish: remove it so the retry is
+  // clean. If the delete fails, fall through and record it like any other.
+  if (ads === 0) {
+    const removed = await writes
+      .deleteCampaign({
+        campaignId: record.externalCampaignId,
+        accountId: input.connectionAccountId,
+      })
+      .then(
+        () => true,
+        (deleteError: unknown) => {
+          console.error("empty push shell delete failed", deleteError);
+          return false;
+        },
+      );
+    if (removed)
+      throw new Error(
+        `${stopped}. No ads were created, so the empty campaign ${record.externalCampaignId} was deleted from ${platformName}. Fix the cause and push again.`,
+      );
+  }
   const kept = `Kept on ${platformName}${note ? "" : ", paused"}: campaign ${record.externalCampaignId} with ${made}`;
   try {
-    await write({
+    await writes.record({
       ...record,
       incomplete: {
         at: new Date().toISOString(),
@@ -4479,12 +4508,21 @@ export async function deletePlatformCampaign(
   }
 
   let provider: Record<string, unknown> | null = null;
+  let alreadyGone = false;
   if (platformCampaign.externalId) {
+    // Needed only for an empty shell, ignored otherwise — so always send it
+    // when we know it, and a stranded shell deletes like anything else.
+    const accountId =
+      input.connectionAccountId ??
+      platformCampaign.settings?.meta?.destination?.connectionAccountId;
     provider = await deleteZernioCampaign({
       campaignId: platformCampaign.externalId,
-      // Needed only for an empty shell, ignored otherwise — so always send it
-      // when we know it, and a stranded shell deletes like anything else.
-      accountId: input.connectionAccountId,
+      accountId,
+    }).catch((error: unknown) => {
+      // Deleted by hand in the platform already: the goal is met.
+      if (!campaignGoneOnPlatform(error)) throw error;
+      alreadyGone = true;
+      return null;
     });
   }
 
@@ -4497,6 +4535,21 @@ export async function deletePlatformCampaign(
   return {
     deleted: true,
     hadExternalId: Boolean(platformCampaign.externalId),
+    alreadyGone,
     provider,
   };
+}
+
+/**
+ * The platform no longer has the campaign: Zernio answers 404 when it has no
+ * record of it, and Meta answers code 100 subcode 33 ("does not exist") when
+ * the delete is forwarded for an id it cannot find.
+ */
+export function campaignGoneOnPlatform(error: unknown) {
+  const text = errorText(error);
+  return (
+    /^Zernio \S+ failed: 404\b/.test(text) ||
+    /"error_subcode":\s*33\b/.test(text) ||
+    /does not exist|already (been )?deleted/i.test(text)
+  );
 }

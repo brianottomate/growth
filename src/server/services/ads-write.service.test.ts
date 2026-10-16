@@ -291,6 +291,7 @@ describe("keepIncompletePush", () => {
       {
         platformName: "Meta",
         managedIn: "Ads Manager",
+        connectionAccountId: "acc_1",
         stoppedAt: "creating ad set 2 of 2 (Families)",
         error: new Error("Hot Tubs has no access to pixel 340"),
         record: {
@@ -327,8 +328,13 @@ describe("keepIncompletePush", () => {
           ],
         },
       },
-      async (record) => {
-        written.push(record);
+      {
+        record: async (record) => {
+          written.push(record);
+        },
+        deleteCampaign: () => {
+          throw new Error("a campaign with ads must not be deleted");
+        },
       },
     ).catch((caught: Error) => caught);
 

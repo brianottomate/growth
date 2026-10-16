@@ -1169,6 +1169,7 @@ export const setDeliveryActionOutputSchema = z.strictObject({
 export const deletePlatformCampaignActionOutputSchema = z.strictObject({
   deleted: z.boolean(),
   hadExternalId: z.boolean(),
+  alreadyGone: z.boolean(),
   provider: z.record(z.string(), jsonValueSchema).nullable(),
 });
 

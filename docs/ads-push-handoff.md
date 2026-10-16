@@ -230,7 +230,9 @@ the push. `createMetaPlacementCreative` in `meta.client.ts`, called through
   with `settings.incompletePush` (where it stopped, the error), and says so.
   The one-push guard then refuses a second push; the operator finishes the
   campaign in Ads Manager or deletes it with `deletePlatformCampaign` and
-  pushes again. Deleting the draft row means the next push mints fresh keys.
+  pushes again. A failed push that created no ads deletes its empty campaign
+  instead, so the retry is clean. `deletePlatformCampaign` counts a campaign
+  already gone from the platform as deleted. Deleting the draft row means the next push mints fresh keys.
 - **Videos** still go through Zernio (`placementAssets`), one ad per call
   like everything else.
 - **Images go up in one request per ad** (multipart `adimages`), and a

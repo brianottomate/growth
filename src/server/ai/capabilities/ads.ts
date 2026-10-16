@@ -365,6 +365,19 @@ export const draftCampaignAction = growthAction({
   },
 });
 
+/**
+ * Callers built before the dry run was removed still send validateOnly: true.
+ * Stripping it silently would turn their check into a real create, so it is
+ * refused by name.
+ */
+const removedDryRunSchema = z
+  .literal(false, {
+    error:
+      "There is no dry run any more. Drop validateOnly and push for real: everything is created paused.",
+  })
+  .optional()
+  .describe("Removed. Omit it: there is no dry run.");
+
 export const createSpecializedMetaDraftAction = growthAction({
   nativeOutputSchema: createSpecializedMetaDraftActionNativeResultSchema,
   outputSchema: createSpecializedMetaDraftActionOutputSchema,
@@ -424,6 +437,7 @@ export const createSpecializedMetaDraftAction = growthAction({
         .describe("Required for lead_generation."),
       targeting: targetingSchema.optional(),
       ...schedulingSchema,
+      validateOnly: removedDryRunSchema,
       promotedObject: z
         .object({
           pixelId: z.string().min(1).optional(),
@@ -1290,6 +1304,7 @@ export const pushDraftAction = growthAction({
     connectionAccountId: destinationSchema.connectionAccountId.optional(),
     adAccountId: destinationSchema.adAccountId.optional(),
     goal: z.enum(AD_PUSH_GOALS).optional(),
+    validateOnly: removedDryRunSchema,
   }),
   execute: async (input, ctx) =>
     pushDraftToPlatform(input, {
