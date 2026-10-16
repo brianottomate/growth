@@ -8,8 +8,7 @@ import type {
 import type { getMetaConnectChoice } from "@/server/services/meta-connect-setup.service";
 
 import { ConnectButton } from "./ConnectButton";
-import { MetaAccountSubmit } from "./MetaAccountSubmit";
-import { selectClientMetaAccount } from "./actions";
+import { MetaAccountChoice } from "./MetaAccountChoice";
 
 /** What clicking Connect actually does, per platform, in the client's words. */
 const WHAT_HAPPENS: Record<BrandConnectChannelKey, string> = {
@@ -133,143 +132,87 @@ export function ConnectView({
           )}
           <div className="mt-6 divide-y divide-white/5 rounded-xl border border-border">
             {status.map((row) => (
-              <div
-                key={row.key}
-                className="flex items-center justify-between gap-4 px-4 py-3.5"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{row.label}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {row.connected
-                      ? [
-                          row.accounts.filter(Boolean).length > 0
-                            ? `Connected as ${row.accounts.filter(Boolean).join(", ")}`
-                            : "Connected",
-                          ...row.externalIds.map(shortAccountId),
-                        ].join(" · ")
-                      : WHAT_HAPPENS[row.key]}
-                  </p>
+              <div key={row.key} className="px-4 py-3.5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{row.label}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {row.connected
+                        ? [
+                            row.accounts.filter(Boolean).length > 0
+                              ? `Connected as ${row.accounts.filter(Boolean).join(", ")}`
+                              : "Connected",
+                            ...row.externalIds.map(shortAccountId),
+                          ].join(" · ")
+                        : WHAT_HAPPENS[row.key]}
+                    </p>
+                  </div>
+                  {row.connected ? (
+                    <span className="shrink-0 text-sm font-medium text-emerald-400">
+                      Connected ✓
+                    </span>
+                  ) : (
+                    <ConnectButton
+                      href={`/connect/${token}/start/${row.key}`}
+                    />
+                  )}
                 </div>
-                {row.connected ? (
-                  <span className="shrink-0 text-sm font-medium text-emerald-400">
-                    Connected ✓
-                  </span>
-                ) : (
-                  <ConnectButton href={`/connect/${token}/start/${row.key}`} />
+                {row.key === "meta-ads" && metaConnected && (
+                  <div
+                    className="mt-4 space-y-4 border-t border-white/5 pt-4"
+                    aria-label="Meta ad account and setup"
+                  >
+                    {metaUnavailable ? (
+                      <p className="text-sm">
+                        We could not load your ad accounts. Refresh this page to
+                        try again, or contact your Wander team.
+                      </p>
+                    ) : metaChoice?.accounts.length ? (
+                      <MetaAccountChoice
+                        token={token}
+                        brandName={brand.name}
+                        choice={metaChoice}
+                      />
+                    ) : (
+                      <p className="text-sm">
+                        No available ad accounts were found. Ask your business
+                        administrator to grant access to the correct account,
+                        then reconnect Meta.
+                      </p>
+                    )}
+                    {selectionReview && (
+                      <p role="status" className="text-sm">
+                        Setup could not finish automatically. Review the status
+                        below or contact your Wander team; your account may
+                        still need Page, billing or tracking setup.
+                      </p>
+                    )}
+                    {setupChecks.length > 0 && (
+                      <ul className="space-y-3" aria-label="Meta setup checks">
+                        {setupChecks.map((check) => (
+                          <li key={check.key} className="text-sm">
+                            <p className="font-medium">
+                              {check.label}:{" "}
+                              {check.state === "ready"
+                                ? "Ready"
+                                : check.state === "unknown"
+                                  ? "Not verified"
+                                  : check.state === "action_required"
+                                    ? "Action needed"
+                                    : "Setup pending"}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {check.detail}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
           </div>
-
-          {metaConnected && (
-            <section
-              className="mt-6 rounded-xl border border-border p-4"
-              aria-label="Meta ad account selection"
-            >
-              <h2 className="text-base font-semibold">
-                Which ad account should Wander use?
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Choose the account that should run {brand.name}&apos;s ads and
-                pay Meta. Your login may have access to accounts for other
-                businesses.
-              </p>
-              {metaUnavailable ? (
-                <p className="mt-4 text-sm">
-                  We could not load your ad accounts. Refresh this page to try
-                  again, or contact your Wander team.
-                </p>
-              ) : metaChoice?.accounts.length ? (
-                <form
-                  action={selectClientMetaAccount}
-                  className="mt-4 space-y-4"
-                >
-                  <input type="hidden" name="token" value={token} />
-                  <fieldset className="space-y-3">
-                    <legend className="sr-only">
-                      Choose your Meta ad account
-                    </legend>
-                    {metaChoice.accounts.map((account) => (
-                      <label
-                        key={account.id}
-                        className="flex cursor-pointer gap-3 rounded-lg border border-border p-3"
-                      >
-                        <input
-                          type="radio"
-                          name="adAccountId"
-                          value={account.id}
-                          required
-                          disabled={!account.selectable}
-                          defaultChecked={account.id === metaChoice?.selectedId}
-                          className="mt-1"
-                        />
-                        <span className="min-w-0 text-sm">
-                          <span className="block font-medium">
-                            {account.name}
-                          </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {[
-                              account.businessName,
-                              account.id,
-                              account.currency,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </span>
-                          {account.reason && (
-                            <span className="mt-1 block text-xs">
-                              {account.reason}
-                            </span>
-                          )}
-                        </span>
-                      </label>
-                    ))}
-                  </fieldset>
-                  <MetaAccountSubmit />
-                  {metaChoice.selectedId && (
-                    <p className="text-sm">
-                      Your selected ad account is saved. You can update it here
-                      if needed.
-                    </p>
-                  )}
-                </form>
-              ) : (
-                <p className="mt-4 text-sm">
-                  No available ad accounts were found. Ask your business
-                  administrator to grant access to the correct account, then
-                  reconnect Meta.
-                </p>
-              )}
-              {selectionReview && (
-                <p role="status" className="mt-4 text-sm">
-                  Setup could not finish automatically. Review the status below
-                  or contact your Wander team; your account may still need Page,
-                  billing or tracking setup.
-                </p>
-              )}
-              {setupChecks.length > 0 && (
-                <ul className="mt-5 space-y-3" aria-label="Meta setup checks">
-                  {setupChecks.map((check) => (
-                    <li key={check.key} className="text-sm">
-                      <p className="font-medium">
-                        {check.label}:{" "}
-                        {check.state === "ready"
-                          ? "Ready"
-                          : check.state === "unknown"
-                            ? "Not verified"
-                            : check.state === "action_required"
-                              ? "Action needed"
-                              : "Setup pending"}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {check.detail}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          )}
 
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
             {[
