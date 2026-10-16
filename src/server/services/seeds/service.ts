@@ -16,6 +16,7 @@ import { getBigQueryClient } from "@/server/clients/bigquery.client";
 import {
   seedDefinitionSchema,
   seedEvidenceScore,
+  seedEvidenceCounts,
   selectSeedCandidates,
   type SeedCandidate,
   type SeedDefinition,
@@ -309,11 +310,7 @@ export async function previewSeed(
   actor: SeedActor,
 ) {
   const { members, ...result } = await collectSeed(input, actor);
-  const evidenceCounts = members.reduce<Record<string, number>>((out, m) => {
-    for (const key of new Set(m.evidence.map((e) => e.search ?? e.source)))
-      out[key] = (out[key] ?? 0) + 1;
-    return out;
-  }, {});
+  const evidenceCounts = seedEvidenceCounts(members);
   return { ...result, memberCount: members.length, evidenceCounts };
 }
 export async function compileSeed(

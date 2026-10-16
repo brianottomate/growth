@@ -33,7 +33,7 @@ export const seedPropertyFilterSchema = z.object({
     .default(null),
 });
 export const seedSearchSchema = z.object({
-  key: z.string().regex(/^[a-z][a-z0-9_-]{0,59}$/),
+  key: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,59}$/),
   why: z.string().trim().min(1).max(1500),
   exclude: z.boolean().default(false),
   filter: seedPropertyFilterSchema,
@@ -211,3 +211,12 @@ export type SeedQueryParams = Record<
   string,
   string | number | boolean | string[] | number[]
 >;
+
+/** Count people once per evidence key, including keys that shadow Object members. */
+export function seedEvidenceCounts(members: Pick<SeedCandidate, "evidence">[]) {
+  const counts = new Map<string, number>();
+  for (const member of members)
+    for (const key of new Set(member.evidence.map((e) => e.search ?? e.source)))
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+  return Object.fromEntries(counts);
+}

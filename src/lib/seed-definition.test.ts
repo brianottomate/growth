@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   seedDefinitionSchema,
+  seedEvidenceCounts,
   selectSeedCandidates,
   type SeedCandidate,
 } from "./seed-definition";
@@ -85,4 +86,21 @@ test("explicit exclusions cannot re-enter through another source or wider geogra
   expect(
     selectSeedCandidates(candidates, d).members.map((m) => m.emailHash),
   ).toEqual([hash(3)]);
+});
+
+test("evidence keys are data identities: numeric brand prefixes and constructor count correctly", () => {
+  const parsed = seedDefinitionSchema.parse({
+    wander: true,
+    searches: [{ key: "30a-coast", why: "Coastal activity", filter: {} }],
+  });
+  expect(parsed.searches[0]?.key).toBe("30a-coast");
+  const one = member(1, 0);
+  one.evidence[0]!.search = "constructor";
+  one.evidence.push({ ...one.evidence[0]! });
+  const two = member(2, 0);
+  two.evidence[0]!.search = "30a-coast";
+  expect(seedEvidenceCounts([one, two])).toEqual({
+    constructor: 1,
+    "30a-coast": 1,
+  });
 });
