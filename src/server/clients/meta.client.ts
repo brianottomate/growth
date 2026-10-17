@@ -495,6 +495,33 @@ async function metaRead<T>(
   return metaFetch<T>(`${ADS_WRITE_URL}/${path}?${params}`);
 }
 
+/**
+ * Share an audience with another ad account the business can reach, for
+ * targeting only (no insights, no lookalikes off it). Idempotent on Meta's
+ * side. https://developers.facebook.com/docs/marketing-api/reference/custom-audience/adaccounts/
+ */
+export async function shareMetaAudience(input: {
+  audienceId: string;
+  adAccountId: string;
+}) {
+  await metaWrite<{ success?: boolean }>(`${input.audienceId}/adaccounts`, {
+    adaccounts: [input.adAccountId.replace(/^act_/, "")],
+    permissions: "targeting",
+  });
+}
+
+/** Ad account ids (bare numbers) an audience is shared with. */
+export async function listMetaAudienceShares(audienceId: string) {
+  // Meta lists recipients as bare account numbers: { data: ["2152…"] }.
+  const result = await metaRead<{
+    data?: (string | number | { id?: string; account_id?: string | number })[];
+  }>(`${audienceId}/adaccounts`, "id");
+  return (result.data ?? []).flatMap((row) => {
+    const id = typeof row === "object" ? (row.id ?? row.account_id) : row;
+    return id == null ? [] : [String(id).replace(/^act_/, "")];
+  });
+}
+
 /** Verify the provider's paused-create promise before recording the campaign. */
 export async function ensureMetaAdsPaused(
   adIds: string[],

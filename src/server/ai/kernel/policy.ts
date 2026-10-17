@@ -65,7 +65,12 @@ export const growthActionPolicies = {
   seedWrite: {
     build: write({ consequence: "provider-read" }),
     refresh: write({ consequence: "provider-read" }),
-    share: write({ consequence: "provider-read", idempotent: true }),
+    share: write({
+      consequence: "provider-write",
+      approval: "user",
+      surfaces: CONFIRMED,
+      idempotent: true,
+    }),
     attach: write({ idempotent: true }),
     upload: write({
       consequence: "provider-write",

@@ -191,7 +191,7 @@ export const seedLookalikeAction = growthAction({
 });
 export const shareSeedLookalikeAction = growthAction({
   description:
-    "For a lookalike in Wander's account, after the operator shares the LOOKALIKE (never the seed) with the client account in Ads Manager: check the client account's audiences and, once it appears, record the client's copy and optionally attach it to the client's campaign audience or persona. If Meta does not list it, ask the operator and pass confirmShared only on their word. No provider writes.",
+    "Share a lookalike in Wander's account with the client's ad account through Meta's API, record the client's own copy and optionally attach it to the client's campaign audience or persona. Explicit approval; no spend. If Meta refuses the share, the result's `next` names the manual Ads Manager step; pass confirmShared only on the operator's word that it was done.",
   inputSchema: z.object({
     seedListId: z.string().min(1),
     platformAudienceId: z.string().min(1),

@@ -93,6 +93,8 @@ export function SeedLookalikeStep({
   const upload = useMutation(orpc.seed.upload.mutationOptions(options));
   const lookalike = useMutation(orpc.seed.lookalike.mutationOptions(options));
   const attach = useMutation(orpc.seed.attach.mutationOptions(options));
+  const share = useMutation(orpc.seed.share.mutationOptions(options));
+  const target = { type: "campaign_audience" as const, id: campaignAudienceId };
 
   const rows = deliveries.data ?? [];
   const d: Delivery | undefined =
@@ -123,18 +125,18 @@ export function SeedLookalikeStep({
   else if (d.stage === "built" || d.stage === "failed")
     next = (
       <Confirm
-        label={`Upload ${d.summary.identifiable.toLocaleString()} and create lookalike`}
-        title={`Upload seed list to ${account} and build its lookalike`}
-        body={`${d.summary.identifiable.toLocaleString()} people (email and phone) from “${d.name}” go to ${account}, then Meta builds a 1% US lookalike from them.${d.wanderData ? ` ${brandName} never receives the list, only the lookalike once shared.` : ""}${d.warning ? ` ${d.warning}` : ""}`}
-        pending={upload.isPending || lookalike.isPending}
+        label={`Upload ${d.summary.identifiable.toLocaleString()} and use lookalike`}
+        title={`Upload seed list to ${account}, build its lookalike, use it here`}
+        body={`${d.summary.identifiable.toLocaleString()} people (email and phone) from “${d.name}” go to ${account}. Meta builds a 1% US lookalike from them${d.wanderData ? `, which is shared with ${brandName}'s ad account; ${brandName} never receives the list` : ""}. The lookalike becomes this ad set's audience.${d.warning ? ` ${d.warning}` : ""}`}
+        pending={upload.isPending || lookalike.isPending || share.isPending}
         onConfirm={async () => {
           const uploaded = await upload.mutateAsync({
             seedListId: d.id,
             approved: true,
           });
-          // Meta may still be matching the list; the Create lookalike step
-          // then stays available for a second try.
-          await lookalike
+          // Meta may still be matching the list; each later step stays
+          // available on its own for a second try.
+          const built = await lookalike
             .mutateAsync({
               seedListId: d.id,
               seedPlatformAudienceId: uploaded.platformAudienceId,
@@ -142,7 +144,15 @@ export function SeedLookalikeStep({
               ratio: 0.01,
               approved: true,
             })
-            .catch(() => undefined);
+            .catch(() => null);
+          if (built)
+            await share
+              .mutateAsync({
+                seedListId: d.id,
+                platformAudienceId: built.platformAudienceId,
+                target,
+              })
+              .catch(() => undefined);
         }}
       />
     );
@@ -166,10 +176,18 @@ export function SeedLookalikeStep({
     );
   else if (d.stage === "lookalike" && d.share)
     next = (
-      <SeedShareDialog
-        share={d.share}
-        onShared={() => void refresh()}
-        trigger={<Button size="sm">Share</Button>}
+      <Confirm
+        label={`Share with ${brandName} and use here`}
+        title={`Share the lookalike with ${brandName}'s ad account`}
+        body={`Meta shares “${d.share.lookalikeName}” with ${d.share.clientAdAccountName ?? d.share.clientAdAccountId} for targeting, and this ad set uses it. The seed list stays in Wander's account.`}
+        pending={share.isPending}
+        onConfirm={() =>
+          share.mutateAsync({
+            seedListId: d.id,
+            platformAudienceId: d.share!.platformAudienceId,
+            target,
+          })
+        }
       />
     );
   else if (d.share?.sharedPlatformAudienceId && !d.linkedToCampaignAudience)
@@ -181,7 +199,7 @@ export function SeedLookalikeStep({
           attach.mutate({
             seedListId: d.id,
             platformAudienceId: d.share!.sharedPlatformAudienceId!,
-            target: { type: "campaign_audience", id: campaignAudienceId },
+            target,
           })
         }
       >
@@ -235,7 +253,7 @@ export function SeedLookalikeStep({
           )}
           <div className="flex flex-wrap items-center gap-2">
             {next}
-            {d.share && d.stage !== "lookalike" && (
+            {d.share && (
               <SeedShareDialog
                 share={d.share}
                 trigger={

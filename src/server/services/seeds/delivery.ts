@@ -14,8 +14,11 @@ import {
 import {
   addUsersToZernioAdAudience,
   getZernioAdAudience,
-  listZernioAdAudiences,
 } from "@/server/clients/zernio.client";
+import {
+  listMetaAudienceShares,
+  shareMetaAudience,
+} from "@/server/clients/meta.client";
 import { seedUsesWanderData, type SeedDefinition } from "@/lib/seed-definition";
 import { requireMetaAudienceAccount } from "../audience-account";
 import {
@@ -392,10 +395,11 @@ async function requireDeliveredLookalike(
 }
 
 /**
- * Sharing happens in Ads Manager. Detection reads the client account's
- * audiences through Zernio; when Meta lists the lookalike there, or the
- * operator confirms the share, the client account gets its own mirror row,
- * which is what the client's campaigns and personas target.
+ * Share the lookalike with the client's ad account through Meta's API (Wander's
+ * business reaches the client account through its Leadsie partnership), then
+ * record the client's own mirror row, which is what its campaigns and personas
+ * target. Zernio has no share endpoint. If Meta refuses, the operator can share
+ * in Ads Manager and pass confirmShared.
  */
 export async function shareSeedLookalike(
   input: {
@@ -422,28 +426,27 @@ export async function shareSeedLookalike(
   let detected: "provider" | "operator" | "same_account" | null = null;
   if (share.status === "not_shared") {
     const client = await clientAccount(brand.id);
-    const found = sameMetaAccount(
+    const sameAccount = sameMetaAccount(
       client.local!.externalId,
       share.sourceAdAccountId,
-    )
+    );
+    let found: "same_account" | "provider" | null = sameAccount
       ? "same_account"
-      : (
-          await listZernioAdAudiences({
-            accountId: client.pinned!.connectionAccountId,
-            adAccountId: client.pinned!.adAccountId,
-          })
-        ).find(
-          (a) =>
-            a.platformAudienceId === lookalike.externalId ||
-            a.id === lookalike.externalId,
-        );
+      : null;
+    if (!found && lookalike.externalId && !input.confirmShared) {
+      const client_ = client.local!.externalId.replace(/^act_/, "");
+      let shares = await listMetaAudienceShares(lookalike.externalId);
+      if (!shares.includes(client_)) {
+        await shareMetaAudience({
+          audienceId: lookalike.externalId,
+          adAccountId: client_,
+        });
+        shares = await listMetaAudienceShares(lookalike.externalId);
+      }
+      if (shares.includes(client_)) found = "provider";
+    }
     if (found || input.confirmShared) {
-      detected =
-        found === "same_account"
-          ? "same_account"
-          : found
-            ? "provider"
-            : "operator";
+      detected = found ?? "operator";
       const channel = await db.query.channelTable.findFirst({
         where: and(
           eq(channelTable.brandId, brand.id),
@@ -467,7 +470,7 @@ export async function shareSeedLookalike(
           source: "lookalike_seed",
           externalId: lookalike.externalId,
           sourceId: lookalike.sourceId,
-          definition: typeof found === "object" ? found : lookalike.definition,
+          definition: lookalike.definition,
         })
         .onConflictDoNothing();
       share = await seedShare(lookalike, list.id);
@@ -489,7 +492,7 @@ export async function shareSeedLookalike(
     next:
       share.status === "shared"
         ? null
-        : `Not visible in ${share.clientAdAccountId} yet. In Ads Manager (${share.adsManagerUrl}) share audience ${share.metaAudienceId} with ${share.clientAdAccountId}, then check again; pass confirmShared if Meta still does not list it.`,
+        : `Meta did not list ${share.clientAdAccountId} as a recipient after sharing. Share audience ${share.metaAudienceId} with ${share.clientAdAccountId} in Ads Manager (${share.adsManagerUrl}), then pass confirmShared.`,
   };
 }
 

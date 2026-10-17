@@ -52,15 +52,19 @@ brand's own pinned account, where its lookalike is already the brand's.
    marked failed and the operator uploads again, which creates a new Meta list.
 3. `seedWrite.lookalike({ seedListId, seedPlatformAudienceId, approved: true })`
    builds a 1% US lookalike in the same account.
-4. Wander's account only: the operator shares the lookalike (never the seed
-   list) with the client's account in Ads Manager. The share dialog lists the
-   lookalike, client account and seed list IDs and a copyable computer-use
-   prompt. `seedWrite.share` then detects the share (or takes `confirmShared`)
-   and records the client's own copy.
+4. Wander's account only: `seedWrite.share({ seedListId, platformAudienceId, target? })`
+   shares the lookalike (never the seed list) with the client's ad account
+   through Meta's API (`POST /{audience}/adaccounts`, targeting only, using
+   Growth's system-user token; Wander's business reaches the client account
+   through its Leadsie partnership), records the client's own copy and attaches
+   it when `target` is given. If Meta refuses, the share dialog still lists the
+   IDs and a copyable computer-use prompt for Ads Manager; `confirmShared`
+   records a share done by hand.
 5. `seedWrite.attach({ seedListId, platformAudienceId, target })` links the
    client's copy to a campaign audience or persona; the push sends it as the
    ad set's custom audience.
 
 Upload and lookalike creation need operator approval and never spend. In the
-app, each Meta ad set's "Seed lookalike" stepper walks these steps;
+app, the ad set editor's "Seed lookalike" section runs upload, lookalike, share
+and attach from one approval;
 `/app/audiences` lists every brand's lists with the needs-sharing queue first.
