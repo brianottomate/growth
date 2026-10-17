@@ -75,31 +75,6 @@ export function MetaDeliverySummary({
             <dd className="mt-1 text-sm font-semibold break-words">{value}</dd>
           </div>
         ))}
-      </dl>
-      <dl className="grid grid-cols-1 gap-4 @sm:grid-cols-2">
-        <div className="min-w-0">
-          <dt className="text-xs text-muted-foreground">Placements</dt>
-          <dd className="mt-1 flex flex-wrap gap-1.5">
-            {selected.length ? (
-              selected.map((p) => (
-                <span
-                  key={p.id}
-                  className="rounded-full bg-muted px-2 py-1 text-xs"
-                >
-                  {p.label}
-                </span>
-              ))
-            ) : (
-              <span className="text-sm text-muted-foreground">
-                {meta?.importSource
-                  ? importedPlacementLabel(meta.importSource.adSets)
-                  : pc.status === "draft"
-                    ? "Not set"
-                    : "Not recorded"}
-              </span>
-            )}
-          </dd>
-        </div>
         {goal === "conversions" && (
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">
@@ -115,6 +90,29 @@ export function MetaDeliverySummary({
           </div>
         )}
       </dl>
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">Placements</p>
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {selected.length ? (
+            selected.map((p) => (
+              <span
+                key={p.id}
+                className="rounded-full bg-muted px-2 py-1 text-xs"
+              >
+                {p.label}
+              </span>
+            ))
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              {meta?.importSource
+                ? importedPlacementLabel(meta.importSource.adSets)
+                : pc.status === "draft"
+                  ? "Not set"
+                  : "Not recorded"}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

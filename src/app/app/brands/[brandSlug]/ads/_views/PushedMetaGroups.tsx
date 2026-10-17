@@ -9,6 +9,8 @@ import { DeliveryTargetingSummary } from "./DeliveryTargetingSummary";
 import { MetaCreativePreview } from "./MetaCreativePreview";
 import { ImportCreativeButton } from "./ImportCreativeButton";
 import { money } from "./format";
+import { SeedLookalikeStep } from "./SeedLookalikeStep";
+import type { NewSeedListContext } from "@/app/app/performance/clients/[brandSlug]/NewSeedList";
 
 /** Native delivery relationships and observed creative, independent of the editable plan. */
 export function PushedMetaGroups({
@@ -17,12 +19,15 @@ export function PushedMetaGroups({
   pc,
   campaignHref = "",
   allowImport = false,
+  seed,
 }: {
   groups: PlatformDeliveryGroup[];
   ads: PlatformAd[];
   pc: PlatformCampaign;
   campaignHref?: string;
   allowImport?: boolean;
+  /** Shows each ad set's seed line; omitted where seeds do not apply. */
+  seed?: { brandId: string; brandName: string; context?: NewSeedListContext };
 }) {
   const account =
     pc.settings?.meta?.destination?.adAccountId ??
@@ -70,54 +75,63 @@ export function PushedMetaGroups({
             ? `https://adsmanager.facebook.com/adsmanager/manage/adsets?act=${encodeURIComponent(account.replace(/^act_/i, ""))}&selected_adset_ids=${encodeURIComponent(group.externalId)}`
             : undefined;
         return (
-          <details
-            key={group.id}
-            className="group rounded-xl border bg-background"
-          >
-            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
-              <ChevronDown className="size-4 text-muted-foreground group-open:rotate-180" />
-              <h5 className="text-sm font-semibold">{group.name}</h5>
-              <span className="text-xs text-muted-foreground">
-                {groupAds.length} {groupAds.length === 1 ? "ad" : "ads"}
-                {group.budget != null
-                  ? ` · ${money(group.budget)}${group.budgetType === "daily" ? "/day" : " lifetime"}`
-                  : ""}
-              </span>
-              {group.status && (
-                <span className="ml-auto text-xs text-muted-foreground capitalize">
-                  {group.status}
+          <div key={group.id} className="rounded-xl border bg-background">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                <ChevronDown className="size-4 text-muted-foreground group-open:rotate-180" />
+                <h5 className="text-sm font-semibold">{group.name}</h5>
+                <span className="text-xs text-muted-foreground">
+                  {groupAds.length} {groupAds.length === 1 ? "ad" : "ads"}
+                  {group.budget != null
+                    ? ` · ${money(group.budget)}${group.budgetType === "daily" ? "/day" : " lifetime"}`
+                    : ""}
                 </span>
-              )}
-              {targeting && (
-                <div className="w-full pl-7">
-                  <DeliveryTargetingSummary compact audience={targeting} />
-                </div>
-              )}
-            </summary>
-            <div className="space-y-4 px-4 pb-4">
-              {!targeting && (
-                <p className="text-xs text-muted-foreground">
-                  Targeting details unavailable.
-                </p>
-              )}
-              {setLink && (
-                <a
-                  href={setLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-block text-xs text-muted-foreground hover:underline"
-                >
-                  Open ad set in Meta ↗
-                </a>
-              )}
-              {groupAds.map(renderAd)}
-              {!groupAds.length && (
-                <p className="text-sm text-muted-foreground">
-                  No delivered ads in this set.
-                </p>
-              )}
-            </div>
-          </details>
+                {group.status && (
+                  <span className="ml-auto text-xs text-muted-foreground capitalize">
+                    {group.status}
+                  </span>
+                )}
+                {targeting && (
+                  <div className="w-full pl-7">
+                    <DeliveryTargetingSummary compact audience={targeting} />
+                  </div>
+                )}
+              </summary>
+              <div className="space-y-4 px-4 pb-4">
+                {!targeting && (
+                  <p className="text-xs text-muted-foreground">
+                    Targeting details unavailable.
+                  </p>
+                )}
+                {setLink && (
+                  <a
+                    href={setLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block text-xs text-muted-foreground hover:underline"
+                  >
+                    Open ad set in Meta ↗
+                  </a>
+                )}
+                {groupAds.map(renderAd)}
+                {!groupAds.length && (
+                  <p className="text-sm text-muted-foreground">
+                    No delivered ads in this set.
+                  </p>
+                )}
+              </div>
+            </details>
+            {seed && group.audienceId && (
+              <div className="px-4 pb-4 pl-11">
+                <SeedLookalikeStep
+                  brandId={seed.brandId}
+                  brandName={seed.brandName}
+                  campaignAudienceId={group.audienceId}
+                  display="row"
+                />
+              </div>
+            )}
+          </div>
         );
       })}
       {ungrouped.length > 0 && (

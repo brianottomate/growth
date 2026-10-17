@@ -322,20 +322,28 @@ export function MetaPlatformCard({
                         No ads included in this ad set.
                       </p>
                     )}
+                  </div>
+                </details>
+                {audience.audienceId && (
+                  <div className="mt-3 pl-7">
+                    <SeedLookalikeStep
+                      brandId={pc.brandId}
+                      brandName={brandName}
+                      campaignAudienceId={audience.audienceId}
+                      display="row"
+                    />
+                  </div>
+                )}
+                <div className="absolute top-4 right-4">
+                  <DeliveryGroupEditor group={audience}>
                     {audience.audienceId && (
                       <SeedLookalikeStep
                         brandId={pc.brandId}
                         brandName={brandName}
-                        campaignId={campaignId}
-                        campaignName={campaignName}
                         campaignAudienceId={audience.audienceId}
                         seedContext={seedContext}
                       />
                     )}
-                  </div>
-                </details>
-                <div className="absolute top-4 right-4">
-                  <DeliveryGroupEditor group={audience}>
                     <section className="space-y-3 border-t pt-4">
                       <h4 className="text-sm font-medium">
                         Included ads · all Meta ad sets
@@ -347,6 +355,14 @@ export function MetaPlatformCard({
                       </p>
                       <PlatformAdSelection pc={pc} ads={ads} compact />
                     </section>
+                    {audience.audienceId && (
+                      <SeedLookalikeStep
+                        brandId={pc.brandId}
+                        brandName={brandName}
+                        campaignAudienceId={audience.audienceId}
+                        display="row"
+                      />
+                    )}
                   </DeliveryGroupEditor>
                 </div>
               </div>

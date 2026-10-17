@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { orpc } from "@/orpc/client";
 import { eligiblePlatformAds, selectPlatformAds } from "@/lib/platform-ad-plan";
 import type { Ad, PlatformCampaign } from "@/server/db/ads-schema";
+import { posterForMedia } from "@/lib/media-url";
 
 export function PlatformAdSelection({
   pc,
@@ -90,10 +91,22 @@ export function PlatformAdSelection({
                 })
               }
             />
+            {"media" in ad.content && posterForMedia(ad.content.media[0]) && (
+              // oxlint-disable-next-line nextjs/no-img-element
+              <img
+                src={posterForMedia(ad.content.media[0])}
+                alt=""
+                className="size-16 shrink-0 rounded-md border object-cover"
+              />
+            )}
             <span className="min-w-0 flex-1">
               <span className="block font-medium">{ad.name}</span>
               <span className="text-xs text-muted-foreground">
-                {ad.type === "text" ? "Responsive search ad" : "Creative ad"}
+                {ad.type === "text"
+                  ? "Responsive search ad"
+                  : "media" in ad.content && ad.content.media.length > 1
+                    ? `Carousel · ${ad.content.media.length} cards`
+                    : "Single image"}
                 {ad.status !== "approved" && " · Awaiting approval"}
               </span>
             </span>

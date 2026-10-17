@@ -346,7 +346,30 @@ async function runBuild(
       ...(await copyEmailList(brand.id, origin.listId)),
     };
   const definition = reuse ?? (await templateDefinition(origin, brand, actor));
-  return { definition, ...(await runQueryBuild(brand, definition, actor)) };
+  const build = await runQueryBuild(brand, definition, actor);
+  // AI-made filters aim at 1,000+ people; one that comes out small gets its
+  // place filters dropped and runs once more across all of Wander's homes.
+  const placed = definition.searches.some(
+    (s) => s.filter.cities.length || s.filter.states.length,
+  );
+  if (
+    !reuse &&
+    (origin.template === "persona" || origin.template === "described") &&
+    build.summary.identifiable < SEED_GUIDELINE_ENTRIES &&
+    placed
+  ) {
+    const wider = seedDefinitionSchema.parse({
+      ...definition,
+      searches: definition.searches.map((s) => ({
+        ...s,
+        filter: { ...s.filter, cities: [], states: [] },
+      })),
+    });
+    const widened = await runQueryBuild(brand, wider, actor);
+    if (widened.summary.identifiable > build.summary.identifiable)
+      return { definition: wider, ...widened };
+  }
+  return { definition, ...build };
 }
 
 /** Make a seed list from a starting point and build it straight away. */

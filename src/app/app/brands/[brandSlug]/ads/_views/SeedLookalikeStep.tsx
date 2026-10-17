@@ -2,28 +2,19 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 
-import { CopyButton } from "@/components/copy-button";
 import { SeedShareDialog } from "@/components/seed-share-dialog";
 import { Button } from "@/components/ui/button";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { cn } from "@/lib/utils";
 import { type RouterOutputs, orpc } from "@/orpc/client";
 import {
   NewSeedList,
   type NewSeedListContext,
 } from "@/app/app/performance/clients/[brandSlug]/NewSeedList";
-import { AskAssistantButton } from "./AskAssistantButton";
 
 type Delivery = RouterOutputs["seed"]["deliveries"][number];
-
-function reached(d: Delivery) {
-  if (d.linkedToCampaignAudience) return 5;
-  return { built: 1, failed: 1, uploaded: 2, lookalike: 3, shared: 4 }[d.stage];
-}
 
 /** Approval gate for the two steps that write to Meta. */
 function Confirm({
@@ -67,27 +58,24 @@ function Confirm({
 }
 
 /**
- * The ad set's seed lookalike: a seed list uploaded to its owner's Meta
- * account (Wander's for Wander travelers, otherwise the brand's own), its 1%
- * lookalike in the client's account, and that copy targeted by this campaign
- * audience.
+ * One line in an ad set: which seed list it uses, where that stands on Meta,
+ * and the one next step. Wander traveler lists go through Wander's account and
+ * reach the brand as a shared lookalike; the brand's own guests go straight to
+ * its account.
  */
 export function SeedLookalikeStep({
   brandId,
   brandName,
-  campaignId,
-  campaignName,
   campaignAudienceId,
-  title = "Seed lookalike",
   seedContext,
+  display = "section",
 }: {
   brandId: string;
   brandName: string;
-  campaignId: string;
-  campaignName: string;
   campaignAudienceId: string;
-  title?: string;
   seedContext?: NewSeedListContext;
+  /** "row": a read-only line, shown only once a lookalike is in use. */
+  display?: "row" | "section";
 }) {
   const queryClient = useQueryClient();
   const deliveries = useQuery(
@@ -107,41 +95,62 @@ export function SeedLookalikeStep({
   const attach = useMutation(orpc.seed.attach.mutationOptions(options));
 
   const rows = deliveries.data ?? [];
-  const d =
+  const d: Delivery | undefined =
     rows.find((r) => r.id === chosenId) ??
     rows.find((r) => r.linkedToCampaignAudience) ??
     rows.find((r) => r.seed) ??
     rows[0];
-  const step = d ? reached(d) : 0;
+
+  if (deliveries.isPending) return null;
+
   const account = d?.wanderData
     ? "Wander's ad account"
     : `${brandName}'s ad account`;
-  const steps = [
-    "Built",
-    d?.wanderData ? "Uploaded to Wander" : `Uploaded to ${brandName}`,
-    "Lookalike created",
-    d?.wanderData ? `Shared with ${brandName}` : `In ${brandName}'s account`,
-    "Used in this ad set",
-  ];
+  const status = !d
+    ? "none"
+    : d.linkedToCampaignAudience
+      ? "Lookalike in use"
+      : {
+          built: d.warning ? "Small for a lookalike" : "Not on Meta yet",
+          failed: "Upload failed",
+          uploaded: "On Meta",
+          lookalike: `Lookalike ready to share with ${brandName}`,
+          shared: "Lookalike shared",
+        }[d.stage];
 
-  let action: React.ReactNode = null;
-  if (d && (d.stage === "built" || d.stage === "failed"))
-    action = (
+  let next: React.ReactNode = null;
+  if (!d) next = null;
+  else if (d.stage === "built" || d.stage === "failed")
+    next = (
       <Confirm
-        label={`Upload ${d.summary.identifiable.toLocaleString()} to Meta`}
-        title={`Upload seed list to ${account}`}
-        body={`${d.summary.identifiable.toLocaleString()} people (email and phone) from “${d.name}” go to ${account}.${d.wanderData ? ` ${brandName} never receives them.` : ""}${d.warning ? ` ${d.warning}` : ""}`}
-        pending={upload.isPending}
-        onConfirm={() =>
-          upload.mutateAsync({ seedListId: d.id, approved: true })
-        }
+        label={`Upload ${d.summary.identifiable.toLocaleString()} and create lookalike`}
+        title={`Upload seed list to ${account} and build its lookalike`}
+        body={`${d.summary.identifiable.toLocaleString()} people (email and phone) from “${d.name}” go to ${account}, then Meta builds a 1% US lookalike from them.${d.wanderData ? ` ${brandName} never receives the list, only the lookalike once shared.` : ""}${d.warning ? ` ${d.warning}` : ""}`}
+        pending={upload.isPending || lookalike.isPending}
+        onConfirm={async () => {
+          const uploaded = await upload.mutateAsync({
+            seedListId: d.id,
+            approved: true,
+          });
+          // Meta may still be matching the list; the Create lookalike step
+          // then stays available for a second try.
+          await lookalike
+            .mutateAsync({
+              seedListId: d.id,
+              seedPlatformAudienceId: uploaded.platformAudienceId,
+              country: "US",
+              ratio: 0.01,
+              approved: true,
+            })
+            .catch(() => undefined);
+        }}
       />
     );
-  else if (d?.stage === "uploaded" && d.seed)
-    action = (
+  else if (d.stage === "uploaded" && d.seed)
+    next = (
       <Confirm
-        label="Create 1% US lookalike"
-        title={`Create lookalike in ${account}`}
+        label="Create lookalike"
+        title={`Create a 1% US lookalike in ${account}`}
         body={`Meta builds a 1% US lookalike from “${d.seed.name}”, recorded as built for ${brandName}.`}
         pending={lookalike.isPending}
         onConfirm={() =>
@@ -155,19 +164,19 @@ export function SeedLookalikeStep({
         }
       />
     );
-  else if (d?.share && d.stage === "lookalike")
-    action = (
+  else if (d.stage === "lookalike" && d.share)
+    next = (
       <SeedShareDialog
         share={d.share}
         onShared={() => void refresh()}
-        trigger={<Button size="sm">Share with {brandName}</Button>}
+        trigger={<Button size="sm">Share</Button>}
       />
     );
-  else if (d?.share?.sharedPlatformAudienceId && !d.linkedToCampaignAudience)
-    action = (
+  else if (d.share?.sharedPlatformAudienceId && !d.linkedToCampaignAudience)
+    next = (
       <Button
         size="sm"
-        disabled={attach.isPending}
+        loading={attach.isPending}
         onClick={() =>
           attach.mutate({
             seedListId: d.id,
@@ -176,119 +185,76 @@ export function SeedLookalikeStep({
           })
         }
       >
-        Use in this ad set
+        Use here
       </Button>
     );
 
-  const detail = (i: number) =>
-    !d
-      ? null
-      : i === 0
-        ? `${d.summary.identifiable.toLocaleString()} people`
-        : i === 1 && d.seed
-          ? (d.seed.metaAudienceId ?? d.seed.status)
-          : i === 2 && d.lookalike
-            ? d.lookalike.metaAudienceId
-            : i === 3 && d.share
-              ? (d.share.clientAdAccountName ?? d.share.clientAdAccountId)
-              : null;
-  const copyable = (i: number) =>
-    (i === 1 && d?.seed?.metaAudienceId) ||
-    (i === 2 && d?.lookalike?.metaAudienceId) ||
-    null;
+  if (display === "row")
+    return d?.linkedToCampaignAudience ? (
+      <p className="text-sm">
+        <span className="text-muted-foreground">Seed </span>
+        {d.name} · lookalike in use
+      </p>
+    ) : null;
 
   return (
     <section className="space-y-3 border-t pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-medium">{title}</h4>
-        {seedContext && rows.length > 0 && (
-          <NewSeedList context={seedContext} />
-        )}
+      <div>
+        <h4 className="text-sm font-medium">Seed lookalike</h4>
+        <p className="text-xs text-muted-foreground">
+          Optional. A seed list becomes a lookalike this ad set targets.
+          {d?.wanderData
+            ? ` Wander travelers go to Wander's ad account; ${brandName} only receives the shared lookalike.`
+            : ""}
+        </p>
       </div>
-      {deliveries.isPending ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
-      ) : !d ? (
-        <div className="flex flex-wrap gap-2">
-          {seedContext && <NewSeedList context={seedContext} primary />}
-          <AskAssistantButton
-            brandId={brandId}
-            brandName={brandName}
-            campaignId={campaignId}
-            campaignName={campaignName}
-            focus="platforms"
-            label="Build one in chat"
-            ask={`Build a seed list for ${brandName} with seedWrite.build from the template that fits this campaign best, and tell me its size. Stop before uploading.`}
-          />
-        </div>
-      ) : (
+      {rows.length > 0 && d ? (
         <>
-          {rows.length > 1 ? (
-            <SimpleSelect
-              value={d.id}
-              onValueChange={setChosenId}
-              options={rows.map((r) => ({
-                value: r.id,
-                label: `${r.name} · ${r.summary.identifiable.toLocaleString()}`,
-              }))}
-            />
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {d.name}
-              {d.builtFrom !== d.name ? ` · ${d.builtFrom}` : ""}
+          <SimpleSelect
+            value={d.id}
+            onValueChange={setChosenId}
+            options={rows.map((r) => ({
+              value: r.id,
+              label: `${r.name} · ${r.summary.identifiable.toLocaleString()}`,
+            }))}
+          />
+          <p className="text-sm text-muted-foreground">
+            {d.builtFrom} · {status}
+          </p>
+          {d.lookalike && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Lookalike </span>
+              {d.lookalike.name}
+              <span className="ml-2 font-mono text-xs text-muted-foreground">
+                {d.lookalike.metaAudienceId}
+              </span>
             </p>
           )}
-          <ol className="grid grid-cols-1 gap-1">
-            {steps.map((label, i) => {
-              const done = i < step;
-              const value = detail(i);
-              const copy = copyable(i);
-              return (
-                <li
-                  key={label}
-                  className={cn(
-                    "flex min-w-0 items-center gap-2 text-xs",
-                    !done && "text-muted-foreground",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid size-4 shrink-0 place-items-center rounded-full border",
-                      done && "border-foreground bg-foreground text-background",
-                    )}
-                  >
-                    {done && <Check className="size-3" />}
-                  </span>
-                  <span className="shrink-0">{label}</span>
-                  {value && (
-                    <span className="truncate font-mono text-muted-foreground">
-                      {value}
-                    </span>
-                  )}
-                  {copy && <CopyButton text={copy} />}
-                </li>
-              );
-            })}
-          </ol>
           {d.warning && d.stage === "built" && (
             <p className="text-xs text-muted-foreground">{d.warning}</p>
           )}
-          {d.stage === "failed" && (
-            <p className="text-xs text-muted-foreground">
-              The last upload failed. Upload again to create a new Meta list.
-            </p>
-          )}
-          {action}
-          {d.share && d.stage === "shared" && (
-            <SeedShareDialog
-              share={d.share}
-              trigger={
-                <Button size="sm" variant="ghost">
-                  Share details
-                </Button>
-              }
-            />
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {next}
+            {d.share && d.stage !== "lookalike" && (
+              <SeedShareDialog
+                share={d.share}
+                trigger={
+                  <Button size="sm" variant="ghost">
+                    IDs and share prompt
+                  </Button>
+                }
+              />
+            )}
+            {seedContext && <NewSeedList context={seedContext} />}
+          </div>
         </>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            No seed lists for {brandName} yet.
+          </p>
+          {seedContext && <NewSeedList context={seedContext} />}
+        </div>
       )}
     </section>
   );

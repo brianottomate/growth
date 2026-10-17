@@ -32,7 +32,6 @@ import { PushToPlatform } from "./PushToPlatform";
 import { MetaDeliverySummary } from "./MetaDeliverySummary";
 import { platformCampaignAdAccount } from "@/lib/platform-campaign-account";
 import { PushedMetaGroups } from "./PushedMetaGroups";
-import { SeedLookalikeStep } from "./SeedLookalikeStep";
 import { PushedSearchGroups } from "./PushedSearchGroups";
 
 /**
@@ -367,7 +366,7 @@ export async function PlatformSection({
           <h4 className="text-sm font-medium">Delivery setup</h4>
           <MetaDeliverySummary
             pc={platformCampaign}
-            accountName={metaAccount?.name}
+            accountName={metaAccount?.name ?? adAccountId}
             pageId={metaBrand?.metaPageId}
             campaignStartAt={campaignStartAt}
             campaignEndAt={campaignEndAt}
@@ -393,21 +392,12 @@ export async function PlatformSection({
             groups={platformCampaign.deliveryGroups ?? []}
             ads={ads}
             pc={platformCampaign}
+            seed={{
+              brandId: platformCampaign.brandId,
+              brandName,
+              context: seedContext,
+            }}
           />
-          {/* The seed steps do not depend on the push; a pushed plan uses
-              the attached lookalike the next time it is compiled. */}
-          {(audiences ?? []).map((audience) => (
-            <SeedLookalikeStep
-              key={audience.id}
-              brandId={platformCampaign.brandId}
-              brandName={brandName}
-              campaignId={campaignId}
-              campaignName={campaignName ?? platformCampaign.name}
-              campaignAudienceId={audience.id}
-              title={`Seed lookalike · ${audience.name}`}
-              seedContext={seedContext}
-            />
-          ))}
         </div>
       ) : platform === "google_ads" &&
         platformCampaign.settings?.google?.campaignType === "search" ? (

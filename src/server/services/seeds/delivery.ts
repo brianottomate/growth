@@ -134,9 +134,11 @@ async function requireSeedAsset(
   return asset;
 }
 
+// Zernio answers { message, numReceived } and names rejected rows only when
+// there are any.
 const acknowledgment = z.object({
   numReceived: z.number().int().nonnegative(),
-  numInvalid: z.number().int().nonnegative(),
+  numInvalid: z.number().int().nonnegative().optional(),
 });
 
 /**
@@ -195,7 +197,9 @@ export async function uploadSeed(
         await addUsersToZernioAdAudience(record, batch),
       );
       if (!ack.success || ack.data.numReceived !== batch.length)
-        throw new Error("Meta did not acknowledge the whole batch");
+        throw new Error(
+          `Meta acknowledged ${ack.success ? ack.data.numReceived : "none"} of ${batch.length} in a batch`,
+        );
     }
     await mark("ready");
   } catch (error) {
