@@ -1,4 +1,13 @@
 import {
+  exportArticleAction,
+  articleHistoryAction,
+  acceptCurrentArticleAction,
+  articleRevisionAction,
+  acceptArticleAction,
+  restoreArticleAction,
+  dismissArticleAction,
+} from "./article-history";
+import {
   listBoardsAction,
   readBoardAction,
   boardMediaAction,
@@ -328,12 +337,22 @@ import { growthDomainTool } from "./types";
 export const creativeRead = growthDomainTool({
   description:
     "Read typed creative briefs and current documents for articles, emails, images and videos.",
-  actions: { list: listCreativeDocuments, get: readCreativeDocument },
+  actions: {
+    list: listCreativeDocuments,
+    get: readCreativeDocument,
+    exportArticle: exportArticleAction,
+    articleHistory: articleHistoryAction,
+    articleRevision: articleRevisionAction,
+  },
 });
 export const creativeWrite = growthDomainTool({
   description:
     "Prepare, edit and produce typed creative documents; explicitly transfer article drafts to or from Dato.",
   actions: {
+    acceptCurrentArticle: acceptCurrentArticleAction,
+    acceptArticle: acceptArticleAction,
+    restoreArticle: restoreArticleAction,
+    dismissArticle: dismissArticleAction,
     create: createCreativeDocumentAction,
     save: saveCreativeDocumentAction,
     select: selectCreativeDocumentAction,

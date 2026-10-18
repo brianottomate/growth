@@ -1,4 +1,13 @@
 import {
+  exportArticleAction,
+  articleHistoryAction,
+  acceptCurrentArticleAction,
+  articleRevisionAction,
+  acceptArticleAction,
+  restoreArticleAction,
+  dismissArticleAction,
+} from "@/server/ai/capabilities/article-history";
+import {
   listCreativeDocuments,
   readCreativeDocument,
   createCreativeDocumentAction,
@@ -66,6 +75,13 @@ async function accessibleThread(
 }
 
 export const creativeWorkRouter = {
+  exportArticle: actionProcedure(exportArticleAction),
+  articleHistory: actionProcedure(articleHistoryAction),
+  articleRevision: actionProcedure(articleRevisionAction),
+  acceptCurrentArticle: actionProcedure(acceptCurrentArticleAction),
+  acceptArticle: actionProcedure(acceptArticleAction),
+  restoreArticle: actionProcedure(restoreArticleAction),
+  dismissArticle: actionProcedure(dismissArticleAction),
   documents: actionProcedure(listCreativeDocuments),
   document: actionProcedure(readCreativeDocument),
   createDocument: actionProcedure(createCreativeDocumentAction),

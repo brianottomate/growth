@@ -1,4 +1,5 @@
 "use client";
+import { ArticleHistory } from "@/components/editorial/ArticleHistory";
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +24,7 @@ export function CreativeDocumentWorkspace({
   });
   const refresh = () =>
     client.invalidateQueries({
-      queryKey: orpc.creativeWork.document.queryKey({ input: { documentId } }),
+      queryKey: orpc.creativeWork.key(),
     });
   const save = useMutation(
     orpc.creativeWork.saveDocument.mutationOptions({ onSuccess: refresh }),
@@ -87,6 +88,13 @@ export function CreativeDocumentWorkspace({
           </Link>
         )}
       </div>
+      {document.type === "article" && (
+        <ArticleHistory
+          current={document}
+          documentId={documentId}
+          disabled={locked || !!draft || save.isPending}
+        />
+      )}
       <div className="flex flex-wrap gap-2">
         <Button
           disabled={locked || !draft || save.isPending}

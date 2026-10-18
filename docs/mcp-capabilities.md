@@ -224,3 +224,12 @@ occurrences, saves proposals and accepts one reviewed proposal into a local
 content idea or ad shell. These share their service with Landscape's board UI.
 Acceptance is atomic and replay-safe; source artwork is never copied into the
 draft. See [reference boards](reference-boards.md).
+
+## Article review history
+
+Article writing returns a candidate for review. `creativeRead.articleHistory`
+and `articleRevision` expose immutable snapshots, while `creativeWrite` adds
+`acceptArticle`, `acceptCurrentArticle`, `restoreArticle` and `dismissArticle`.
+Edits retain history and clear current editorial acceptance. These local actions
+share the editor's service and leave CMS publication separate. See
+[article review and recovery](article-history.md).

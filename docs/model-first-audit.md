@@ -506,3 +506,18 @@ ad when an acceptance is retried. Edits before acceptance remain last-write-wins
 Source previews resolve current visibility instead of storing private snapshots.
 The shared visible-brand check now scopes tracking links in SQL, so a public
 reference tracked by multiple organizations is visible to each valid tracker.
+
+## 2026-10-18: article candidates and editorial decisions
+
+The typed article writer replaced `production_packet.document` immediately on
+completion, while ordinary saves retained no prior copy. A successful generation
+and a reviewed working draft represented different facts in the same field.
+
+`article_revision` now records immutable candidates and recovery snapshots.
+The current draft remains in `production_packet`; `article_acceptance` links the
+current editorial decision to its exact snapshot. Edits clear this relationship
+while retaining the historical decision. Provider transfer receipts remain in
+`workflow_run`. Applying a candidate and its decision happens atomically, and
+retries cannot overwrite a later edit. Restoring prose preserves the current CMS
+item identity. The shared document access check also verifies the live brand's
+organization and deletion state.

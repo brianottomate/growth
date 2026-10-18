@@ -295,6 +295,20 @@
       "when": 1792322495665,
       "tag": "0040_reference_boards",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792323468194,
+      "tag": "0041_article_revisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792323956042,
+      "tag": "0042_article_acceptance",
+      "breakpoints": true
     }
   ]
 }

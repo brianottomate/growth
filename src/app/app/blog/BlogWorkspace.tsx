@@ -1,4 +1,5 @@
 "use client";
+import { ArticleHistory } from "@/components/editorial/ArticleHistory";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -37,7 +38,7 @@ export function BlogWorkspace({
         : false,
   });
   const refresh = () =>
-    client.invalidateQueries({ queryKey: options.queryKey });
+    client.invalidateQueries({ queryKey: orpc.creativeWork.key() });
   const [draft, setDraft] = useState<Article | null>(null);
   const [tab, setTab] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -181,6 +182,11 @@ export function BlogWorkspace({
             )}
         </div>
       </div>
+      <ArticleHistory
+        documentId={documentId}
+        current={data.document}
+        disabled={busy || !!draft}
+      />
       {draft && (
         <p className="text-sm text-muted-foreground">
           Unsaved changes. Save before generating or transferring to Dato.

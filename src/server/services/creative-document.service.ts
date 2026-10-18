@@ -1,3 +1,4 @@
+import { preserveArticleDraft } from "./article-revision-store";
 import { assertEmailCreativeEditable } from "./email-creative-review";
 import { claimWorkflowRun } from "./workflow-run.service";
 import "server-only";
@@ -8,6 +9,7 @@ import {
 } from "@/lib/creative-document";
 import { db, withTransaction, type TransactionClient } from "@/server/db";
 import {
+  articleRevisionTable,
   brandTable,
   contentPostTable,
   workflowRunTable,
@@ -22,12 +24,19 @@ export async function getCreativeDocument(
   documentId: string,
   organizationId: string,
 ) {
-  const row = await db.query.productionPacketTable.findFirst({
-    where: and(
-      eq(productionPacketTable.id, documentId),
-      eq(productionPacketTable.organizationId, organizationId),
-    ),
-  });
+  const [found] = await db
+    .select({ row: productionPacketTable })
+    .from(productionPacketTable)
+    .innerJoin(brandTable, eq(brandTable.id, productionPacketTable.brandId))
+    .where(
+      and(
+        eq(productionPacketTable.id, documentId),
+        eq(productionPacketTable.organizationId, organizationId),
+        eq(brandTable.organizationId, organizationId),
+        isNull(brandTable.deletedAt),
+      ),
+    );
+  const row = found?.row;
   if (!row) throw new Error("Creative document not found in this workspace.");
   const document = creativeDocumentSchema.parse(row.document);
   if (document.type !== row.documentType)
@@ -40,16 +49,19 @@ export async function lockDocument(
   organizationId: string,
 ) {
   const rows = await tx
-    .select()
+    .select({ row: productionPacketTable })
     .from(productionPacketTable)
+    .innerJoin(brandTable, eq(brandTable.id, productionPacketTable.brandId))
     .where(
       and(
         eq(productionPacketTable.id, id),
         eq(productionPacketTable.organizationId, organizationId),
+        eq(brandTable.organizationId, organizationId),
+        isNull(brandTable.deletedAt),
       ),
     )
     .for("update");
-  const row = rows[0];
+  const row = rows[0]?.row;
   if (!row) throw new Error("Creative document not found in this workspace.");
   await tx
     .update(workflowRunTable)
@@ -80,7 +92,10 @@ export async function assertUnlocked(tx: TransactionClient, id: string) {
       "This document is being produced. Wait for completion or cancel the run before editing.",
     );
 }
-async function validateAssets(document: CreativeDocument, brandId: string) {
+export async function validateCreativeAssets(
+  document: CreativeDocument,
+  brandId: string,
+) {
   const ids = new Set(document.brief.assets.map((a) => a.assetId));
   if (document.type === "article" && document.content.heroAssetId)
     ids.add(document.content.heroAssetId);
@@ -168,7 +183,7 @@ export async function createCreativeDocument(
       ].filter((value): value is string => !!value);
     }
   }
-  await validateAssets(document, brand.id);
+  await validateCreativeAssets(document, brand.id);
   const [row] = await db
     .insert(productionPacketTable)
     .values({
@@ -209,10 +224,11 @@ export async function saveCreativeDocument(
     parsed.content.authorName !== current.document.content.authorName
   )
     delete parsed.content.datoAuthorId;
-  await validateAssets(parsed, current.brandId);
+  await validateCreativeAssets(parsed, current.brandId);
   return withTransaction(async (tx) => {
-    await lockDocument(tx, current.id, input.organizationId);
+    const locked = await lockDocument(tx, current.id, input.organizationId);
     await assertUnlocked(tx, current.id);
+    await preserveArticleDraft(tx, locked, "before_edit", input.userId);
     const [row] = await tx
       .update(productionPacketTable)
       .set({
@@ -275,7 +291,7 @@ export async function selectCreativeDocument(
       (creative.type === "image" || creative.type === "video") &&
       creative.content.selectedAssetId
     ) {
-      await validateAssets(creative, document.brandId);
+      await validateCreativeAssets(creative, document.brandId);
       const asset = await tx.query.mediaAssetTable.findFirst({
         where: eq(mediaAssetTable.id, creative.content.selectedAssetId),
       });
@@ -320,7 +336,7 @@ export async function beginDocumentRun(
     const row = await lockDocument(tx, input.documentId, input.organizationId);
     await assertUnlocked(tx, row.id);
     const document = creativeDocumentSchema.parse(row.document);
-    await validateAssets(document, row.brandId);
+    await validateCreativeAssets(document, row.brandId);
     const [run] = await tx
       .insert(workflowRunTable)
       .values({
@@ -358,10 +374,10 @@ export async function finishDocumentRun(
   if (parsed) {
     if (parsed.type !== run.kind)
       throw new Error("Result type does not match the run.");
-    await validateAssets(parsed, run.brandId);
+    await validateCreativeAssets(parsed, run.brandId);
   }
   return withTransaction(async (tx) => {
-    await lockDocument(tx, run.packetId!, run.organizationId);
+    const current = await lockDocument(tx, run.packetId!, run.organizationId);
     const [finished] = await tx
       .update(workflowRunTable)
       .set({
@@ -379,11 +395,28 @@ export async function finishDocumentRun(
       )
       .returning();
     if (!finished) return false;
-    if (parsed)
+    if (parsed?.type === "article" && run.operation === "write") {
+      await tx.insert(articleRevisionTable).values({
+        documentId: current.id,
+        runId: run.id,
+        document: parsed,
+        source: "generated",
+        status: "candidate",
+        createdBy: run.createdBy,
+      });
+    } else if (parsed) {
+      await preserveArticleDraft(
+        tx,
+        current,
+        `before_${run.operation}`,
+        run.createdBy,
+        run.operation !== "push",
+      );
       await tx
         .update(productionPacketTable)
         .set({ document: parsed, updatedAt: new Date() })
-        .where(eq(productionPacketTable.id, run.packetId!));
+        .where(eq(productionPacketTable.id, current.id));
+    }
     return true;
   });
 }

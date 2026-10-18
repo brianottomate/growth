@@ -62,11 +62,20 @@ export const listCreativeDocuments = growthAction({
   }),
   execute: async (input, ctx) => {
     const rows = await db
-      .select()
+      .select({
+        id: productionPacketTable.id,
+        title: productionPacketTable.title,
+        documentType: productionPacketTable.documentType,
+        contentPostId: productionPacketTable.contentPostId,
+        document: productionPacketTable.document,
+      })
       .from(productionPacketTable)
+      .innerJoin(brandTable, eq(brandTable.id, productionPacketTable.brandId))
       .where(
         and(
           eq(productionPacketTable.organizationId, ctx.orgId),
+          eq(brandTable.organizationId, ctx.orgId),
+          isNull(brandTable.deletedAt),
           input.contentPostId
             ? eq(productionPacketTable.contentPostId, input.contentPostId)
             : undefined,
@@ -220,7 +229,7 @@ export const createCreativeDocumentAction = growthAction({
 });
 export const saveCreativeDocumentAction = growthAction({
   description:
-    "Replace the current typed creative document. Keep its type and preserve any fields not intentionally changed. Blocked while a production run is active. No revision history is created.",
+    "Replace the current typed creative document. Keep its type and preserve any fields not intentionally changed. Blocked while a production run is active. Article saves preserve the previous draft in recoverable history.",
   inputSchema: idInput.extend({ document: creativeDocumentSchema }),
   outputSchema: saved,
   execute: async (input, ctx) => {
@@ -249,7 +258,7 @@ export const selectCreativeDocumentAction = growthAction({
 });
 export const produceCreativeDocument = growthAction({
   description:
-    "Produce from a saved creative brief. Articles use the shared lab storyboard, writer, revision and editorial checks. Emails use the email writer; images use the existing image adapter; videos produce a script and scene plan, not rendered footage. One run at a time, with editing locked. Poll creativeRead.get for completion.",
+    "Produce from a saved creative brief. Articles use the shared lab storyboard, writer, revision and editorial checks. Emails use the email writer; images use the existing image adapter; videos produce a script and scene plan, not rendered footage. One run at a time, with editing locked. Poll creativeRead.get for completion. Article writing returns a candidate: inspect creativeRead.articleHistory and articleRevision, then use creativeWrite.acceptArticle when the operator chooses it.",
   inputSchema: idInput,
   outputSchema: z.object({ runId: z.string(), url: z.string() }),
   execute: async ({ documentId }, ctx) => {
