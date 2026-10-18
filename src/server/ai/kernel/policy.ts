@@ -180,6 +180,8 @@ export const growthActionPolicies = {
     wanderOsContext: read(),
   },
   performanceRead: {
+    reportWorkspace: read(),
+    reviewReport: read(),
     pitch: read(),
     draftPitch: read("model-read"),
     list: read(),
@@ -202,6 +204,9 @@ export const growthActionPolicies = {
   // rows with a cycle id (undo = attach with cycleId null); nothing here
   // touches a provider or spends.
   performanceWrite: {
+    saveReportDraft: write(),
+    publishReport: write({ approval: "user" }),
+    revokeReportShare: write({ approval: "user", idempotent: true }),
     savePitch: write({ undoWith: "performanceWrite.savePitch" }),
     saveHomeGroup: write(),
     recordLaunchChecklist: write(),

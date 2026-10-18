@@ -10,6 +10,7 @@ import {
 import { organizationTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
 import type {
+  PerformanceReportSnapshot,
   PerformanceReportChannel,
   PerformanceReportDeliverable,
   PerformanceReportHighlight,
@@ -304,17 +305,7 @@ export const performanceReportStatusEnum = pgEnum("performance_report_status", [
 export type PerformanceReportStatus =
   (typeof performanceReportStatusEnum.enumValues)[number];
 
-/**
- * Customers get no Growth access: a report is served at a tokenized public URL
- * (the pregen claim-link pattern). `token` is the whole credential — treat it
- * like one.
- *
- * A report covers its own date window, which need not match a billing month
- * (a first report is usually "launch to date"), so the cycle link is optional.
- * The content is a snapshot written by whoever pulls the data; its shape and
- * validation live in `@/lib/performance-report`, and `sources` records where
- * each number came from.
- */
+/** Mutable report draft. Published links read performanceReportShareTable. */
 export const performanceReportTable = pgTable(
   "performance_report",
   (t) => ({
@@ -379,6 +370,37 @@ export const performanceReportTable = pgTable(
 export type PerformanceReport = typeof performanceReportTable.$inferSelect;
 export type PerformanceReportInsert =
   typeof performanceReportTable.$inferInsert;
+
+/** A reviewed publication; later draft edits never change its content. */
+export const performanceReportShareTable = pgTable(
+  "performance_report_share",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("rptshare")),
+    reportId: t
+      .text()
+      .notNull()
+      .references(() => performanceReportTable.id, { onDelete: "cascade" }),
+    organizationId: t
+      .text()
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    token: t.text().notNull(),
+    snapshot: t.jsonb().$type<PerformanceReportSnapshot>().notNull(),
+    expiresAt: t.timestamp(), // null only for migrated existing links
+    revokedAt: t.timestamp(),
+    createdAt: t
+      .timestamp()
+      .notNull()
+      .$defaultFn(() => new Date()),
+  }),
+  (table) => [
+    uniqueIndex("performance_report_share_token_idx").on(table.token),
+    index("performance_report_share_report_idx").on(table.reportId),
+  ],
+);
 
 // ---- INTAKE (the client's onboarding submission) ----------------------------
 

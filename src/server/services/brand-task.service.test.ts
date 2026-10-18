@@ -32,6 +32,10 @@ async function fixture() {
     new URL("../../../drizzle/0029_brand_tasks.sql", import.meta.url),
   ).text();
   await pg.exec(migration.replaceAll("--> statement-breakpoint", ""));
+  const decisionMigration = await Bun.file(
+    new URL("../../../drizzle/0038_brand_task_decision.sql", import.meta.url),
+  ).text();
+  await pg.exec(decisionMigration.replaceAll("--> statement-breakpoint", ""));
   const client = drizzle(pg, {
     schema,
     casing: "snake_case",

@@ -1,3 +1,4 @@
+import { r2IsPublicUrl } from "@/server/clients/r2.client";
 import {
   loadPerformanceReportPage,
   performanceReportImageUrls,
@@ -16,7 +17,12 @@ export async function GET(
   const { token } = await params;
   const src = new URL(request.url).searchParams.get("u");
   const report = src ? await loadPerformanceReportPage(token) : null;
-  if (!src || !report || !performanceReportImageUrls(report).has(src))
+  if (
+    !src ||
+    !r2IsPublicUrl(src) ||
+    !report ||
+    !performanceReportImageUrls(report).has(src)
+  )
     return new Response(null, { status: 404 });
 
   const image = await previewImage(src).catch(() => null);
@@ -24,8 +30,9 @@ export async function GET(
   return new Response(new Uint8Array(image.body), {
     headers: {
       "Content-Type": image.type,
-      "Cache-Control": "private, max-age=3600",
-      "X-Robots-Tag": "noindex",
+      "Cache-Control": "private, no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+      "Referrer-Policy": "no-referrer",
     },
   });
 }

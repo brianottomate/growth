@@ -67,6 +67,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   ],
   personaRead: ["list", "suggest", "wanderOsContext"],
   performanceRead: [
+    "reportWorkspace",
+    "reviewReport",
     "pitch",
     "draftPitch",
     "list",
@@ -84,6 +86,9 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "previewIntakeApply",
   ],
   performanceWrite: [
+    "saveReportDraft",
+    "publishReport",
+    "revokeReportShare",
     "savePitch",
     "createAccount",
     "updateAccount",

@@ -1,4 +1,11 @@
 import {
+  reportWorkspaceAction,
+  saveReportDraftAction,
+  reviewReportAction,
+  publishReportAction,
+  revokeReportShareAction,
+} from "@/server/ai/capabilities/performance-reports";
+import {
   listSeedsAction,
   buildSeedAction,
   refreshSeedAction,
@@ -414,6 +421,8 @@ export const performanceRead = growthDomainTool({
   description:
     "Read Performance accounts, the commercial record of each client paying Wander to run performance marketing for their homes, with their properties, billing cycles, and attached delivery.",
   actions: {
+    reportWorkspace: reportWorkspaceAction,
+    reviewReport: reviewReportAction,
     pitch: getPitchAction,
     draftPitch: draftPitchAction,
     list: listPerformanceAccountsAction,
@@ -436,6 +445,9 @@ export const performanceWrite = growthDomainTool({
   description:
     "Manage Performance accounts: onboard clients, create and edit named home groups and their membership, add their homes, update one home at a time (featured on the Setup page, hero photo), open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
   actions: {
+    saveReportDraft: saveReportDraftAction,
+    publishReport: publishReportAction,
+    revokeReportShare: revokeReportShareAction,
     savePitch: savePitchAction,
     createAccount: createPerformanceAccountAction,
     updateAccount: updatePerformanceAccountAction,

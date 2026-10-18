@@ -14,6 +14,7 @@ const TABS = [
   { label: "Ad studio", tab: "ads" },
   { label: "Campaigns", tab: "campaigns" },
   { label: "Email", tab: "newsletters" },
+  { label: "Reports", tab: "reports" },
   { label: "Billing", tab: "billing" },
   { label: "Settings", tab: "settings" },
   { label: "Pitch", tab: "pitch" },

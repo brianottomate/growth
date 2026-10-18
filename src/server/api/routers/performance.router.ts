@@ -1,4 +1,11 @@
 import {
+  reportWorkspaceAction,
+  saveReportDraftAction,
+  reviewReportAction,
+  publishReportAction,
+  revokeReportShareAction,
+} from "@/server/ai/capabilities/performance-reports";
+import {
   getPitchAction,
   savePitchAction,
   draftPitchAction,
@@ -51,6 +58,11 @@ import {
 } from "@/server/ai/capabilities/launch-checklist";
 
 export const performanceRouter = {
+  reportWorkspace: actionProcedure(reportWorkspaceAction),
+  saveReportDraft: actionProcedure(saveReportDraftAction),
+  reviewReport: actionProcedure(reviewReportAction),
+  publishReport: actionProcedure(publishReportAction),
+  revokeReportShare: actionProcedure(revokeReportShareAction),
   movePipelineCard: workspaceProcedure
     .input(
       z.object({

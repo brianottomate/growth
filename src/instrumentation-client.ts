@@ -35,6 +35,12 @@ if (env.NEXT_PUBLIC_POSTHOG_KEY) {
     defaults: "2025-11-30",
     capture_performance: true,
     autocapture: false,
+    // Public report paths contain bearer credentials, including in referrers.
+    before_send: (event) =>
+      window.location.pathname.startsWith("/report/") ||
+      JSON.stringify(event).includes("/report/")
+        ? null
+        : event,
     capture_pageview: false,
     capture_pageleave: false,
     disable_session_recording: true,

@@ -160,7 +160,7 @@ export function ReportView({
   token,
   report,
 }: {
-  token: string;
+  token?: string;
   report: PerformanceReportPage;
 }) {
   const { metrics } = report;
@@ -299,7 +299,9 @@ export function ReportView({
             </span>
           </div>
           <div {...{ [EXPORT_HIDE]: "" }} className="flex gap-2 print:hidden">
-            <PngExport mediaBase={`/report/${token}`} filename={filename} />
+            {token && (
+              <PngExport mediaBase={`/report/${token}`} filename={filename} />
+            )}
             <Button variant="outline" size="sm" onClick={() => window.print()}>
               <Printer className="size-3.5" />
               Save as PDF

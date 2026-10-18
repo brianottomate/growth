@@ -105,6 +105,14 @@ const config: NextConfig = {
         ],
       },
       {
+        source: "/report/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
+      {
         source: "/connect/:path*",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },

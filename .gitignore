@@ -67,6 +67,7 @@ test-data/
 
 generated-videos/
 reports/
+!src/app/app/performance/clients/**/reports/
 runs/
 # Immutable blog-workbench run fixtures are tracked despite the generic runs/ ignore.
 !fixtures/blog/runs/

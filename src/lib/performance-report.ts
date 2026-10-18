@@ -132,3 +132,38 @@ export function ratio(
     ? null
     : numerator / denominator;
 }
+
+/** Editable content. Publication creates a separate, frozen share. */
+export const performanceReportContent = z
+  .object({
+    periodLabel: z.string().trim().min(1).max(200),
+    startDate: z.iso.date(),
+    endDate: z.iso.date(),
+    channels: performanceReportChannels,
+    metrics: performanceReportMetrics,
+    otherBookings: performanceReportOtherBookingsList.default([]),
+    highlights: performanceReportHighlights.default([]),
+    deliverables: performanceReportDeliverables.default([]),
+    sources: performanceReportSources.min(1),
+    narrative: z.string().nullable().default(null),
+    recommendations: z.string().nullable().default(null),
+  })
+  .strict()
+  .refine((value) => value.startDate <= value.endDate, {
+    message: "Start date must be on or before end date",
+  });
+export type PerformanceReportContent = z.infer<typeof performanceReportContent>;
+export const performanceReportSnapshot = performanceReportContent.safeExtend({
+  clientName: z.string(),
+  status: z.enum(["draft", "published"]),
+  publishedAt: z.iso.datetime().nullable(),
+});
+export type PerformanceReportSnapshot = z.infer<
+  typeof performanceReportSnapshot
+>;
+export const savePerformanceReportSchema = z.object({
+  brandId: z.string().min(1),
+  id: z.string().min(1).optional(),
+  cycleId: z.string().nullable().default(null),
+  content: performanceReportContent,
+});
