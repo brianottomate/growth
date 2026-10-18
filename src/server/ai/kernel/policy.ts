@@ -95,6 +95,14 @@ export const growthActionPolicies = {
     pullDato: write({ consequence: "provider-read" }),
     pushDato: write({ consequence: "provider-write" }),
   },
+  referenceBoardRead: { list: read(), get: read(), media: read() },
+  referenceBoardWrite: {
+    save: write(),
+    addReference: write(),
+    editReferences: write(),
+    saveProposal: write(),
+    acceptProposal: write({ idempotent: true }),
+  },
   initiativeRead: { list: read(), get: read(), options: read() },
   initiativeWrite: {
     save: write(),

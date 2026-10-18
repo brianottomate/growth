@@ -34,11 +34,19 @@ export async function requireVisibleBrand(
   if (brand.organizationId)
     throw new Error("That brand is outside your organization.");
 
-  const tracked = await db.query.brandInspirationTable.findFirst({
-    where: eq(brandInspirationTable.inspirationBrandId, brandId),
-    with: { brand: { columns: { organizationId: true } } },
-  });
-  if (tracked?.brand?.organizationId !== ctx.orgId)
+  const [tracked] = await db
+    .select({ id: brandInspirationTable.id })
+    .from(brandInspirationTable)
+    .innerJoin(brandTable, eq(brandTable.id, brandInspirationTable.brandId))
+    .where(
+      and(
+        eq(brandInspirationTable.inspirationBrandId, brandId),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!tracked)
     throw new Error(
       "That reference brand is not tracked by your organization.",
     );

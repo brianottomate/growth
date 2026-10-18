@@ -47,3 +47,5 @@ export * from "./email-sequence-schema";
 export * from "./performance-booking-schema";
 
 export * from "./seed-schema";
+
+export * from "./reference-board-schema";

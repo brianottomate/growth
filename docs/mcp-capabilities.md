@@ -215,3 +215,12 @@ records the client's shared copy and attaches it to campaign audiences or
 personas. Upload and lookalike creation require operator approval and never
 spend. About 1,000 people is a guideline for a useful lookalike, not a gate. Same action definitions
 serve `seed.*` oRPC. See [model, existing-versus-new and workflow](seed-audiences.md).
+
+## Reference boards
+
+`referenceBoardRead` lists boards, reads their visible references and proposals,
+and lists approved brand media. `referenceBoardWrite` edits boards and reference
+occurrences, saves proposals and accepts one reviewed proposal into a local
+content idea or ad shell. These share their service with Landscape's board UI.
+Acceptance is atomic and replay-safe; source artwork is never copied into the
+draft. See [reference boards](reference-boards.md).

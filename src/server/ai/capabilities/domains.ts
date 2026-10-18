@@ -1,4 +1,14 @@
 import {
+  listBoardsAction,
+  readBoardAction,
+  boardMediaAction,
+  saveBoardAction,
+  addBoardReferenceAction,
+  editBoardReferencesAction,
+  saveBoardProposalAction,
+  acceptBoardProposalAction,
+} from "./reference-boards";
+import {
   reportWorkspaceAction,
   saveReportDraftAction,
   reviewReportAction,
@@ -331,6 +341,26 @@ export const creativeWrite = growthDomainTool({
     cancel: cancelCreativeDocumentRun,
     pullDato: pullCreativeDato,
     pushDato: pushCreativeDato,
+  },
+});
+export const referenceBoardRead = growthDomainTool({
+  description:
+    "Read brand reference boards, visual sources and creative proposals.",
+  actions: {
+    list: listBoardsAction,
+    get: readBoardAction,
+    media: boardMediaAction,
+  },
+});
+export const referenceBoardWrite = growthDomainTool({
+  description:
+    "Capture references, shape proposals and accept one local draft.",
+  actions: {
+    save: saveBoardAction,
+    addReference: addBoardReferenceAction,
+    editReferences: editBoardReferencesAction,
+    saveProposal: saveBoardProposalAction,
+    acceptProposal: acceptBoardProposalAction,
   },
 });
 export const initiativeRead = growthDomainTool({
@@ -903,6 +933,8 @@ export const seedWrite = growthDomainTool({
 });
 
 export const DOMAIN_CAPABILITY_TOOLS = {
+  referenceBoardRead,
+  referenceBoardWrite,
   seedRead,
   seedWrite,
   reviewRead,

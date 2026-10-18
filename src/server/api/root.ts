@@ -1,3 +1,4 @@
+import { referenceBoardRouter } from "./routers/reference-board.router";
 import { seedRouter } from "./routers/seed.router";
 import { reviewRouter } from "./routers/review.router";
 import { emailSequenceRouter } from "@/server/api/routers/email-sequence.router";
@@ -54,6 +55,7 @@ import { zernioRouter } from "@/server/api/routers/zernio.router";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = {
+  referenceBoard: referenceBoardRouter,
   seed: seedRouter,
   review: reviewRouter,
   workflow: workflowRouter,

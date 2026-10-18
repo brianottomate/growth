@@ -488,3 +488,21 @@ seed histories. The old campaign upload UI remains a compatibility entry point;
 new assistant/MCP/API work uses `seedRead`/`seedWrite`. Do not add another seed uploader
 or duplicate the new snapshot FK in JSON. Follow-up UI adoption can retire that
 campaign-only path once its consumers have moved. See [seed audiences](seed-audiences.md).
+
+## 2026-10-18: report publications and creative references
+
+Report authoring now distinguishes a mutable `performance_report` draft from
+its immutable `performance_report_share` publications. Existing public links
+were backfilled without changing their tokens or contents in migration 0039.
+The legacy report token column remains for application rollback compatibility;
+remove it in a later reviewed migration after the rollback window closes.
+New readers resolve publications through the share table.
+
+Reference boards add an explicit occurrence identity and a proposal acceptance
+receipt. A reference points to its source through a typed FK, while notes belong
+to the occurrence. Proposal acceptance creates its draft and records that link
+atomically. This removes the need to deduplicate by title or overwrite a prior
+ad when an acceptance is retried. Edits before acceptance remain last-write-wins.
+Source previews resolve current visibility instead of storing private snapshots.
+The shared visible-brand check now scopes tracking links in SQL, so a public
+reference tracked by multiple organizations is visible to each valid tracker.

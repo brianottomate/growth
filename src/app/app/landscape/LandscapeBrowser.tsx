@@ -1,5 +1,6 @@
 "use client";
 /* oxlint-disable nextjs/no-img-element -- imported social media has dynamic source URLs */
+import { SaveReference } from "./SaveReference";
 import { useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
@@ -62,9 +63,14 @@ export function LandscapeBrowser({ brands }: { brands: Brand[] }) {
             Browse your brand alongside competitors and creative references.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/app/feed-v5">Open timeline</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/app/landscape/boards">Reference boards</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/app/feed-v5">Open timeline</Link>
+          </Button>
+        </div>
       </header>
       <div className="flex flex-wrap gap-2">
         {["all", "owned", "competitor", "inspiration"].map((r) => (
@@ -161,35 +167,42 @@ export function LandscapeBrowser({ brands }: { brands: Brand[] }) {
           <div className="grid grid-cols-1 gap-4 @sm:grid-cols-2 @3xl:grid-cols-3 @6xl:grid-cols-4">
             {visible.flatMap((b) =>
               b.posts.map((p) => (
-                <Link
+                <article
                   key={p.id}
-                  href={`/app/feed-v5?post=${encodeURIComponent(p.id)}`}
                   className="min-w-0 overflow-hidden rounded-xl border bg-card"
                 >
-                  {p.media[0] &&
-                  (p.media[0].thumbnail || p.media[0].type !== "video") ? (
-                    <img
-                      src={p.media[0].thumbnail ?? p.media[0].url}
-                      alt={`${b.name} post`}
-                      loading="lazy"
-                      className="aspect-[4/5] w-full bg-muted object-contain"
-                    />
-                  ) : (
-                    <div className="flex aspect-square items-center bg-muted p-4">
-                      <p className="line-clamp-6 text-sm">
-                        {p.text || "View post"}
+                  <Link
+                    href={`/app/feed-v5?post=${encodeURIComponent(p.id)}`}
+                    className="block"
+                  >
+                    {p.media[0] &&
+                    (p.media[0].thumbnail || p.media[0].type !== "video") ? (
+                      <img
+                        src={p.media[0].thumbnail ?? p.media[0].url}
+                        alt={`${b.name} post`}
+                        loading="lazy"
+                        className="aspect-[4/5] w-full bg-muted object-contain"
+                      />
+                    ) : (
+                      <div className="flex aspect-square items-center bg-muted p-4">
+                        <p className="line-clamp-6 text-sm">
+                          {p.text || "View post"}
+                        </p>
+                      </div>
+                    )}
+                    <div className="space-y-1 p-3">
+                      <p className="text-sm font-medium">{b.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.platform} · {new Date(p.at).toLocaleDateString()} ·{" "}
+                        {p.media.length} media
                       </p>
+                      <p className="line-clamp-3 text-xs">{p.text}</p>
                     </div>
-                  )}
-                  <div className="space-y-1 p-3">
-                    <p className="text-sm font-medium">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {p.platform} · {new Date(p.at).toLocaleDateString()} ·{" "}
-                      {p.media.length} media
-                    </p>
-                    <p className="line-clamp-3 text-xs">{p.text}</p>
+                  </Link>
+                  <div className="p-3 pt-0">
+                    <SaveReference postId={p.id} />
                   </div>
-                </Link>
+                </article>
               )),
             )}
           </div>

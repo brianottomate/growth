@@ -73,6 +73,8 @@ const pitchOperations = new Set([
 const common = new Set([
   "reviewRead",
   "reviewWrite",
+  "referenceBoardRead",
+  "referenceBoardWrite",
   "initiativeRead",
   "initiativeWrite",
   "creativeRead",
