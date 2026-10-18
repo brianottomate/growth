@@ -505,6 +505,12 @@ export function ContentBoard({
           >
             ✨ Groupings
           </Link>
+          <Link
+            href="/app/content/workbooks"
+            className="rounded-full border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+          >
+            Import workbook
+          </Link>
           {createBrandId && (
             <button
               onClick={() => setAddOpen(true)}

@@ -233,3 +233,7 @@ and `articleRevision` expose immutable snapshots, while `creativeWrite` adds
 Edits retain history and clear current editorial acceptance. These local actions
 share the editor's service and leave CMS publication separate. See
 [article review and recovery](article-history.md).
+
+## Content workbooks
+
+`workbookRead` lists and reads saved workbook mappings and current brand options. `workbookWrite.import` parses CSV/TSV or base64 XLSX without a model; `save` edits the mapping; `apply` accepts the exact reviewed document into local content drafts with a durable receipt. These are the same actions used by the app. No provider delivery runs during import or apply.

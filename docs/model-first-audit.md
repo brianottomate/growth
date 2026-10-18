@@ -521,3 +521,7 @@ while retaining the historical decision. Provider transfer receipts remain in
 retries cannot overwrite a later edit. Restoring prose preserves the current CMS
 item identity. The shared document access check also verifies the live brand's
 organization and deletion state.
+
+## Content workbook source and application receipts
+
+The prior workbook queue was retired in #213. Source ingestion remains a distinct operation from launch/initiative planning. A workbook now owns its source cells and editable mapping. The application receipt links each selected occurrence to native content and platform drafts, so retries cannot create duplicates or overwrite later edits. Ordinary mapping saves remain last-write-wins. Existing content is touched only through an explicitly selected empty slot; its occurrences and editorial work are checked within the apply transaction.

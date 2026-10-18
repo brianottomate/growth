@@ -105,6 +105,12 @@ export const growthActionPolicies = {
     pullDato: write({ consequence: "provider-read" }),
     pushDato: write({ consequence: "provider-write" }),
   },
+  workbookRead: { list: read(), get: read(), options: read() },
+  workbookWrite: {
+    import: write(),
+    save: write(),
+    apply: write({ idempotent: true }),
+  },
   referenceBoardRead: { list: read(), get: read(), media: read() },
   referenceBoardWrite: {
     save: write(),

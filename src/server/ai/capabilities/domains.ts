@@ -8,6 +8,14 @@ import {
   dismissArticleAction,
 } from "./article-history";
 import {
+  workbookListAction,
+  workbookGetAction,
+  workbookOptionsAction,
+  workbookImportAction,
+  workbookSaveAction,
+  workbookApplyAction,
+} from "./content-workbooks";
+import {
   listBoardsAction,
   readBoardAction,
   boardMediaAction,
@@ -360,6 +368,23 @@ export const creativeWrite = growthDomainTool({
     cancel: cancelCreativeDocumentRun,
     pullDato: pullCreativeDato,
     pushDato: pushCreativeDato,
+  },
+});
+export const workbookRead = growthDomainTool({
+  description: "Inspect content workbooks, mappings and applied receipts.",
+  actions: {
+    list: workbookListAction,
+    get: workbookGetAction,
+    options: workbookOptionsAction,
+  },
+});
+export const workbookWrite = growthDomainTool({
+  description:
+    "Import, edit and apply reviewed workbooks into native content drafts.",
+  actions: {
+    import: workbookImportAction,
+    save: workbookSaveAction,
+    apply: workbookApplyAction,
   },
 });
 export const referenceBoardRead = growthDomainTool({
@@ -952,6 +977,8 @@ export const seedWrite = growthDomainTool({
 });
 
 export const DOMAIN_CAPABILITY_TOOLS = {
+  workbookRead,
+  workbookWrite,
   referenceBoardRead,
   referenceBoardWrite,
   seedRead,

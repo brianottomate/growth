@@ -5,6 +5,8 @@
  * handling all key off this one public ID/action map.
  */
 export const GROWTH_CAPABILITY_ACTIONS = {
+  workbookRead: ["list", "get", "options"],
+  workbookWrite: ["import", "save", "apply"],
   seedRead: ["list", "deliveries", "assetStatus"],
   seedWrite: ["build", "refresh", "upload", "lookalike", "share", "attach"],
   reviewRead: ["listComments"],
@@ -363,6 +365,8 @@ export const GROWTH_CAPABILITY_LABELS = {
   productAtlasRead: "Reading Product Atlas",
   creativeRead: "Reading creative documents",
   creativeWrite: "Working on creative documents",
+  workbookRead: "Reading content workbooks",
+  workbookWrite: "Updating content workbooks",
   referenceBoardRead: "Reading reference boards",
   referenceBoardWrite: "Updating reference boards",
   initiativeRead: "Reading initiatives",

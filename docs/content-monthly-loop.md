@@ -1,5 +1,7 @@
 # The monthly content loop
 
+> Historical workflow below: the original `plan_import` queue was retired in #213. Current workbook ingestion, editable mapping and atomic application to native drafts are documented in [Content workbook import](content-workbooks.md). Initiatives and series own planning. The old import IDs and July state below are historical records.
+
 How a month of social content goes from strategy to calendar in the growth
 back-office — without anyone transcribing a spreadsheet. Built 2026-07-02/03;
 first live month: August 2026.

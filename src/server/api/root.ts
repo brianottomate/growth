@@ -1,3 +1,4 @@
+import { contentWorkbookRouter } from "./routers/content-workbook.router";
 import { referenceBoardRouter } from "./routers/reference-board.router";
 import { seedRouter } from "./routers/seed.router";
 import { reviewRouter } from "./routers/review.router";
@@ -55,6 +56,7 @@ import { zernioRouter } from "@/server/api/routers/zernio.router";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = {
+  contentWorkbook: contentWorkbookRouter,
   referenceBoard: referenceBoardRouter,
   seed: seedRouter,
   review: reviewRouter,

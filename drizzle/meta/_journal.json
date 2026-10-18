@@ -309,6 +309,13 @@
       "when": 1792323956042,
       "tag": "0042_article_acceptance",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792325132540,
+      "tag": "0043_content_workbooks",
+      "breakpoints": true
     }
   ]
 }

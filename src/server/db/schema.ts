@@ -50,3 +50,5 @@ export * from "./seed-schema";
 
 export * from "./reference-board-schema";
 export * from "./article-revision-schema";
+
+export * from "./content-workbook-schema";
