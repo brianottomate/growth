@@ -1,4 +1,5 @@
 "use client";
+import { BroadcastDeliveryStatus } from "../BroadcastDeliveryStatus";
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -81,6 +82,7 @@ export function SendCard({
   return (
     <section className="rounded-xl border bg-card p-4">
       <h2 className="font-semibold">Send</h2>
+      {latest && <BroadcastDeliveryStatus messageSendId={latest.id} />}
       {!canDispatch && (
         <p className="mt-2 text-sm text-muted-foreground">
           Approve the creative to prepare delivery. You can send yourself a test

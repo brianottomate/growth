@@ -341,6 +341,8 @@ export const growthActionPolicies = {
     importFromDrive: write({ consequence: "provider-write" }),
   },
   emailRead: {
+    previewBroadcasts: read(),
+    broadcastStatus: read(),
     previewOptions: read(),
     listTemplates: read(),
     listSequences: read(),
@@ -354,6 +356,22 @@ export const growthActionPolicies = {
     audienceSnapshot: read(),
   },
   emailWrite: {
+    prepareBroadcast: write(),
+    scheduleBroadcasts: write({
+      approval: "user",
+      consequence: "background-run",
+      idempotent: true,
+      reversible: false,
+      surfaces: CONFIRMED,
+    }),
+    pauseBroadcast: write({ idempotent: true }),
+    recoverBroadcast: write({
+      approval: "user",
+      consequence: "background-run",
+      idempotent: true,
+      reversible: false,
+      surfaces: CONFIRMED,
+    }),
     sharePreview: write({ approval: "user" }),
     saveSequence: write(),
     archiveSequence: write({ idempotent: true, reversible: false }),

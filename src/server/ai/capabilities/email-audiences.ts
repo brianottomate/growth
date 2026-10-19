@@ -95,9 +95,10 @@ export const saveEmailAudienceAction = growthAction({
 });
 export const compileEmailAudienceAction = growthAction({
   description:
-    "Compile a saved audience revision into a private, immutable BigQuery recipient table expiring after 30 days. Returns an asynchronous job receipt; poll audienceSnapshot for readiness. No guest records are copied into Neon and no email is sent. Live opt-outs and suppressions must still be checked before each delivery batch.",
+    "Compile a saved audience revision into a private, immutable BigQuery recipient table retained for retentionDays (default 30, maximum 90 for a reviewed broadcast schedule). Returns an asynchronous job receipt; poll audienceSnapshot for readiness. No guest records are copied into Neon and no email is sent. Live opt-outs and suppressions must still be checked before each delivery batch.",
   inputSchema: z.object({
     audienceId: z.string(),
+    retentionDays: z.number().int().min(1).max(90).optional(),
   }),
   outputSchema: snapshot,
   execute: (input, ctx) => compileEmailAudience(input, actor(ctx)),

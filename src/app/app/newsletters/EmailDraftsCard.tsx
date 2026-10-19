@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { orpc } from "@/orpc/client";
+import { toast } from "@/components/ui/toast";
+import { resolveZonedDateTime, localEmailDate } from "@/lib/scheduling-time";
+import { fromDateInputValue } from "@/components/ui/date-picker";
+import { EmailPlanningDialog } from "./EmailPlanningDialog";
+import { BroadcastScheduler } from "./BroadcastScheduler";
 import Image from "next/image";
 import {
   Mail,
@@ -14,7 +22,6 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { WorkspaceCard } from "@/app/app/performance/WorkspaceCard";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NewsletterChatStart } from "./NewsletterChatStart";
 import { NewsletterTemplateStart } from "./NewsletterTemplateStart";
@@ -23,8 +30,9 @@ import { EmailCalendar } from "./EmailCalendar";
 import { EmailReviewActions } from "./EmailReviewActions";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type Email = {
+export type Email = {
   id: string;
+  contentPostId: string | null;
   title: string;
   scheduledAt: string | null;
   publishedAt: string | null;
@@ -114,6 +122,9 @@ export function EmailDraftsCard({
   actions,
   intro,
   titleAccessory,
+  brandSlug,
+  seriesId,
+  calendarFirst = false,
 }: {
   emails: Email[];
   brandId?: string;
@@ -124,8 +135,35 @@ export function EmailDraftsCard({
   actions?: ReactNode;
   intro?: ReactNode;
   titleAccessory?: ReactNode;
+  brandSlug?: string | null;
+  seriesId?: string;
+  calendarFirst?: boolean;
 }) {
-  const [view, setView] = useState<"list" | "calendar">("list");
+  const router = useRouter();
+  const [view, setView] = useState<"list" | "calendar">(
+    calendarFirst ? "calendar" : "list",
+  );
+  const [planning, setPlanning] = useState<{
+    emailId?: string;
+    date: Date;
+  } | null>(null);
+  const timeZone =
+    brandSlug === "winter-park-escapes"
+      ? "America/Denver"
+      : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeZoneLabel =
+    timeZone === "America/Denver"
+      ? "Mountain time"
+      : (timeZone.replaceAll("_", " ").split("/").pop() ?? "Local time");
+  const move = useMutation(
+    orpc.content.updateWorkItem.mutationOptions({
+      onSuccess: () => {
+        router.refresh();
+        toast.success("Tentative date updated");
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const [filter, setFilter] = useState<StageFilter>("All");
   const candidates = emails.filter(
     (email) =>
@@ -153,7 +191,7 @@ export function EmailDraftsCard({
       ? date.toLocaleDateString(undefined, { month: "long", year: "numeric" })
       : filter === "Sent"
         ? "Send date unavailable"
-        : "Unscheduled";
+        : "Not on calendar";
     const group = groups.get(key) ?? { title, emails: [] };
     group.emails.push(email);
     groups.set(key, group);
@@ -165,16 +203,39 @@ export function EmailDraftsCard({
       count={candidates.length}
       titleAccessory={titleAccessory}
       actions={
-        actions ?? (
-          <>
-            {brandId && <NewsletterTemplateStart brandId={brandId} />}
-            <NewsletterChatStart brandId={brandId} brandName={brandName} />
-            {extraActions}
-          </>
-        )
+        <>
+          {actions ?? (
+            <>
+              {brandId && <NewsletterTemplateStart brandId={brandId} />}
+              <NewsletterChatStart brandId={brandId} brandName={brandName} />
+              {extraActions}
+            </>
+          )}
+          {brandId && calendarFirst && (
+            <BroadcastScheduler
+              brandId={brandId}
+              brandSlug={brandSlug ?? null}
+              emails={candidates}
+            />
+          )}
+        </>
       }
     >
       {intro}
+      {planning && brandId && (
+        <EmailPlanningDialog
+          key={`${planning.emailId ?? "new"}:${planning.date.toISOString()}`}
+          emails={candidates}
+          emailId={planning.emailId}
+          date={planning.date}
+          brandId={brandId}
+          brandSlug={brandSlug}
+          seriesId={seriesId}
+          timeZone={timeZone}
+          timeZoneLabel={timeZoneLabel}
+          onClose={() => setPlanning(null)}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           value={filter}
@@ -208,6 +269,61 @@ export function EmailDraftsCard({
       </div>
       {view === "calendar" && (
         <EmailCalendar
+          timeZone={calendarFirst ? timeZone : undefined}
+          timeZoneLabel={calendarFirst ? timeZoneLabel : undefined}
+          onPlan={
+            calendarFirst && brandId
+              ? (date) => setPlanning({ date })
+              : undefined
+          }
+          onOpen={
+            calendarFirst && brandId
+              ? (id) => {
+                  const email = candidates.find((item) => item.id === id);
+                  if (!email) return;
+                  if (email.publishedAt || email.status === "published") {
+                    router.push(`/app/newsletters/${email.id}`);
+                    return;
+                  }
+                  const local = email.scheduledAt
+                    ? localEmailDate(email.scheduledAt, timeZone)
+                    : null;
+                  setPlanning({
+                    emailId: id,
+                    date: local ? fromDateInputValue(local.day)! : new Date(),
+                  });
+                }
+              : undefined
+          }
+          onMove={
+            calendarFirst && brandId
+              ? (id, day) => {
+                  const email = candidates.find((item) => item.id === id);
+                  if (!email?.contentPostId || !email.scheduledAt) return;
+                  const local = localEmailDate(email.scheduledAt, timeZone);
+                  try {
+                    move.mutate({
+                      contentPostId: email.contentPostId,
+                      platformDrafts: [
+                        {
+                          platformPostId: id,
+                          scheduledAt: resolveZonedDateTime({
+                            localDateTime: `${day}T${local.time}`,
+                            timeZone,
+                          }),
+                        },
+                      ],
+                    });
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not move the date.",
+                    );
+                  }
+                }
+              : undefined
+          }
           entries={visible.flatMap((email) => {
             const at = emailDate(email);
             return at
@@ -215,6 +331,7 @@ export function EmailDraftsCard({
                   {
                     id: email.id,
                     title: email.subject ?? email.title,
+                    thumbnail: email.thumbnail,
                     stage: emailStage(email),
                     at,
                   },

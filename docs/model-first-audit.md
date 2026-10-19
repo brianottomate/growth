@@ -526,6 +526,19 @@ organization and deletion state.
 
 The prior workbook queue was retired in #213. Source ingestion remains a distinct operation from launch/initiative planning. A workbook now owns its source cells and editable mapping. The application receipt links each selected occurrence to native content and platform drafts, so retries cannot create duplicates or overwrite later edits. Ordinary mapping saves remain last-write-wins. Existing content is touched only through an explicitly selected empty slot; its occurrences and editorial work are checked within the apply transaction.
 
+## Scheduled email broadcasts (2026-10-19)
+
+Content identity remains `content_post` / `platform_post`, with `series` owning
+editorial membership. Scheduling does not create a synthetic sequence or another
+editable broadcast group. Existing prepared `message_send.snapshot.schedule`
+owns absolute delivery intent, queue receipt, and pause state. The existing post
+date owns tentative editorial planning; an approved post may have a date without
+being queued. Only a queue receipt advances the post to Scheduled; pausing returns
+it to Approved while preserving its calendar date. The sequence QStash transport/signature boundary is shared while the
+broadcast audience/send ledger remains authoritative. Old snapshots need no
+backfill: absence of schedule means existing on-demand delivery. Audience
+retention is set at compilation, including actual warehouse expiration, so an
+eight-week plan does not silently outlive a thirty-day audience table.
 ## Email creative review and client links (2026-10-19)
 
 Email content remains the existing platform post plus canonical email document;

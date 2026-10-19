@@ -298,9 +298,16 @@ export async function importEmailList(
 }
 
 export async function compileEmailAudience(
-  input: { audienceId: string },
+  input: { audienceId: string; retentionDays?: number },
   actor: Actor,
 ) {
+  const retentionDays = input.retentionDays ?? 30;
+  if (
+    !Number.isInteger(retentionDays) ||
+    retentionDays < 1 ||
+    retentionDays > 90
+  )
+    throw new Error("Audience retention must be 1–90 days.");
   const { audience, brand } = await requireAudience(input.audienceId, actor);
   const list = await assertAudienceSource(audience.definition, brand);
   if (list) {
@@ -319,7 +326,7 @@ export async function compileEmailAudience(
           list,
           audience.definition.sampleSize,
         ),
-        expiresAt: new Date(Date.now() + 30 * 86400000),
+        expiresAt: new Date(Date.now() + retentionDays * 86400000),
       })
       .returning();
     return snapshotSummary(snapshot!);
@@ -340,7 +347,7 @@ export async function compileEmailAudience(
   const id = createId("easnap");
   const tableId = `snapshot_${id}`;
   const jobId = `compile_${id}`;
-  const expiresAt = new Date(Date.now() + 30 * 86400000);
+  const expiresAt = new Date(Date.now() + retentionDays * 86400000);
   const [snapshot] = await db
     .insert(emailAudienceSnapshotTable)
     .values({

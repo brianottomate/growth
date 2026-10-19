@@ -1,4 +1,12 @@
 import {
+  prepareBroadcast,
+  previewBroadcasts,
+  scheduleBroadcastsAction,
+  pauseBroadcastAction,
+  recoverBroadcastAction,
+  broadcastStatus,
+} from "./email-broadcasts";
+import {
   emailPreviewOptionsAction,
   shareEmailPreviewAction,
 } from "./email-client-preview";
@@ -639,6 +647,8 @@ export const emailRead = growthDomainTool({
   description:
     "Read email drafts, executable sequences and delivery status, and preview warehouse recipient audiences.",
   actions: {
+    previewBroadcasts,
+    broadcastStatus,
     listSequences,
     getSequence,
     sequenceEmails,
@@ -657,6 +667,10 @@ export const emailWrite = growthDomainTool({
   description:
     "Plan and edit email content, audiences and sequences; manage sequence delivery with explicit approval for actions that can send.",
   actions: {
+    prepareBroadcast,
+    scheduleBroadcasts: scheduleBroadcastsAction,
+    pauseBroadcast: pauseBroadcastAction,
+    recoverBroadcast: recoverBroadcastAction,
     saveSequence,
     archiveSequence,
     prepareSequence,

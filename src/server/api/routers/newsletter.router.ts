@@ -1,4 +1,12 @@
 import {
+  prepareBroadcast,
+  previewBroadcasts,
+  scheduleBroadcastsAction,
+  pauseBroadcastAction,
+  recoverBroadcastAction,
+  broadcastStatus,
+} from "@/server/ai/capabilities/email-broadcasts";
+import {
   importEmailList,
   previewEmailAudience,
 } from "@/server/services/email-audience.service";
@@ -104,6 +112,12 @@ async function deliveryOrganizationIdForUser(
 }
 
 export const newsletterRouter = {
+  prepareBroadcast: actionProcedure(prepareBroadcast),
+  previewBroadcasts: actionProcedure(previewBroadcasts),
+  scheduleBroadcasts: actionProcedure(scheduleBroadcastsAction),
+  pauseBroadcast: actionProcedure(pauseBroadcastAction),
+  recoverBroadcast: actionProcedure(recoverBroadcastAction),
+  broadcastStatus: actionProcedure(broadcastStatus),
   createSlot: actionProcedure(createEmailSlotAction),
   reviewCreative: workspaceProcedure
     .input(

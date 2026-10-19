@@ -10,6 +10,7 @@ import {
   emailRecipientMetadata,
 } from "@/server/email/recipient-identity";
 import { createId } from "@/server/db/utils";
+import { broadcastJobCanRun } from "@/lib/broadcast-schedule";
 
 import { and, eq, inArray, lt, ne, or } from "drizzle-orm";
 
@@ -349,6 +350,7 @@ export async function dispatchBrandSend(input: {
   messageSendId: string;
   organizationId: string;
   userId?: string;
+  scheduledJob?: { dueAt: string; runtimeId: string };
 }) {
   const send = await db.query.messageSendTable.findFirst({
     where: eq(messageSendTable.id, input.messageSendId),
@@ -360,13 +362,30 @@ export async function dispatchBrandSend(input: {
     input.organizationId,
   );
   const snapshot = send.snapshot;
-  if (!["approved", "published"].includes(spot.status))
+  if (
+    snapshot.schedule &&
+    (!input.scheduledJob ||
+      !broadcastJobCanRun(snapshot.schedule, input.scheduledJob) ||
+      Date.parse(snapshot.schedule.dueAt) > Date.now())
+  )
+    throw new Error("This email is controlled by its saved delivery schedule.");
+  if (!["approved", "scheduled", "published"].includes(spot.status))
     throw new Error(
       "Approve the email creative before sending. Reopened drafts cannot be sent.",
     );
   if (snapshot.audience.provider !== "postmark" || !snapshot.sender)
     throw new Error("This send has no Postmark audience.");
   const audience = snapshot.audience;
+  if (
+    snapshot.schedule &&
+    (brandSendBlockers(spot.brand).length ||
+      JSON.stringify(senderOf(spot)) !== JSON.stringify(snapshot.sender) ||
+      spot.brand.emailDelivery?.serverId !== audience.serverId ||
+      spot.brand.emailDelivery?.messageStream !== audience.messageStream)
+  )
+    throw new Error(
+      "The approved sender or Postmark destination changed. Review delivery again.",
+    );
 
   const staleBefore = new Date(Date.now() - STALE_LEASE_MS);
   const claimed = await withTransaction(async (tx) => {
@@ -375,8 +394,23 @@ export async function dispatchBrandSend(input: {
       .from(platformPostTable)
       .where(eq(platformPostTable.id, spot.id))
       .for("update");
-    if (!current || !["approved", "published"].includes(current.status))
+    if (
+      !current ||
+      !["approved", "scheduled", "published"].includes(current.status)
+    )
       throw new Error("Approve the email creative before sending.");
+    if (snapshot.schedule) {
+      const [scheduled] = await tx
+        .select()
+        .from(messageSendTable)
+        .where(eq(messageSendTable.id, send.id))
+        .for("update");
+      if (
+        !input.scheduledJob ||
+        !broadcastJobCanRun(scheduled?.snapshot.schedule, input.scheduledJob)
+      )
+        throw new Error("The delivery schedule changed or paused.");
+    }
     const [row] = await tx
       .update(messageSendTable)
       .set({
@@ -462,6 +496,33 @@ export async function dispatchBrandSend(input: {
     };
 
     const sendPage = async (recipients: EmailAudienceRecipient[]) => {
+      if (snapshot.schedule) {
+        const currentSend = await db.query.messageSendTable.findFirst({
+          where: eq(messageSendTable.id, claimed.id),
+        });
+        const currentSpot = await requireOwnedEmailSpot(
+          spot.id,
+          input.organizationId,
+        );
+        const { document } = await ensureEmailDocument({
+          platformPostId: spot.id,
+          ...actor,
+        });
+        if (
+          !input.scheduledJob ||
+          !broadcastJobCanRun(
+            currentSend?.snapshot.schedule,
+            input.scheduledJob,
+          ) ||
+          !["approved", "scheduled", "published"].includes(
+            currentSpot.status,
+          ) ||
+          contentHashOf(document).hash !== claimed.contentHash
+        )
+          throw new Error(
+            "Scheduled delivery paused or creative changed; inspect before resuming.",
+          );
+      }
       const emails = [
         ...new Set(
           recipients.map((recipient) => recipient.email.trim().toLowerCase()),

@@ -126,3 +126,13 @@ export function formatResolvedPublishingTime(input: {
     return `${input.localDateTime} ${input.timeZone}`;
   }
 }
+
+/** Read the calendar day and wall-clock time of a stored instant. */
+export function localEmailDate(value: string, timeZone: string) {
+  const parts = zonedParts(new Date(value), timeZone);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return {
+    day: `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`,
+    time: `${pad(parts.hour)}:${pad(parts.minute)}`,
+  };
+}

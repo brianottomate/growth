@@ -62,7 +62,18 @@ export function messageSendSummary(
   };
 }
 
+export type BroadcastSchedule = {
+  dueAt: string;
+  timeZone: string;
+  runtimeId: string;
+  state: "approved" | "scheduled" | "paused";
+  queueMessageId?: string;
+  customerIoStopped: true;
+};
+
 export type MessageSendSnapshot = {
+  /** Delivery intent owned by this prepared send, separate from editorial dates. */
+  schedule?: BroadcastSchedule;
   schema: "wander-growth.message-send.v1";
   // Frozen historical sends retain their original format label.
   format: "newsletter.broadcast" | "newsletter.blast";

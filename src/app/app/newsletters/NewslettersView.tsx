@@ -292,6 +292,9 @@ export async function NewslettersView({
         blastsOnly={basePath.startsWith("/app/performance/clients/")}
         brandId={selectedBrand?.id}
         brandName={selectedBrand?.name}
+        brandSlug={selectedBrand?.slug}
+        seriesId={seriesId}
+        calendarFirst={basePath.startsWith("/app/performance/clients/")}
         emails={ownedEmails
           // A client's Broadcasts are standalone emails; a series' editions
           // live on its Newsletters tab.
@@ -320,6 +323,7 @@ export async function NewslettersView({
                 .find((home) => home.imageUrl)?.imageUrl;
             return {
               id: email.id,
+              contentPostId: email.contentPostId,
               title: email.contentPost?.title || email.text || "Untitled email",
               subject: document?.subject || null,
               preheader: document?.preheader || null,

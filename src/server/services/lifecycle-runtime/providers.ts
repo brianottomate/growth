@@ -44,7 +44,25 @@ export async function publishLifecycleDelivery(
   deliveryId: string,
   dueAt: Date,
 ) {
+  return publishEmailJob({
+    path: "/api/jobs/lifecycle",
+    failurePath: "/api/jobs/lifecycle/failure",
+    key: deliveryId,
+    body: { deliveryId, runtimeId: env.LIFECYCLE_RUNTIME_ID ?? "" },
+    dueAt,
+  });
+}
+
+/** Shared durable wakeups for journeys and calendar broadcasts. */
+export async function publishEmailJob(input: {
+  path: string;
+  failurePath?: string;
+  key: string;
+  body: Record<string, string>;
+  dueAt: Date;
+}) {
   requireLifecycleRuntime();
+  const { dueAt } = input;
   const client = new Client({
     token: env.QSTASH_TOKEN!,
     ...(env.QSTASH_URL ? { baseUrl: env.QSTASH_URL } : {}),
@@ -56,14 +74,16 @@ export async function publishLifecycleDelivery(
     Date.now() + (7 * 24 * 60 - 1) * 60_000,
   );
   const result = await client.publishJSON({
-    url: lifecycleUrl("/api/jobs/lifecycle"),
-    body: { deliveryId, runtimeId: env.LIFECYCLE_RUNTIME_ID },
+    url: lifecycleUrl(input.path),
+    body: input.body,
     notBefore: Math.ceil(wakeAt / 1000),
-    deduplicationId: `${deliveryId}-${Math.floor(wakeAt / 60_000)}`,
+    deduplicationId: `${input.key}-${Math.floor(wakeAt / 60_000)}`,
     retries: 5,
     retryDelay: "60000 * (1 + retried)",
     timeout: "60s",
-    failureCallback: lifecycleUrl("/api/jobs/lifecycle/failure"),
+    ...(input.failurePath
+      ? { failureCallback: lifecycleUrl(input.failurePath) }
+      : {}),
   });
   return {
     messageId: result.messageId,
