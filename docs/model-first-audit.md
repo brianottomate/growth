@@ -525,3 +525,20 @@ organization and deletion state.
 ## Content workbook source and application receipts
 
 The prior workbook queue was retired in #213. Source ingestion remains a distinct operation from launch/initiative planning. A workbook now owns its source cells and editable mapping. The application receipt links each selected occurrence to native content and platform drafts, so retries cannot create duplicates or overwrite later edits. Ordinary mapping saves remain last-write-wins. Existing content is touched only through an explicitly selected empty slot; its occurrences and editorial work are checked within the apply transaction.
+
+## Email creative review and client links (2026-10-19)
+
+Email content remains the existing platform post plus canonical email document;
+a newsletter series remains its editorial grouping. Rich connector previews and
+the series reading dialog reuse the existing renderer, rather than approximating
+email from a social caption. No duplicate series, preview document or approval
+state is written. Interactive review and full-length PDF print documents share
+the same rendering.
+
+Client email links follow the existing ad preview's live signed-selection model,
+with a separate purpose key. The signature binds an explicit email selection,
+brand, organization and expiry to the brand's current connect token. Public reads
+re-check ownership, deletion, expiry and signature and expose creative only.
+These links are deliberately live, not publication snapshots; the UI states that
+edits appear there and future editions are excluded. A frozen publication model
+would be a separate product decision. Private PDF export does not mint a link.

@@ -341,6 +341,7 @@ export const growthActionPolicies = {
     importFromDrive: write({ consequence: "provider-write" }),
   },
   emailRead: {
+    previewOptions: read(),
     listTemplates: read(),
     listSequences: read(),
     getSequence: read(),
@@ -353,6 +354,7 @@ export const growthActionPolicies = {
     audienceSnapshot: read(),
   },
   emailWrite: {
+    sharePreview: write({ approval: "user" }),
     saveSequence: write(),
     archiveSequence: write({ idempotent: true, reversible: false }),
     prepareSequence: write(),

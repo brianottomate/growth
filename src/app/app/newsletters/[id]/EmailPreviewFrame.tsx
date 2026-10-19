@@ -184,6 +184,7 @@ function ScaledFrame({
         srcDoc={previewDocument(html)}
         // Same origin so the page can read clicks; still no scripts.
         sandbox="allow-same-origin"
+        referrerPolicy="no-referrer"
         title="Newsletter preview"
         className="mx-auto block"
         style={{

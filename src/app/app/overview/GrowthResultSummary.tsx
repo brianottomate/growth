@@ -1,4 +1,5 @@
 "use client";
+import { EmailResultPreview } from "./EmailResultPreview";
 import Link from "next/link";
 import { growthResultSummary } from "@/lib/growth-result-summary";
 
@@ -9,6 +10,7 @@ export function GrowthResultSummary({
   kind: string;
   result: unknown;
 }) {
+  if (kind === "email") return <EmailResultPreview result={result} />;
   const summary = growthResultSummary(kind, result);
   return (
     <section

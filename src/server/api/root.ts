@@ -8,6 +8,7 @@ import { initiativeRouter } from "@/server/api/routers/initiative.router";
 import { homeGroupsRouter } from "@/server/api/routers/homeGroups.router";
 import { userRouter } from "@/server/api/routers/user.router";
 import { adsRouter } from "@/server/api/routers/ads.router";
+import { emailPreviewRouter } from "./routers/emailPreview.router";
 import { adPreviewRouter } from "@/server/api/routers/adPreview.router";
 import { affiliateRouter } from "@/server/api/routers/affiliate.router";
 import { amplifierRouter } from "@/server/api/routers/amplifier.router";
@@ -66,6 +67,7 @@ export const appRouter = {
   user: userRouter,
   ads: adsRouter,
   adPreview: adPreviewRouter,
+  emailPreview: emailPreviewRouter,
   affiliate: affiliateRouter,
   amplifier: amplifierRouter,
   persona: personaRouter,

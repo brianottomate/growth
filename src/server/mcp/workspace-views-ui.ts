@@ -1,3 +1,4 @@
+import { BRAND_PICKER_HTML } from "./brand-picker-ui";
 import { compactResultDocument } from "./compact-result-ui";
 export const WORK_ITEM_URI = "ui://wander-growth/work-item/v1.html";
 export const WORK_ITEM_HTML = compactResultDocument("workitem");
@@ -8,6 +9,6 @@ export const CREATIVE_HTML = compactResultDocument("creative");
 export const CATALOG_URI = "ui://wander-growth/catalog-review/v1.html";
 export const CATALOG_HTML = compactResultDocument("catalog");
 export const BRANDS_URI = "ui://wander-growth/brand-picker/v1.html";
-export const BRANDS_HTML = compactResultDocument("brands");
+export const BRANDS_HTML = BRAND_PICKER_HTML;
 export const PHOTOS_URI = "ui://wander-growth/listing-photos/v1.html";
 export const PHOTOS_HTML = compactResultDocument("photos");

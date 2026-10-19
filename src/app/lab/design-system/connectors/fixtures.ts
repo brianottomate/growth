@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { socialPostPreviewOutputSchema } from "@/server/ai/capabilities/social-post-preview";
+import { emailFixtures } from "./email-fixtures";
 import { workspaceFixtures } from "./workspace-fixtures";
 
 type SocialResult = z.infer<typeof socialPostPreviewOutputSchema>;
@@ -424,6 +425,7 @@ const performanceFixtures: ConnectorFixture[] = [
 // All samples are validated against the canonical tool schema by the server page.
 export const connectorFixtures: Record<string, ConnectorFixture[]> = {
   ...workspaceFixtures,
+  email: emailFixtures,
   social: socialFixtures,
   options: optionsFixtures,
   calendar: calendarFixtures,

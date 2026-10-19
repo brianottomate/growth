@@ -165,7 +165,9 @@ const creative = {
   copyRules:
     "Use concrete moments. Keep the opening line short. Avoid unsupported claims.",
   homes: [],
+  videos: [],
   images: document.cards.map((card, i) => ({
+    kind: "image",
     cardId: card.id,
     slide: i + 1,
     size: "square",
@@ -215,12 +217,8 @@ const campaign = {
       ageMin: 25,
       ageMax: 65,
       geography: { countries: ["US"] },
-      excludedKeywords: null,
-      keywords: ["Weekend getaway", "Family travel"],
-      optimizationGoal: null,
       persona: { id: "demo-persona", name: "The thoughtful planner" },
       personaId: "demo-persona",
-      homeIds: null,
       type: "intent",
     },
   ],
@@ -391,6 +389,61 @@ export const workspaceFixtures: Record<string, ConnectorFixture[]> = {
     }),
   ],
   brands: [
+    sample(
+      "single",
+      "One client · no logo",
+      "list",
+      {
+        brands: [
+          {
+            id: "demo-mountain",
+            name: "Mountain collection",
+            slug: "demo-mountain",
+            logo: null,
+            tagline: "Cabins, fresh air, and room to reconnect.",
+            relationship: "client",
+          },
+        ],
+      },
+      "brandRead__list",
+    ),
+    sample(
+      "unavailable",
+      "Long name · unavailable logo",
+      "list",
+      {
+        brands: [
+          {
+            id: "demo-long-name",
+            name: "The Mountain & Lakeside Vacation Collection",
+            slug: "demo-long-name",
+            logo: "https://example.com/missing-logo.png",
+            tagline:
+              "Thoughtful places to gather, from alpine cabins to quiet lakeside homes. A little room for everyone, a little closer to nature.",
+            relationship: "client",
+          },
+        ],
+      },
+      "brandRead__list",
+    ),
+    sample(
+      "logo",
+      "One brand · public logo",
+      "list",
+      {
+        brands: [
+          {
+            id: "demo-wander",
+            name: "Wander",
+            slug: "demo-wander",
+            logo: "https://www.wander.com/Wander-Brand-Assets/svg/Logo%20Dark.svg",
+            tagline: "Exceptional places. Better time together.",
+            relationship: "internal",
+          },
+        ],
+      },
+      "brandRead__list",
+    ),
     sample("map", "Brand workspace coverage", "getMap", {
       brands,
       guidance: "Choose a brand before reviewing content or creative.",

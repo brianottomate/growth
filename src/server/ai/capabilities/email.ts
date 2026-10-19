@@ -1,3 +1,4 @@
+import { connectorEmailHtml } from "@/lib/connector-email-html";
 import {
   getEmailDraftNativeResultSchema,
   getEmailDraftOutputSchema,
@@ -36,6 +37,7 @@ import {
   createEmailSlot as createEmailSlotService,
   createProductUpdateDraft as createProductUpdateDraftService,
   getEmailWorkspace,
+  renderEmailPreview,
   runEmailGenerationJob,
   saveEmailDocument,
   startEmailGeneration,
@@ -66,8 +68,14 @@ export const getEmailDraft = growthAction({
       userId: ctx.userId,
       canDeliver: membership?.role === "owner" || membership?.role === "admin",
     });
+    const preview = await renderEmailPreview({
+      platformPostId,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+    });
     return {
       ...workspace,
+      preview: { ...preview, html: connectorEmailHtml(preview.html) },
       url: `/app/newsletters/${platformPostId}`,
     };
   },

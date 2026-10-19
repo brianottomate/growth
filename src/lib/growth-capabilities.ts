@@ -170,6 +170,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "importFromDrive",
   ],
   emailRead: [
+    "previewOptions",
     "listTemplates",
     "get",
     "audiences",
@@ -182,6 +183,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "previewSequence",
   ],
   emailWrite: [
+    "sharePreview",
     "saveSequence",
     "archiveSequence",
     "prepareSequence",

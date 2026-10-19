@@ -21,6 +21,8 @@ import {
 import { NewsletterTemplateStart } from "./NewsletterTemplateStart";
 import { NewsletterChatStart } from "./NewsletterChatStart";
 import { NewsletterSwitcher } from "./NewsletterSwitcher";
+import { EmailClientPreviewLink } from "./EmailClientPreviewLink";
+import { NewsletterSeriesPreview } from "./NewsletterSeriesPreview";
 import { EMAIL_READ_FORMATS } from "@/lib/email-document";
 
 export async function NewsletterSeriesView({
@@ -181,6 +183,31 @@ export async function NewsletterSeriesView({
       }
       editionActions={
         <>
+          <EmailClientPreviewLink
+            brandId={brand.id}
+            editionIds={editionsFor(selected.id)
+              .filter(
+                (email) => !["archived", "rejected"].includes(email.status),
+              )
+              .map((email) => email.id)}
+          />
+          <NewsletterSeriesPreview
+            name={selected.name}
+            editions={editionsFor(selected.id)
+              .sort(
+                (a, b) =>
+                  (a.scheduledAt?.getTime() ?? Infinity) -
+                    (b.scheduledAt?.getTime() ?? Infinity) ||
+                  a.createdAt.getTime() - b.createdAt.getTime(),
+              )
+              .map((email) => ({
+                id: email.id,
+                title:
+                  email.text || email.contentPost?.title || "Untitled email",
+                status: email.status,
+                plannedAt: email.scheduledAt?.toISOString() ?? null,
+              }))}
+          />
           <NewsletterChatStart
             brandId={brand.id}
             brandName={brand.name}

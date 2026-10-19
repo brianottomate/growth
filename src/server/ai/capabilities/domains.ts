@@ -1,4 +1,8 @@
 import {
+  emailPreviewOptionsAction,
+  shareEmailPreviewAction,
+} from "./email-client-preview";
+import {
   exportArticleAction,
   articleHistoryAction,
   acceptCurrentArticleAction,
@@ -641,6 +645,7 @@ export const emailRead = growthDomainTool({
     sequenceStatus,
     previewSequence,
     get: EMAIL_TOOLS.getEmailDraft,
+    previewOptions: emailPreviewOptionsAction,
     listTemplates: EMAIL_TOOLS.listEmailTemplates,
     audiences: listEmailAudiencesAction,
     previewAudience: previewEmailAudienceAction,
@@ -663,6 +668,7 @@ export const emailWrite = growthDomainTool({
     saveAudience: saveEmailAudienceAction,
     compileAudience: compileEmailAudienceAction,
     createSlot: EMAIL_TOOLS.createEmailSlot,
+    sharePreview: shareEmailPreviewAction,
     createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,
     draftFromTemplate: EMAIL_TOOLS.draftEmailFromTemplate,
     setDigestImage: EMAIL_TOOLS.setDigestImage,

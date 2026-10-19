@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Mail,
   ArrowLeft,
   RotateCcw,
   Send,
@@ -18,7 +19,8 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { SimpleSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { connectorFixtures, socialFixtures } from "./fixtures";
+import { socialFixtures, type ConnectorFixture } from "./fixtures";
+import { EmailResultPreview } from "@/app/app/overview/EmailResultPreview";
 import { GrowthResultSummary } from "@/app/app/overview/GrowthResultSummary";
 import { SocialPostSummary } from "@/app/app/overview/SocialPostSummary";
 import { InternalNextOptionsPreview } from "./InternalNextOptionsPreview";
@@ -64,7 +66,7 @@ function validationMessage(error: unknown) {
 function previewDocument(html: string, theme: string, host: string) {
   // Only trusted, server-provided widget HTML runs here. Edited JSON is sent as data.
   // The opaque-origin sandbox and CSP keep the preview away from app sessions.
-  const bootstrap = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https://growth-red.vercel.app https://www.wander.com; connect-src 'none'; form-action 'none'; base-uri 'none'"><style>:root{color-scheme:${theme}!important}</style><script>
+  const bootstrap = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src about:; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://growth-red.vercel.app https://www.wander.com https://assets.wander.com https://assets-websites.wander.com; connect-src 'none'; form-action 'none'; base-uri 'none'"><style>:root{color-scheme:${theme}!important}</style><script>
 var waiters={},counter=0;
 window.openai={theme:${JSON.stringify(theme)},toolOutput:null};
 ${host === "openai" ? `window.openai.sendFollowUpMessage=function(args){return new Promise(function(resolve,reject){var id='openai-'+(++counter);waiters[id]={resolve:resolve,reject:reject};window.parent.postMessage({jsonrpc:'2.0',id:id,method:'openai/sendFollowUpMessage',params:args},'*')})};` : ""}
@@ -353,6 +355,8 @@ function InternalSummaryPreview({
             <p className="text-xs text-muted-foreground">
               Waiting for tool result…
             </p>
+          ) : kind === "email" ? (
+            <EmailResultPreview result={payload} />
           ) : (
             <GrowthResultSummary kind={kind} result={payload} />
           )}
@@ -379,12 +383,14 @@ function InternalSummaryPreview({
 
 export function ConnectorWorkbench({
   widgets,
+  fixturesByWidget,
 }: {
   widgets: ConnectorWidget[];
+  fixturesByWidget: Record<string, ConnectorFixture[]>;
 }) {
   const [widgetId, setWidgetId] = useState("social");
   const widget = widgets.find((item) => item.id === widgetId) ?? widgets[0]!;
-  const fixtures = connectorFixtures[widgetId] ?? [];
+  const fixtures = fixturesByWidget[widgetId] ?? [];
   const [fixtureId, setFixtureId] = useState("comparison");
   const [payload, setPayload] = useState<unknown>(socialFixtures[0]!.payload);
   const [draft, setDraft] = useState(
@@ -433,6 +439,12 @@ export function ConnectorWorkbench({
     <main className="mx-auto max-w-7xl space-y-8 p-4 sm:p-8">
       <header className="space-y-3">
         <Link
+          href="/lab/design-system/connectors/email-review"
+          className="block text-sm underline underline-offset-2"
+        >
+          Client email preview + PDF
+        </Link>
+        <Link
           href="/app/admin"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
@@ -469,6 +481,7 @@ export function ConnectorWorkbench({
               catalog: Layers,
               brands: Layers,
               photos: Image,
+              email: Mail,
               social: Image,
               options: Sparkles,
               calendar: CalendarDays,
@@ -487,8 +500,8 @@ export function ConnectorWorkbench({
                 setHost("mcp");
                 setLoading(false);
                 loadFixture(
-                  connectorFixtures[item.id]![0]!.id,
-                  connectorFixtures[item.id],
+                  fixturesByWidget[item.id]![0]!.id,
+                  fixturesByWidget[item.id],
                 );
               }}
               className={`group flex items-start gap-3 rounded-2xl border p-4 text-left transition-colors hover:bg-muted/50 ${active ? "border-foreground/30 bg-muted" : "bg-card"}`}

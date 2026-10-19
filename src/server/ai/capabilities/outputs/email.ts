@@ -38,6 +38,7 @@ export const getEmailDraftOutputSchema = z.strictObject({
     sendBlockers: z.array(z.string()),
   }),
   canDeliver: z.boolean(),
+  preview: z.strictObject({ html: z.string(), warnings: z.array(z.string()) }),
   sequences: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
   content: z
     .strictObject({

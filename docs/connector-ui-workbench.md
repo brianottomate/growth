@@ -9,6 +9,7 @@ tool metadata, and gallery. The workbench renders the exact HTML served by MCP:
 
 | View | Existing tool | Interactions |
 | --- | --- | --- |
+| Email | `emailRead__get` | Subject, preheader, body excerpt, CTA and separate planning/creative/delivery status |
 | Social previews | `renderSocialPosts` | Platform filters, carousel navigation, first comment |
 | Next options | `presentNextOptions` | Answer/request choices, editable details, send status |
 | Content calendar | `contentRead__upcoming` | Date groups, status filters, item discussion |
@@ -73,3 +74,52 @@ and verifies its tool metadata.
 
 The OpenAI compatibility bridge follows the official reference:
 https://developers.openai.com/plugins/reference
+
+
+Brand results use a dedicated identity card: a fixed-size contained logo with
+initials underneath, relationship badge, one primary workspace action for a
+single result, and compact rows for multiple results. Image failure removes only
+the image, preserving geometry. WanderOS logo proxies pointing at public
+Wander asset hosts resolve to that underlying source; the simulator permits the
+same first-party asset origins without allowing arbitrary image hosts. Fixtures
+include a single client, unavailable logo, long name, multiple brands and empty
+results. Brand cards provide their own frame and do not request another host border.
+
+Email is a dedicated connector view over the existing content post and canonical
+email document. It is not projected from social copy. Samples cover tentative
+newsletter dates, approved but unqueued content, scheduled broadcasts, sent emails
+and empty slots. These read-only cards link to the full email workspace.
+
+Email previews now use the canonical newsletter renderer, including hero images,
+structured home sections, CTA, brand identity and footer. `emailRead.get` returns
+rendered preview HTML alongside the canonical document. Internal chat reuses the
+editor's phone/desktop/full-screen frame; the MCP App isolates HTML in a scriptless
+`srcdoc` frame, declaring only the `about:` frame scheme and its existing public
+asset/font origins. The simulator uses the same restrictions. Actual host review
+is still needed after deployment. WanderOS image proxies resolve to their public
+Wander source assets in the connector so browser previews fit the existing CSP.
+
+Newsletter series have a separate **Preview newsletter** reading dialog with
+edition navigation and the existing sample-guest controls. The list and calendar
+remain the working views for planning and approval.
+
+**Client email preview** appears in Newsletters, Broadcasts and Extra. Operators
+choose up to 24 existing emails. PDF export is available directly from this
+selection without publishing a public link. It opens a full-length print document
+and the browser's Print / Save as PDF action; portrait images scale to fit paper
+without cropping. Every selected edition is included, not just the interactive
+iframe viewport. A synthetic two-edition review and print view are linked from
+the workbench for QA.
+
+The separate `/email-preview/[token]` client page has no login, recipient data,
+approval mutation or send controls. Links expire after 7, 30 or 90 days and show
+only the explicit selection's latest saved creative. They do not automatically
+add new editions. PDFs capture content at export time; online links remain live.
+This follows the existing ad preview's brand connect-token revocation model,
+with its own purpose-specific signature and organization/brand/selection claims.
+Rotating the brand connect token revokes these links too. Archived/deleted content
+is unavailable. Public reads never create email documents or read delivery ledgers.
+No public Winter Park link was created during QA.
+
+`emailRead.previewOptions` and approval-gated `emailWrite.sharePreview` expose the
+same options/sharing actions through the normal Growth catalog and MCP.

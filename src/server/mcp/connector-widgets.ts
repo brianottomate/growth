@@ -14,6 +14,7 @@ import {
   PRODUCTION_QUEUE_HTML,
   PRODUCTION_QUEUE_URI,
 } from "./content-views-ui";
+import { EMAIL_PREVIEW_HTML } from "./email-preview-ui";
 import { AD_PERFORMANCE_HTML, AD_PERFORMANCE_URI } from "./ad-performance-ui";
 import {
   WORK_ITEM_HTML,
@@ -92,6 +93,16 @@ export const CONNECTOR_WIDGETS = [
     tool: "mediaLibraryRead__listingPhotos",
     uri: PHOTOS_URI,
     html: PHOTOS_HTML,
+    legacy: true,
+  },
+  {
+    id: "email",
+    title: "Email",
+    description:
+      "Newsletter and broadcast previews with subject, preheader, creative approval and delivery status.",
+    tool: "emailRead__get",
+    uri: "ui://wander-growth/email-preview/v1.html",
+    html: EMAIL_PREVIEW_HTML,
     legacy: true,
   },
   {
@@ -182,10 +193,14 @@ export function registerConnectorResources(
             text: widget.html,
             _meta: {
               ui: {
-                prefersBorder: widget.id !== "options",
+                prefersBorder: !["options", "brands"].includes(widget.id),
                 csp: {
                   connectDomains: [],
+                  ...(widget.id === "email"
+                    ? { frameDomains: ["about:"] }
+                    : {}),
                   resourceDomains: [
+                    "email",
                     "social",
                     "performance",
                     "workitem",
@@ -194,7 +209,13 @@ export function registerConnectorResources(
                     "catalog",
                     "photos",
                   ].includes(widget.id)
-                    ? resourceDomains
+                    ? widget.id === "email"
+                      ? [
+                          ...resourceDomains,
+                          "https://fonts.googleapis.com",
+                          "https://fonts.gstatic.com",
+                        ]
+                      : resourceDomains
                     : widget.id === "brands"
                       ? [...resourceDomains, "https://www.wander.com"]
                       : [],

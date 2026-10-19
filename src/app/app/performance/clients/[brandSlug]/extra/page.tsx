@@ -1,3 +1,4 @@
+import { EmailClientPreviewLink } from "@/app/app/newsletters/EmailClientPreviewLink";
 import { ClientPreviewLink } from "../ads/ClientPreviewLink";
 import type { Metadata } from "next";
 import { Suspense } from "react";
@@ -34,6 +35,16 @@ export default async function PerformanceBrandExtraPage({
           </p>
         </div>
         <ClientPreviewLink brandId={brand.id} />
+      </section>
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+        <div>
+          <h3 className="text-sm font-semibold">Email client preview</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Share selected newsletter editions and broadcasts, with full email
+            previews and PDF export.
+          </p>
+        </div>
+        <EmailClientPreviewLink brandId={brand.id} />
       </section>
       <Suspense fallback={null}>
         <OnboardingEmailCard brandId={brand.id} orgId={org.id} />

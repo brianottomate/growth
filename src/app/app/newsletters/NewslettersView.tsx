@@ -1,3 +1,4 @@
+import { EmailClientPreviewLink } from "./EmailClientPreviewLink";
 import type { ReactNode } from "react";
 import { MailCheck } from "lucide-react";
 import { WorkspaceCard } from "@/app/app/performance/WorkspaceCard";
@@ -280,7 +281,14 @@ export async function NewslettersView({
         title={editionTitle ?? (seriesId ? "Editions" : undefined)}
         intro={editionIntro}
         titleAccessory={editionSwitcher}
-        actions={editionActions}
+        actions={
+          <>
+            {editionActions}
+            {selectedBrand && !seriesId && (
+              <EmailClientPreviewLink brandId={selectedBrand.id} />
+            )}
+          </>
+        }
         blastsOnly={basePath.startsWith("/app/performance/clients/")}
         brandId={selectedBrand?.id}
         brandName={selectedBrand?.name}

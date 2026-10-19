@@ -2,6 +2,7 @@ export type GrowthSummaryRow = {
   title: string;
   detail?: string;
   thumbnail?: string;
+  badge?: string;
   href?: string;
 };
 export type GrowthResultSummary = {
@@ -28,11 +29,12 @@ export const growthSummaryTools: Record<string, string> = {
   "contentRead.pipeline": "pipeline",
   "contentRead.productionQueue": "production",
   "adsRead.top": "performance",
+  "emailRead.get": "email",
 };
 
 /** Pure, self-contained projection shared with the sandboxed external widget.
  * Keep helpers inside this function: its JavaScript is embedded in the MCP HTML.
- * No host APIs, imports, dates, or writes belong in this projection.
+ * No host APIs, imports, current-time lookups, or writes belong in this projection.
  */
 export function growthResultSummary(
   kind: string,
@@ -65,6 +67,29 @@ export function growthResultSummary(
     );
     return url.startsWith("https://") ? url : undefined;
   }
+  // WanderOS may wrap its public asset in a site-specific image proxy. The
+  // underlying first-party asset is already covered by the connector image CSP.
+  function brandLogo(value: unknown) {
+    const source = text(value);
+    if (!source.startsWith("https://")) return undefined;
+    try {
+      const url = new URL(source);
+      const original = url.searchParams.get("src");
+      if (url.pathname.startsWith("/i/") && original) {
+        const asset = new URL(original);
+        if (
+          asset.protocol === "https:" &&
+          ["assets-websites.wander.com", "assets.wander.com"].includes(
+            asset.hostname,
+          )
+        )
+          return asset.href;
+      }
+      return source;
+    } catch {
+      return undefined;
+    }
+  }
   function status(value: unknown) {
     return text(value, "Not recorded").replace(/_/g, " ");
   }
@@ -87,7 +112,72 @@ export function growthResultSummary(
     );
     return summary;
   }
-  if (kind === "workitem") {
+  if (kind === "email") {
+    const document = obj(d.document),
+      spot = obj(d.spot),
+      content = obj(d.content);
+    const series = obj(content.series);
+    const latestSend = list(d.messageSends).sort((a, b) =>
+      text(b.createdAt).localeCompare(text(a.createdAt)),
+    )[0];
+    const sent = Boolean(spot.publishedAt) || spot.status === "published";
+    const queued = !sent && spot.status === "scheduled";
+    const approved = sent || queued || spot.status === "approved";
+    summary.title = text(
+      document.subject,
+      text(content.title, "Untitled email"),
+    );
+    summary.description = [
+      text(brand.name),
+      text(series.name, "Standalone broadcast"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    summary.facts = [
+      sent
+        ? "Sent"
+        : latestSend?.status === "failed"
+          ? "Delivery needs review"
+          : latestSend?.status === "sending"
+            ? "Sending"
+            : queued
+              ? "Delivery scheduled"
+              : "Delivery not scheduled",
+      approved
+        ? "Creative approved"
+        : spot.status === "pending_review"
+          ? "Ready for review"
+          : "Draft creative",
+    ];
+    const plannedAt = text(spot.scheduledAt);
+    if (plannedAt && !sent)
+      summary.facts.push(
+        `${queued ? "Delivery" : "Tentative"}: ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(plannedAt))} UTC`,
+      );
+    summary.rows = [
+      {
+        title: text(document.preheader, "No preheader yet"),
+        detail: text(
+          document.bodyMarkdown,
+          "Email copy has not been drafted yet.",
+        ),
+        thumbnail: thumbnail(list(spot.media)[0]),
+      },
+    ];
+    if (text(document.ctaLabel))
+      summary.rows.push({
+        title: text(document.ctaLabel),
+        detail: text(document.ctaUrl, "CTA destination not set"),
+      });
+    summary.href = path(d.url, "/app/newsletters");
+    summary.linkLabel = "Open email in Growth";
+    summary.note =
+      latestSend?.status === "failed"
+        ? "The latest delivery attempt failed. Review its status in Growth before trying again."
+        : sent
+          ? "Open Growth for the full creative and delivery report."
+          : "Calendar planning, creative approval and delivery are separate. Review the full email in Growth.";
+  } else if (kind === "workitem") {
     const ready = obj(d.readiness);
     summary.title = text(d.title, "Untitled content");
     summary.description = [text(brand.name), status(d.status)]
@@ -193,7 +283,7 @@ export function growthResultSummary(
   } else if (kind === "brands") {
     const brands = list(d.brands);
     summary.title = "Brands";
-    summary.description = `${brands.length} returned brands`;
+    summary.description = `${brands.length} ${brands.length === 1 ? "brand" : "brands"} found`;
     summary.rows = brands.slice(0, 3).map((b) => ({
       title: text(b.name, "Brand"),
       detail: text(
@@ -202,8 +292,12 @@ export function growthResultSummary(
           ? `${count(obj(b.surfaces).pendingReviews)} pending reviews`
           : text(b.relationship),
       ),
-      href: path(b.url, `/app/brands/${encodeURIComponent(text(b.slug))}`),
-      thumbnail: text(b.logo) || undefined,
+      href: path(
+        b.url,
+        `/app/brands/${encodeURIComponent(text(b.slug, text(b.id)))}`,
+      ),
+      badge: text(b.relationship) || undefined,
+      thumbnail: brandLogo(b.logo),
     }));
     summary.href = "/app/brands";
     summary.linkLabel = "View all brands";
