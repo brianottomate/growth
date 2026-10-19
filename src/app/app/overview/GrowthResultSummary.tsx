@@ -33,12 +33,25 @@ export function GrowthResultSummary({
         </div>
       )}
       {summary.rows.map((row, index) => (
-        <article key={index} className="flex min-w-0 items-start gap-3">
+        <article
+          key={index}
+          className={
+            kind === "creative"
+              ? "min-w-0 space-y-2"
+              : "flex min-w-0 items-start gap-3"
+          }
+        >
           {row.thumbnail && (
             <img
               src={row.thumbnail}
               alt={row.title}
-              className="size-12 shrink-0 rounded-lg object-cover"
+              // A creative is the composition itself, so it gets the card's
+              // width; everything else is a thumbnail beside its line.
+              className={
+                kind === "creative"
+                  ? "aspect-square w-full max-w-[360px] rounded-xl border bg-muted object-cover"
+                  : "size-12 shrink-0 rounded-lg object-cover"
+              }
               loading="lazy"
             />
           )}
