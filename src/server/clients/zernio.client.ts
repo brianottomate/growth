@@ -1594,6 +1594,7 @@ export type BoostZernioMetaPostInput = {
   budget: { amount: number; type: "daily" | "lifetime" };
   schedule?: { startDate?: string; endDate?: string };
   targeting?: ZernioAdTargeting;
+  tracking?: CreateZernioStandaloneAdInput["tracking"];
 };
 
 /** Boosts launch active on Meta, so this client is only called by an approved capability. */

@@ -108,6 +108,7 @@ export async function classifyPerformanceBooking(
         id: platformCampaignTable.id,
         externalId: platformCampaignTable.externalId,
         name: platformCampaignTable.name,
+        platform: platformCampaignTable.platform,
       })
       .from(platformCampaignTable)
       .leftJoin(
@@ -116,7 +117,7 @@ export async function classifyPerformanceBooking(
       )
       .where(
         and(
-          eq(platformCampaignTable.platform, "facebook"),
+          inArray(platformCampaignTable.platform, ["meta_ads", "google_ads"]),
           or(
             and(
               eq(platformCampaignTable.brandId, brandId),
@@ -174,7 +175,13 @@ export async function classifyPerformanceBooking(
   }
   const result = classifyBookingAttribution(
     booking.attribution,
-    campaigns,
+    campaigns.map((campaign) => ({
+      ...campaign,
+      channel:
+        campaign.platform === "google_ads"
+          ? ("google" as const)
+          : ("meta" as const),
+    })),
     [...sends.values()],
     booking.confirmedAt,
   );

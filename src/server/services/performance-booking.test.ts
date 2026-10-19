@@ -170,7 +170,12 @@ test("generic Meta/email signals and acquisition history never become confirmed 
     initial: { utm_id: "external" },
   };
   const campaigns = [
-    { id: "our-campaign", externalId: "external", name: "Summer" },
+    {
+      id: "our-campaign",
+      externalId: "external",
+      name: "Summer",
+      channel: "meta" as const,
+    },
   ];
   expect(
     classifyBookingAttribution(attribution, campaigns, [], new Date())
@@ -264,7 +269,7 @@ test("only relevant client bookings persist before ack; after classifies and rep
       CREATE TABLE message_send (id text primary key, provider_broadcast_id text, sent_at timestamp, platform_post_id text, status text);
       INSERT INTO brand VALUES ('brand-one','org-one','site-one','One','one'),('brand-two','org-two','site-two','Two','two');
       INSERT INTO performance_account VALUES ('account-one','brand-one','org-one',null),('account-two','brand-two','org-two',null);
-      INSERT INTO platform_campaign VALUES ('campaign-one','campaign-external','Summer','brand-one','facebook','plan-one',null),('foreign-campaign','foreign-external','Other','brand-two','facebook','plan-two',null);
+      INSERT INTO platform_campaign VALUES ('campaign-one','campaign-external','Summer','brand-one','meta_ads','plan-one',null),('foreign-campaign','foreign-external','Other','brand-two','meta_ads','plan-two',null);
     `);
     await pg.exec(
       (

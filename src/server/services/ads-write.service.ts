@@ -43,7 +43,7 @@ import {
 } from "@/lib/meta-placement-plan";
 import { ideaAwaitingArtwork } from "@/lib/ad-idea-studio";
 import { searchTerms, type SearchTerm } from "@/lib/search-terms";
-import { META_URL_TAGS } from "@/lib/ad-utm";
+import { META_URL_TAGS, tagGoogleAdUrl } from "@/lib/ad-utm";
 import {
   createMetaPlacementCreative,
   ensureMetaAdsPaused,
@@ -1126,7 +1126,7 @@ export async function createGoogleAd(
     budgetType: input.budgetType,
     headline: input.headline,
     body: input.body,
-    linkUrl: input.linkUrl,
+    linkUrl: tagGoogleAdUrl(input.linkUrl),
     keywords: input.keywords,
     negativeKeywords: input.negativeKeywords,
     campaignNegativeKeywords: input.campaignNegativeKeywords,
@@ -1217,6 +1217,7 @@ export async function boostMetaPost(
     postId: input.postId,
     platformPostId: input.platformPostId,
     budget: { amount: input.budgetAmount, type: input.budgetType },
+    tracking: { urlTags: [...META_URL_TAGS] },
     schedule: { startDate: input.startDate, endDate: input.endDate },
     targeting: input.targeting,
   };
@@ -3041,7 +3042,7 @@ async function pushToGoogle(args: PushArgs) {
   const unitPayload = (unit: GoogleUnit) => ({
     headline: unit.headline,
     body: unit.body,
-    linkUrl: unit.linkUrl!,
+    linkUrl: tagGoogleAdUrl(unit.linkUrl!),
     ...(campaignType === "search"
       ? {
           additionalHeadlines: unit.headlines.slice(1),

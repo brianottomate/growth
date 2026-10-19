@@ -85,7 +85,12 @@ export function bookingSlackMessage(
   const { booking } = row;
   const confidence =
     booking.confidence === "confirmed" ? "Confirmed" : "Possible";
-  const channels = { meta: "Meta", email: "Email", chatgpt: "ChatGPT" };
+  const channels = {
+    meta: "Meta",
+    google: "Google Ads",
+    email: "Email",
+    chatgpt: "ChatGPT",
+  };
   const scopes = {
     event: "booking",
     current: "current visit",

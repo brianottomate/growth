@@ -66,7 +66,7 @@ export type BookingAttribution = Record<
 >;
 export type BookingEvidence = {
   scope: AttributionScope;
-  channel: "meta" | "email" | "chatgpt";
+  channel: "meta" | "google" | "email" | "chatgpt";
   kind:
     | "signal"
     | "campaign_name"
@@ -117,9 +117,27 @@ export function attributionSignals(
     if (
       props.fbclid ||
       props.meta_campaign_id ||
-      ["facebook", "instagram", "meta", "fb", "ig"].includes(source ?? "")
+      ["facebook", "instagram", "meta", "meta_ads", "fb", "ig"].includes(
+        source ?? "",
+      )
     )
       evidence.push({ scope, channel: "meta", kind: "signal" });
+    if (
+      props.gclid ||
+      props.gbraid ||
+      props.wbraid ||
+      (["google", "google_ads"].includes(source ?? "") &&
+        [
+          "cpc",
+          "ppc",
+          "paid_search",
+          "paid",
+          "display",
+          "cpm",
+          "paid_video",
+        ].includes(medium ?? ""))
+    )
+      evidence.push({ scope, channel: "google", kind: "signal" });
     if (
       medium === "email" ||
       ["newsletter", "email", "customerio", "postmark"].includes(
@@ -188,6 +206,7 @@ export type SitesOrder = Extract<
   { status: "valid" }
 >["booking"];
 export type ManagedCampaign = {
+  channel: "meta" | "google";
   id: string;
   externalId: string | null;
   name: string;
@@ -223,7 +242,14 @@ export function classifyBookingAttribution(
       props.campaign_id,
       props.meta_campaign_id,
     ].filter(Boolean);
-    const exactCampaigns = campaigns.filter(
+    // Provider campaign IDs can overlap. Match only the channel signaled by this touch.
+    const channels = evidence
+      .filter((e) => e.scope === scope)
+      .map((e) => e.channel);
+    const eligibleCampaigns = campaigns.filter((c) =>
+      channels.includes(c.channel),
+    );
+    const exactCampaigns = eligibleCampaigns.filter(
       (c) =>
         campaignIds.includes(c.id) ||
         (c.externalId && campaignIds.includes(c.externalId)),
@@ -231,17 +257,19 @@ export function classifyBookingAttribution(
     if (exactCampaigns.length === 1) {
       evidence.push({
         scope,
-        channel: "meta",
+        channel: exactCampaigns[0]!.channel,
         kind: "campaign_id",
         matchedId: exactCampaigns[0]!.id,
       });
       if (scope !== "initial") confidence = "confirmed";
     } else {
-      const named = campaigns.filter((c) => c.name === props.utm_campaign);
+      const named = eligibleCampaigns.filter(
+        (c) => c.name === props.utm_campaign,
+      );
       if (named.length === 1)
         evidence.push({
           scope,
-          channel: "meta",
+          channel: named[0]!.channel,
           kind: "campaign_name",
           matchedId: named[0]!.id,
         });
