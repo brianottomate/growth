@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, isNull, or } from "drizzle-orm";
 
+import { parseInspirationToken } from "@/lib/inbound-email";
 import { R2 } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
 import {
@@ -26,16 +27,6 @@ import {
 // on metadata. Mirrors the F5Bot pipeline (see f5bot.service.ts): AI-first,
 // best-effort, and watching-mode safe — an unmatched email is logged, never
 // thrown, so we can point real competitors at it and watch what lands.
-
-/**
- * Pull the brand token out of an `inspo+<token>@…` recipient. Returns null for
- * a bare `inspo@…` (no token) or when no inspo recipient is present.
- */
-export function parseInspirationToken(recipients: string[]): string | null {
-  const joined = recipients.join(",");
-  const match = /inspo\+([^@>,\s]+)@/i.exec(joined);
-  return match?.[1]?.toLowerCase() ?? null;
-}
 
 // ---- Inspiration extraction --------------------------------------------------
 

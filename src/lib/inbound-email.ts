@@ -12,6 +12,12 @@ export function inspirationAddress(brandId: string): string {
   return `inspo+${brandId}@${RESEND_RECEIVING_DOMAIN}`;
 }
 
+/** Extract the opaque, case-sensitive brand ID (or slug) from a recipient. */
+export function parseInspirationToken(recipients: string[]): string | null {
+  const match = /inspo\+([^@>,\s]+)@/i.exec(recipients.join(","));
+  return match?.[1] ?? null;
+}
+
 /**
  * Inbound address for affiliate-program mail. The partnerships@wander.com
  * Google group forward-copies here (humans keep Gmail; the system gets a copy

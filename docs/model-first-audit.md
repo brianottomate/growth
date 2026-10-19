@@ -1,5 +1,16 @@
 # Model-first simplification audit
 
+## Newsletter forwarding identity (2026-10-19)
+
+The brand owns its opaque, case-sensitive ID. The newsletter recipient embeds
+that ID verbatim, but `parseInspirationToken` lowercased it before lookup. A
+real Indie Campers forward was received by Resend and silently skipped because
+the changed ID matched no brand. Preserve the token at the inbound boundary;
+do not add fuzzy sender matching or case-insensitive ID fallback queries. The
+address builder and parser now share `src/lib/inbound-email.ts`, with a
+round-trip regression test for mixed-case IDs. Existing addresses and stored
+identities require no migration.
+
 Audited and implemented in PR #653 on 2026-10-09. The evidence below records
 the pre-change behavior. This is a source-level audit of Growth's cadence, media,
 home photo ordering, Performance delivery attribution and billing, and blog
