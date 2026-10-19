@@ -1100,7 +1100,13 @@ export type ZernioAdTargeting = {
   ageMin?: number;
   ageMax?: number;
   languages?: string[];
-  audienceId?: string;
+  /**
+   * Platform custom-audience ids to include: the `platformAudienceId` that
+   * GET /v1/ads/audiences returns, never Zernio's own `id`. Zernio's
+   * TargetingSpec has no `audienceId`; a nested one is ignored, so the ad
+   * set runs broad.
+   */
+  audienceInclude?: string[];
 };
 
 export type ZernioTargetingSearchResult = {
@@ -1640,7 +1646,7 @@ export async function duplicateZernioMetaCampaign(
 // POST /v1/ads/audiences is discriminated by `type`. We type the two shapes we
 // use: `customer_list` (created empty, filled via addUsersToZernioAdAudience)
 // and Meta-only `lookalike` (fills itself from sourceAudienceId; no upload).
-// Reference the resulting id via ZernioAdTargeting.audienceId on ad create.
+// Reference the resulting platform id via ZernioAdTargeting.audienceInclude on ad create.
 // https://docs.zernio.com/ad-audiences/create-audience
 
 export type ZernioAdAudience = {

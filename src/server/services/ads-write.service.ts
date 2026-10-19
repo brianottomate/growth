@@ -2310,7 +2310,7 @@ async function compileAudienceTargeting(input: {
     input.brandId,
     input.platform,
   );
-  if (assetId) spec.audienceId = assetId;
+  if (assetId) spec.audienceInclude = [assetId];
 
   const empty = Object.keys(spec).length === 0;
   if (empty) {

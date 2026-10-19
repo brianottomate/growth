@@ -255,7 +255,13 @@ const targetingSchema = z.object({
   ageMin: z.number().int().min(13).max(65).optional(),
   ageMax: z.number().int().min(13).max(65).optional(),
   languages: z.array(z.string().min(2).max(10)).max(25).optional(),
-  audienceId: z.string().min(1).optional(),
+  audienceInclude: z
+    .array(z.string().min(1))
+    .max(25)
+    .optional()
+    .describe(
+      "Platform custom-audience ids to include (the platformAudienceId from adsRead, never Zernio's own id).",
+    ),
 });
 const destinationSchema = {
   brandSlug: z
