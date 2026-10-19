@@ -78,7 +78,7 @@ export function buildBrandSteps(
     {
       label: "Properties",
       title: "Which homes should we advertise?",
-      help: "Aim for five to ten.",
+      help: "Aim for 4–8 homes.",
       complete: a.allProperties || a.propertyUrls.length > 0,
       body: (
         <>

@@ -78,12 +78,12 @@ export function Hub({ data }: { data: ScenarioData }) {
       title: "About your brand",
       detail: data.sentAt
         ? `Sent ${formatDate(data.sentAt)}. ${data.prefill.repName ?? "Your Wander contact"} is on your launch plan.`
-        : "Homes, budget, photos and your guest list. About five minutes.",
+        : "Homes, budget, photos and your guest list.",
       state: states.brand,
       action: data.sentAt ? "See what you sent" : "Start",
     },
     {
-      title: "Ads and social accounts",
+      title: "Accounts for ads",
       detail: connected.length
         ? `${connected.map((row) => row.label).join(", ")} connected.`
         : "Meta and Google so we can run your ads. Instagram and Facebook so the ads run as you.",
@@ -218,15 +218,15 @@ export function ConnectSection({
     },
     {
       key: "social",
-      title: "Social accounts",
-      hint: "So ads show your name and photo, and we can post for you.",
+      title: "Social accounts for ads",
+      hint: "So ads show your brand’s name and photo.",
     },
   ] as const;
   const chosen = META_ACCOUNTS[0]!;
 
   return (
     <SectionFrame
-      eyebrow="Ads and social accounts"
+      eyebrow="Accounts for ads"
       title="Give us access"
       help="Each button opens the platform's own sign-in. You stay the owner of everything and can revoke our access any time."
     >

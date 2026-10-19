@@ -236,8 +236,8 @@ function WelcomePanel({ brand }: { brand: string }) {
         </p>
         <ol className="mt-8 space-y-4">
           {[
-            "Five minutes about your brand, and we can start",
-            "Connect your ad and social accounts, now or later",
+            "About five minutes to set up your brand, ad accounts and email",
+            "Connect the accounts we’ll use for your ads, now or later",
             "Set up email whenever suits you",
           ].map((line, index) => (
             <li key={line} className="flex gap-3">
