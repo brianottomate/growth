@@ -68,24 +68,21 @@ export function composeOnboardingEmail(input: OnboardingEmailInput) {
     ? `${sendingDomain} and ${CUSTOMER_IO_SUBDOMAIN}.${rootDomain}`
     : sendingDomain;
   const subject = `Getting ${brandName} set up with Wander Performance`;
-  const steps = [
-    links?.intake
-      ? { label: "Tell us about your business", url: links.intake }
-      : null,
-    links?.connect
-      ? {
-          label: "Connect your Meta and Google Ads accounts",
-          url: links.connect,
-        }
-      : null,
-    links?.dns
-      ? {
-          label:
-            "Set up your email domain (optional, strongly recommended; use Entri or add the records yourself)",
-          url: links.dns,
-        }
-      : null,
-  ].filter((step): step is { label: string; url: string } => Boolean(step));
+  const steps = links?.intake
+    ? [
+        {
+          label: "Set up your brand, ad accounts and email in one place",
+          url: links.intake,
+        },
+      ]
+    : [
+        links?.connect
+          ? { label: "Connect your accounts for ads", url: links.connect }
+          : null,
+        links?.dns
+          ? { label: "Finish your email setup", url: links.dns }
+          : null,
+      ].filter((step): step is { label: string; url: string } => Boolean(step));
 
   const dnsIntro = `To send email to your guests from ${domains}, please add these ${records.length} records at your DNS provider (GoDaddy, Cloudflare, Squarespace or similar). "Host" is the part before ${rootDomain}. Leave TTL at the default.`;
   const scope = `They only touch ${domains}. Your website and current email are not affected.`;

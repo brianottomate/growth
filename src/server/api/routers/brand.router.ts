@@ -73,7 +73,6 @@ import {
   setBrandWebsiteId,
 } from "@/server/services/wanderos-listings.service";
 import {
-  brandConnectUrl,
   brandIntakeUrl,
   brandPitchUrl,
   ensureBrandConnect,
@@ -966,12 +965,12 @@ export const brandRouter = {
     .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.brandId);
       return {
-        url: brand.connectToken ? brandConnectUrl(brand.connectToken) : null,
+        url: brand.connectToken
+          ? `${brandIntakeUrl(brand.connectToken)}?section=connect`
+          : null,
         intakeUrl: brand.connectToken
           ? brandIntakeUrl(brand.connectToken)
-          : brand.slug
-            ? brandIntakeUrl(brand.slug)
-            : null,
+          : null,
         // Slug only: the pitch goes out before anything is signed and gets
         // read out loud, and the page shows nothing a token would protect.
         pitchUrl: brand.slug ? brandPitchUrl(brand.slug) : null,
@@ -987,7 +986,7 @@ export const brandRouter = {
         name: ctx.session.user.name ?? null,
         email: ctx.session.user.email ?? null,
       });
-      return { url: result.url };
+      return { url: brandIntakeUrl(result.token) };
     }),
 
   regenerateConnectLink: protectedProcedure
@@ -998,7 +997,7 @@ export const brandRouter = {
         name: ctx.session.user.name ?? null,
         email: ctx.session.user.email ?? null,
       });
-      return { url: result.url };
+      return { url: brandIntakeUrl(result.token) };
     }),
 
   /**

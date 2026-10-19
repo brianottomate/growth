@@ -64,14 +64,12 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
       <div>
         <h2 className="text-base font-semibold">Client connect</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Four client-facing surfaces for one brand: the pitch a rep sends
-          before anything is signed, the intake form the client fills in, the
-          Leadsie grant that hands us their ad accounts, and the connect page
-          they authorise accounts on here. The token is the credential for the
-          intake, connect and ad preview links, so regenerating it revokes those
-          you have already sent. The pitch reads off the slug and shows only
-          what is already public on the client&rsquo;s own site. The grant is
-          one Wander-wide link, which the token does not govern at all.
+          Share the public sales pitch before signing. After signing, send the
+          private onboarding link for brand details, ad accounts and email
+          setup. Account follow-ups open a section of that same onboarding page.
+          Regenerating the token revokes existing onboarding and ad preview
+          links. Leadsie is a separate Wander-wide access grant, also available
+          during account setup.
         </p>
       </div>
 
@@ -112,7 +110,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
         {intakeUrl && (
           <div className="mb-3">
             <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Intake form
+              Client onboarding
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <code className="min-w-0 flex-1 truncate rounded-md bg-surface-secondary/50 px-2.5 py-1.5 font-mono text-xs">
@@ -179,7 +177,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
 
         {url && (
           <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Connect page
+            Accounts follow-up
           </p>
         )}
         {url ? (
@@ -224,7 +222,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
             onClick={() => create.mutate({ brandId })}
           >
             <Link2 className="size-3.5" />
-            Create connect link
+            Create onboarding link
           </Button>
         )}
         {(create.error ?? regenerate.error) && (

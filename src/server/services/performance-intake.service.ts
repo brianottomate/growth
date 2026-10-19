@@ -2,7 +2,6 @@ import { intakeSetupSummary } from "@/lib/intake-setup-status";
 import { loadPerformanceConnections } from "./performance-connections.service";
 import { getBrandEmailDns } from "./email-dns.service";
 import { validIntakeUrl } from "./performance-settings.service";
-import { privatePerformanceLinks } from "@/lib/performance-client-links";
 import {
   STANDARD_PITCH_DEFAULTS,
   publicPitchSettings,
@@ -167,57 +166,50 @@ export function geographyFromProperties(
   return geographyByLookup(rows);
 }
 
-export const submitIntakeSchema = z
-  .object({
-    token: z.string().min(16).optional(),
-    slug: z.string().min(1).max(200).optional(),
-    // Preserve new questions while validating the fields downstream code consumes.
-    answers: z
-      .object({
-        propertyUrls: z
-          .array(z.string().trim().min(1).max(2000))
-          .max(1000)
-          .optional(),
-        allProperties: z.boolean().optional(),
-        detailsConfirmed: z.boolean().optional(),
-        billingAcknowledged: z.boolean().optional(),
-        accountsConnected: z.boolean().optional(),
-        budget: z.string().max(200).optional(),
-        reportEmails: z.string().max(4000).optional(),
-        invoiceEmail: z.string().max(4000).optional(),
-        ugcPermission: z.string().max(4000).optional(),
-        creativeDriveUrl: z.string().max(4000).optional(),
-        guestListDriveUrl: z.string().max(4000).optional(),
-        guestConsent: z.boolean().optional(),
-        propertyNotes: z.string().max(20000).optional(),
-        anythingElse: z.string().max(20000).optional(),
-        contactName: z.string().max(500).optional(),
-        contactEmail: z.string().max(500).optional(),
-      })
-      .catchall(z.unknown()),
-  })
-  .refine((value) => Boolean(value.token ?? value.slug), {
-    message: "A token or a slug is required",
-  });
+export const submitIntakeSchema = z.object({
+  token: z.string().min(16).max(200),
+  // Preserve new questions while validating the fields downstream code consumes.
+  answers: z
+    .object({
+      propertyUrls: z
+        .array(z.string().trim().min(1).max(2000))
+        .max(1000)
+        .optional(),
+      allProperties: z.boolean().optional(),
+      detailsConfirmed: z.boolean().optional(),
+      billingAcknowledged: z.boolean().optional(),
+      accountsConnected: z.boolean().optional(),
+      budget: z.string().max(200).optional(),
+      reportEmails: z.string().max(4000).optional(),
+      invoiceEmail: z.string().max(4000).optional(),
+      ugcPermission: z.string().max(4000).optional(),
+      creativeDriveUrl: z.string().max(4000).optional(),
+      guestListDriveUrl: z.string().max(4000).optional(),
+      guestConsent: z.boolean().optional(),
+      propertyNotes: z.string().max(20000).optional(),
+      anythingElse: z.string().max(20000).optional(),
+      contactName: z.string().max(500).optional(),
+      contactEmail: z.string().max(500).optional(),
+    })
+    .catchall(z.unknown()),
+});
 
 /**
  * Record a submission against the brand's connect token.
  *
- * Addressed by token or slug, never by an id from the caller: this is reached
+ * Addressed by the onboarding token, never by an id from the caller: this is reached
  * from a public form, so the account is derived rather than supplied, or
  * created in `onboarding` when a brand reaches intake before anyone opened a
  * commercial record for them.
  *
- * A slug can be guessed, so a submission is a claim rather than proof of who
- * filed it. That is why apply is an operator step with a preview, and why
- * nothing here marks the access verified.
+ * Filing records the answers; applying them to live operational settings
+ * remains an operator step. Account access is observed from provider connections.
  */
 export async function submitPerformanceIntake(input: {
-  token?: string;
-  slug?: string;
+  token: string;
   answers: PerformanceIntakeAnswers;
 }): Promise<{ intakeId: string }> {
-  const { brand } = await brandForHandle(input);
+  const { brand } = await brandForHandle({ token: input.token });
 
   let account = await db.query.performanceAccountTable.findFirst({
     where: and(
@@ -292,30 +284,7 @@ export async function submitPerformanceIntake(input: {
 }
 
 /**
- * The client's own contact details for the form, or nulls.
- *
- * Only ever from the commercial record. `brand.connectTokenIssuedBy*` is the
- * WANDER rep who minted the link, and using it as a fallback here put their
- * name and email in the client's "is this still right?" box on any brand
- * without a performance_account. Null means the form asks, which is the right
- * answer when we do not know.
- *
- * Withheld entirely from a slug link, because a guessable URL should not
- * hand out an email address.
- */
-export function prefillContact(
-  byToken: boolean,
-  account: { contactName: string | null; contactEmail: string | null } | null,
-): { contact: string | null; email: string | null } {
-  if (!byToken) return { contact: null, email: null };
-  return {
-    contact: account?.contactName ?? null,
-    email: account?.contactEmail ?? null,
-  };
-}
-
-/**
- * Resolve a brand from either handle the client-facing form is addressed by.
+ * Resolve a brand for token-based onboarding or the public slug-based pitch.
  *
  * A token is unguessable and identifies one brand. A slug is readable, so it
  * is what goes in a link someone reads out loud, and it is guessable by
@@ -380,21 +349,9 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
   throw new PerformanceError("NOT_FOUND", "Unknown intake link");
 }
 
-/**
- * Everything the client-facing form needs to render.
- *
- * Read-only and deliberately narrow: this crosses a repo boundary onto a
- * public page, so it returns the fields the form displays and nothing else.
- * No ids, no commercial state, no billing.
- *
- * A slug-addressed link is guessable, so it gets only what is already on the
- * client's own public booking site: their name, their domain, their homes. The
- * contact name and email come back for a token link and not for a slug one,
- * and the form asks for them instead. Same form either way; the readable URL
- * just costs two fields.
- */
-export async function intakePrefill(handle: { token?: string; slug?: string }) {
-  const { brand, byToken } = await brandForHandle(handle);
+/** Client details for the one token-addressed onboarding journey. */
+export async function intakePrefill(handle: { token: string }) {
+  const { brand } = await brandForHandle({ token: handle.token });
 
   const account = await db.query.performanceAccountTable.findFirst({
     where: and(
@@ -409,7 +366,8 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
   return {
     brand: brand.name,
     slug: brand.slug,
-    ...prefillContact(byToken, account ?? null),
+    contact: account?.contactName ?? null,
+    email: account?.contactEmail ?? null,
     site: brand.website,
     // URLs, because that is what the form collects and pre-ticks.
     properties: properties
@@ -417,11 +375,6 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
       .filter((url): url is string => Boolean(url)),
     repName: brand.connectTokenIssuedByName?.split(" ")[0] ?? null,
     repEmail: brand.connectTokenIssuedByEmail,
-    links: privatePerformanceLinks(
-      byToken,
-      brand.connectToken,
-      brand.emailSender?.marketingDomain,
-    ),
   };
 }
 
@@ -434,10 +387,9 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
  * them separately would be detail nobody acts on.
  */
 export async function intakeListings(handle: {
-  token?: string;
-  slug?: string;
+  token: string;
 }): Promise<{ supported: boolean; listings: WanderOsListingSummary[] }> {
-  const { brand } = await brandForHandle(handle);
+  const { brand } = await brandForHandle({ token: handle.token });
   const listings = await brandListings(brand);
   return {
     supported: listings.length > 0,
@@ -1225,8 +1177,6 @@ export type PerformancePitch = {
    * Carries `markets` too, which is the line a person actually reads.
    */
   geography: ResolvedGeography;
-  /** Where the same link takes them once they say yes. */
-  intakePath: string;
 };
 
 export async function performancePitch(handle: {
@@ -1278,8 +1228,6 @@ export async function performancePitch(handle: {
     },
     homes,
     geography,
-    // The slug, never the token: this payload can reach a guessable page.
-    intakePath: brand.slug ? `/internal/intake/${brand.slug}` : "",
   };
 }
 

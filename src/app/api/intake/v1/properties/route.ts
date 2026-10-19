@@ -20,14 +20,16 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   const params = request.nextUrl.searchParams;
-  const token = params.get("token") ?? undefined;
-  const slug = params.get("slug") ?? undefined;
-  if (!token && !slug) {
-    return NextResponse.json({ error: "Missing handle" }, { status: 400 });
+  const token = params.get("token");
+  if (!token) {
+    return NextResponse.json(
+      { error: "Missing onboarding token" },
+      { status: 400 },
+    );
   }
 
   try {
-    return NextResponse.json(await intakeListings({ token, slug }));
+    return NextResponse.json(await intakeListings({ token }));
   } catch (error) {
     if (error instanceof PerformanceError) {
       return NextResponse.json({ error: "Unknown link" }, { status: 404 });

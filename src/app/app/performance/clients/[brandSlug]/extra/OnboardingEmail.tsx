@@ -31,8 +31,8 @@ export function OnboardingEmail({
   links: { intake: string | null; connect: string | null; dns: string | null };
 }) {
   const [includeIntake, setIncludeIntake] = useState(true);
-  const [includeConnect, setIncludeConnect] = useState(true);
-  const [includeEmail, setIncludeEmail] = useState(true);
+  const [includeConnect, setIncludeConnect] = useState(false);
+  const [includeEmail, setIncludeEmail] = useState(false);
   const [includeRecords, setIncludeRecords] = useState(false);
   const [draftSubject, setDraftSubject] = useState<string | null>(null);
   const [draftBody, setDraftBody] = useState<string | null>(null);
@@ -98,8 +98,8 @@ export function OnboardingEmail({
             variant="outline"
             onClick={() => {
               setIncludeIntake(true);
-              setIncludeConnect(true);
-              setIncludeEmail(true);
+              setIncludeConnect(false);
+              setIncludeEmail(false);
             }}
           >
             Full onboarding
@@ -142,24 +142,24 @@ export function OnboardingEmail({
           {[
             {
               id: "intake",
-              label: "Intake form",
+              label: "Full onboarding (one link)",
               checked: includeIntake,
               change: setIncludeIntake,
               disabled: !links.intake,
             },
             {
               id: "connect",
-              label: "Growth Connect (Meta / Zernio)",
+              label: "Accounts follow-up",
               checked: includeConnect,
               change: setIncludeConnect,
-              disabled: !links.connect,
+              disabled: includeIntake || !links.connect,
             },
             {
               id: "dns",
-              label: "Email / DNS setup link",
+              label: "Email setup follow-up",
               checked: includeEmail,
               change: setIncludeEmail,
-              disabled: !links.dns,
+              disabled: includeIntake || !links.dns,
             },
             {
               id: "records",

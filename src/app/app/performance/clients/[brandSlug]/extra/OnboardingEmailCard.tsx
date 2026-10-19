@@ -7,7 +7,6 @@ import { brandTable } from "@/server/db/schema";
 import { brandIntakeUrl } from "@/server/services/brand-connect.service";
 import { getEmailDmarcStatus } from "@/server/services/email-dmarc.service";
 import { getBrandEmailDns } from "@/server/services/email-dns.service";
-import { privatePerformanceLinks } from "@/lib/performance-client-links";
 
 import { OnboardingEmail } from "./OnboardingEmail";
 
@@ -51,12 +50,9 @@ export async function OnboardingEmailCard({
       )
     : null;
   const setup = available?.setup;
-  const handle = brand.connectToken ?? brand.slug;
-  const privateLinks = privatePerformanceLinks(
-    true,
-    brand.connectToken,
-    brand.emailSender?.marketingDomain,
-  );
+  const intakeUrl = brand.connectToken
+    ? brandIntakeUrl(brand.connectToken)
+    : null;
   return (
     <OnboardingEmail
       brandName={brand.name}
@@ -72,9 +68,9 @@ export async function OnboardingEmailCard({
           : []
       }
       links={{
-        intake: handle ? brandIntakeUrl(handle) : null,
-        connect: privateLinks.connect,
-        dns: privateLinks.emailDns,
+        intake: intakeUrl,
+        connect: intakeUrl ? `${intakeUrl}?section=connect` : null,
+        dns: intakeUrl ? `${intakeUrl}?section=email` : null,
       }}
     />
   );

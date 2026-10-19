@@ -41,7 +41,13 @@ export default async function BrandPerformanceChecklistPage({
       eq(brandTable.organizationId, org.id),
       isNull(brandTable.deletedAt),
     ),
-    columns: { id: true, name: true, slug: true, performanceChecklist: true },
+    columns: {
+      id: true,
+      name: true,
+      slug: true,
+      performanceChecklist: true,
+      connectToken: true,
+    },
   });
   if (!brand) notFound();
 
@@ -74,7 +80,9 @@ export default async function BrandPerformanceChecklistPage({
         brandId={brand.id}
         initial={brand.performanceChecklist ?? null}
         links={{
-          intake: brand.slug ? brandIntakeUrl(brand.slug) : null,
+          intake: brand.connectToken
+            ? brandIntakeUrl(brand.connectToken)
+            : null,
           pitch: brand.slug ? brandPitchUrl(brand.slug) : null,
           leadsie: LEADSIE_URL,
         }}
