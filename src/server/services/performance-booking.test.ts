@@ -17,6 +17,7 @@ import {
   bookingSlackMessage,
 } from "./performance-booking-notification.service";
 import { workflowRunTable } from "@/server/db/creative-work-schema";
+import { emailRecipientKey } from "@/server/email/recipient-identity";
 import { receiveSitesOrder } from "./performance-booking-webhook";
 
 const payload = {
@@ -206,7 +207,7 @@ test("only relevant client bookings persist before ack; after classifies and rep
       CREATE TABLE performance_cycle (id text primary key, account_id text);
       CREATE TABLE platform_campaign (id text primary key, external_id text, name text, brand_id text, platform text, campaign_id text, performance_cycle_id text);
       CREATE TABLE platform_post (id text primary key, brand_id text);
-      CREATE TABLE message_send_recipient (id text primary key, message_send_id text, status text, sent_at timestamp);
+      CREATE TABLE message_send_recipient (id text primary key, message_send_id text, status text, sent_at timestamp, email text);
       CREATE TABLE message_send (id text primary key, provider_broadcast_id text, sent_at timestamp, platform_post_id text, status text);
       INSERT INTO brand VALUES ('brand-one','org-one','site-one','One','one'),('brand-two','org-two','site-two','Two','two');
       INSERT INTO performance_account VALUES ('account-one','brand-one','org-one',null),('account-two','brand-two','org-two',null);
@@ -328,7 +329,7 @@ test("only relevant client bookings persist before ack; after classifies and rep
     await pg.exec(`
       INSERT INTO platform_post VALUES ('email-post','brand-one');
       INSERT INTO message_send VALUES ('msg-early','bulk-1',null,'email-post','sending');
-      INSERT INTO message_send_recipient VALUES ('recipient-1','msg-early','sent','2026-10-14T00:00:00Z');
+      INSERT INTO message_send_recipient VALUES ('recipient-1','msg-early','sent','2026-10-14T00:00:00Z','guest@example.com');
     `);
     expect(
       (
@@ -338,6 +339,7 @@ test("only relevant client bookings persist before ack; after classifies and rep
           utm_source: "wander_performance",
           utm_medium: "email",
           utm_id: "msg-early",
+          utm_term: emailRecipientKey("brand-one", "guest@example.com"),
         })
       ).status,
     ).toBe(200);
@@ -346,6 +348,14 @@ test("only relevant client bookings persist before ack; after classifies and rep
     expect(rows.find((r) => r.bookingId === "booking-email")!.confidence).toBe(
       "confirmed",
     );
+    expect(
+      rows.find((r) => r.bookingId === "booking-email")!.evidence,
+    ).toContainEqual({
+      scope: "event",
+      channel: "email",
+      kind: "recipient_key",
+      matchedId: "recipient-1",
+    });
     await pg.exec(
       `INSERT INTO brand VALUES ('duplicate','org-one','site-one','Duplicate','duplicate'); INSERT INTO performance_account VALUES ('duplicate-account','duplicate','org-one',null);`,
     );

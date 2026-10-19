@@ -1,9 +1,10 @@
 import "server-only";
-import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, or, inArray, lte } from "drizzle-orm";
 import {
   attributionSignals,
   classifyBookingAttribution,
   type SitesOrder,
+  type SentMessage,
 } from "@/lib/performance-booking";
 import { db, type Database } from "@/server/db";
 import { brandTable } from "@/server/db/brand-schema";
@@ -17,6 +18,7 @@ import {
   messageSendRecipientTable,
   messageSendTable,
 } from "@/server/db/email-document-schema";
+import { emailRecipientKey } from "@/server/email/recipient-identity";
 import { platformPostTable } from "@/server/db/content-schema";
 
 export async function recordPerformanceBooking(
@@ -89,6 +91,15 @@ export async function classifyPerformanceBooking(
     );
   if (!row?.brandId) return;
   const { booking, brandId } = row;
+  const sendIds = [
+    ...new Set(
+      Object.values(booking.attribution).flatMap((props) =>
+        [props.utm_id, props.message_send_id].filter((id): id is string =>
+          Boolean(id),
+        ),
+      ),
+    ),
+  ];
   // A discovered campaign on a connected ad account isn't enough. It must
   // belong to our campaign plan or this client's Performance delivery cycle.
   const [campaigns, messages] = await Promise.all([
@@ -115,37 +126,56 @@ export async function classifyPerformanceBooking(
           ),
         ),
       ),
-    client
-      .select({
-        id: messageSendTable.id,
-        providerBroadcastId: messageSendTable.providerBroadcastId,
-        // The first accepted page can convert while later pages are still sending.
-        sentAt: sql<Date>`min(${messageSendRecipientTable.sentAt})`.mapWith(
-          messageSendRecipientTable.sentAt,
-        ),
-      })
-      .from(messageSendTable)
-      .innerJoin(
-        platformPostTable,
-        eq(platformPostTable.id, messageSendTable.platformPostId),
-      )
-      .innerJoin(
-        messageSendRecipientTable,
-        eq(messageSendRecipientTable.messageSendId, messageSendTable.id),
-      )
-      .where(
-        and(
-          eq(platformPostTable.brandId, brandId),
-          eq(messageSendRecipientTable.status, "sent"),
-          isNotNull(messageSendRecipientTable.sentAt),
-        ),
-      )
-      .groupBy(messageSendTable.id, messageSendTable.providerBroadcastId),
+    sendIds.length
+      ? client
+          .select({
+            id: messageSendTable.id,
+            providerBroadcastId: messageSendTable.providerBroadcastId,
+            recipientId: messageSendRecipientTable.id,
+            email: messageSendRecipientTable.email,
+            sentAt: messageSendRecipientTable.sentAt,
+          })
+          .from(messageSendTable)
+          .innerJoin(
+            platformPostTable,
+            eq(platformPostTable.id, messageSendTable.platformPostId),
+          )
+          .innerJoin(
+            messageSendRecipientTable,
+            eq(messageSendRecipientTable.messageSendId, messageSendTable.id),
+          )
+          .where(
+            and(
+              eq(platformPostTable.brandId, brandId),
+              inArray(messageSendTable.id, sendIds),
+              eq(messageSendRecipientTable.status, "sent"),
+              isNotNull(messageSendRecipientTable.sentAt),
+              lte(messageSendRecipientTable.sentAt, booking.confirmedAt),
+            ),
+          )
+      : Promise.resolve([]),
   ]);
+  const sends = new Map<string, SentMessage>();
+  for (const message of messages) {
+    if (!message.sentAt) continue;
+    const send = sends.get(message.id) ?? {
+      id: message.id,
+      providerBroadcastId: message.providerBroadcastId,
+      sentAt: message.sentAt,
+      recipients: [],
+    };
+    if (message.sentAt < send.sentAt) send.sentAt = message.sentAt;
+    send.recipients!.push({
+      id: message.recipientId,
+      key: emailRecipientKey(brandId, message.email),
+      sentAt: message.sentAt,
+    });
+    sends.set(send.id, send);
+  }
   const result = classifyBookingAttribution(
     booking.attribution,
     campaigns,
-    messages.flatMap((m) => (m.sentAt ? [{ ...m, sentAt: m.sentAt }] : [])),
+    [...sends.values()],
     booking.confirmedAt,
   );
   await client

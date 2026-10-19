@@ -97,6 +97,7 @@ export function bookingSlackMessage(
     campaign_name: "campaign name",
     campaign_id: "matched campaign",
     message_id: "matched email",
+    recipient_key: "matched recipient link",
   };
   const signals = [
     ...new Set(

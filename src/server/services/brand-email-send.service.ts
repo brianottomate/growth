@@ -1,7 +1,14 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { toPlainText } from "@react-email/render";
-import { tagBookingLinks } from "@/server/email/booking-attribution";
+import {
+  tagBookingLinks,
+  RECIPIENT_KEY_PLACEHOLDER,
+} from "@/server/email/booking-attribution";
+import {
+  emailRecipientKey,
+  emailRecipientMetadata,
+} from "@/server/email/recipient-identity";
 import { createId } from "@/server/db/utils";
 
 import { and, eq, inArray, lt, ne, or } from "drizzle-orm";
@@ -197,7 +204,7 @@ export async function prepareBrandSend(
     throw new Error("Save an email before preparing a send.");
   const delivery = spot.brand.emailDelivery!;
   const idempotencyKey = [
-    "email-attribution-v1",
+    "email-recipient-attribution-v2",
     spot.id,
     hash,
     "postmark",
@@ -444,8 +451,14 @@ export async function dispatchBrandSend(input: {
         : content;
     const template = {
       ...compiled,
-      html: unsubscribeKey(compiled.html),
-      text: unsubscribeKey(compiled.text),
+      html: unsubscribeKey(compiled.html).replaceAll(
+        RECIPIENT_KEY_PLACEHOLDER,
+        "{{{growth_recipient_key}}}",
+      ),
+      text: unsubscribeKey(compiled.text).replaceAll(
+        RECIPIENT_KEY_PLACEHOLDER,
+        "{{{growth_recipient_key}}}",
+      ),
     };
 
     const sendPage = async (recipients: EmailAudienceRecipient[]) => {
@@ -535,8 +548,11 @@ export async function dispatchBrandSend(input: {
         eligible.map((recipient) => [recipient.email, recipient]),
       );
       if (!fresh.length) return;
-      const guestUnsubscribe = (email: string) => {
-        const model = template.modelFor(byEmail.get(email)!);
+      const recipientTemplate = (email: string, key: string) => {
+        const model = {
+          ...template.modelFor(byEmail.get(email)!),
+          growth_recipient_key: key,
+        };
         if (!ownUnsubscribe) return { TemplateModel: model };
         const own = personalUnsubscribe(spot.brandId, email);
         return {
@@ -557,11 +573,19 @@ export async function dispatchBrandSend(input: {
         Tag: spot.id,
         TrackOpens: true,
         TrackLinks: "HtmlAndText",
-        Messages: fresh.map((row) => ({
-          To: row.email,
-          ...guestUnsubscribe(row.email),
-          Metadata: { message_send_id: claimed.id, platform_post_id: spot.id },
-        })),
+        Messages: fresh.map((row) => {
+          const key = emailRecipientKey(spot.brandId, row.email);
+          return {
+            To: row.email,
+            ...recipientTemplate(row.email, key),
+            Metadata: emailRecipientMetadata({
+              sendId: claimed.id,
+              postId: spot.id,
+              recipientId: row.id,
+              key,
+            }),
+          };
+        }),
       });
       // "sent" means handed to Postmark in this bulk request; delivery,
       // bounces and suppressions arrive through its webhooks.

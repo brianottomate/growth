@@ -1,5 +1,7 @@
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 
+export const RECIPIENT_KEY_PLACEHOLDER = "__GROWTH_EMAIL_RECIPIENT_KEY__";
+
 /** Tag only this brand's website links; leave external links and provider placeholders alone. */
 export function tagBookingLinks(
   html: string,
@@ -23,6 +25,8 @@ export function tagBookingLinks(
           url.searchParams.set("utm_campaign", input.campaign);
           url.searchParams.set("utm_id", input.sendId);
           url.searchParams.set("utm_content", "booking_link");
+          // Email has no paid-search keyword; carry recipient identity separately from utm_id.
+          url.searchParams.set("utm_term", RECIPIENT_KEY_PLACEHOLDER);
           const location = node.sourceCodeLocation?.attrs?.href;
           if (location)
             replacements.push({

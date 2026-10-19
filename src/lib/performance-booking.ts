@@ -2,6 +2,7 @@ import { z } from "zod";
 
 // The Amplitude project is a transport boundary. Booking identity belongs to Wander.
 export const SITES_AMPLITUDE_PROJECT_ID = 767045;
+export const EMAIL_RECIPIENT_KEY_PREFIX = "e1_";
 const id = z.string().trim().min(1).max(256);
 const eventTime = z
   .string()
@@ -66,7 +67,12 @@ export type BookingAttribution = Record<
 export type BookingEvidence = {
   scope: AttributionScope;
   channel: "meta" | "email" | "chatgpt";
-  kind: "signal" | "campaign_name" | "campaign_id" | "message_id";
+  kind:
+    | "signal"
+    | "campaign_name"
+    | "campaign_id"
+    | "message_id"
+    | "recipient_key";
   matchedId?: string;
 };
 export type AttributionResult = {
@@ -188,6 +194,7 @@ export type SentMessage = {
   id: string;
   providerBroadcastId: string;
   sentAt: Date;
+  recipients?: { id: string; key: string; sentAt: Date }[];
 };
 
 // A matched campaign identifies a touch, not incremental causation or last-click credit.
@@ -244,6 +251,26 @@ export function classifyBookingAttribution(
         [props.utm_id, props.message_send_id].includes(m.id),
     );
     if (exactMessages.length === 1) {
+      const message = exactMessages[0]!;
+      const recipientKey = props.utm_term?.startsWith(
+        EMAIL_RECIPIENT_KEY_PREFIX,
+      )
+        ? props.utm_term
+        : undefined;
+      const recipient = recipientKey
+        ? message.recipients?.find(
+            (r) => r.key === recipientKey && r.sentAt <= confirmedAt,
+          )
+        : undefined;
+      // A recipient-tagged link must belong to a recipient actually reached by this send.
+      if (recipientKey && !recipient) continue;
+      if (recipient)
+        evidence.push({
+          scope,
+          channel: "email",
+          kind: "recipient_key",
+          matchedId: recipient.id,
+        });
       evidence.push({
         scope,
         channel: "email",

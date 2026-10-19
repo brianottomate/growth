@@ -4,6 +4,7 @@ import { mock } from "bun:test";
 // Services initialize clients when imported, including tests of pure helpers.
 // Fresh checkouts need no real database or provider credentials for this suite.
 process.env.SKIP_ENV_VALIDATION = "1";
+process.env.BETTER_AUTH_SECRET ??= "unit-test-only-recipient-secret";
 process.env.DATABASE_URL ??= "postgresql://test:test@127.0.0.1:1/growth_test";
 process.env.RESEND_API_KEY ??= "re_unit_test";
 process.env.NEXT_PUBLIC_BASE_URL ??= "http://localhost:3000";

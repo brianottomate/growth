@@ -16,7 +16,13 @@ Only the Sites Amplitude project (767045) forwards `Order Completed` to Growth. 
 - **Possible:** a relevant signal, such as `fbclid`, Meta source, email medium, ChatGPT source/referrer or a known campaign name. Initial acquisition evidence remains possible, even when its ID matches.
 - **Confirmed:** an exact campaign ID matches a Growth-planned Meta campaign for that brand or a campaign assigned to that customer's Performance cycle; or an exact message-send ID matches a sent email for that brand before the booking. Matching remains scoped to the client. Confirmation means a recorded touch matches our campaign, not proof of incremental causation or last-click credit.
 
-The current Meta link helper sends campaign/ad **names**, and newsletter links use title-derived campaign slugs. Those links usually produce possible attribution. Stable identifiers must reach Amplitude before these paths can confirm an exact match. This PR does not change outbound tagging or invent identifiers. It also does not fetch user history from Amplitude or assume its channel classifier is included in the payload.
+Growth-prepared brand emails use `utm_id=<messageSendId>` and `utm_term=e1_<recipientKey>`, with `utm_source=wander_performance`, `utm_medium=email`, `utm_campaign=<platformPostId>` and `utm_content=booking_link`. For these email links, `utm_term` carries recipient identity rather than a paid-search keyword. Sites already saves and forwards it; the booking-event UTM forwarding in backend #22065 is still required for booking-specific evidence.
+
+The recipient key is an HMAC of the brand and normalized email, using domain-separated input and the existing `BETTER_AUTH_SECRET`. It reveals no email address and needs no WanderOS user ID. Rotating that secret retires old recipient keys. Postmark fills the key per recipient in both HTML and text, and receives the send ID, recipient ledger ID and key as metadata. New preparation uses a new idempotency version; already approved snapshots are never rewritten.
+
+Growth resolves the key against recipients actually sent that email for that brand before the booking. Recipient-tagged links with no matching recipient stay possible. The saved evidence points to the existing recipient ledger row, without copying its email into analytics. This proves a recipient's link was used, not that the recipient was the booker: forwarding can transfer the link. This does not implement a 14-day open-to-booking window or independently match the booker's email. Those need booking identity and engagement history.
+
+Older links without a recipient key retain send-level matching. Initial acquisition evidence remains possible. The Meta link helper still uses names, which ordinarily produces possible attribution.
 
 ## Business data
 

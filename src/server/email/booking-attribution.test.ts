@@ -1,7 +1,15 @@
 import { expect, test } from "bun:test";
 import { toPlainText } from "@react-email/render";
 import { parse, type DefaultTreeAdapterMap } from "parse5";
-import { tagBookingLinks } from "./booking-attribution";
+import {
+  emailRecipientKey,
+  emailRecipientMetadata,
+} from "./recipient-identity";
+import { compilePostmarkTemplate } from "@/lib/email-personalization";
+import {
+  tagBookingLinks,
+  RECIPIENT_KEY_PLACEHOLDER,
+} from "./booking-attribution";
 import {
   parseSitesOrder,
   classifyBookingAttribution,
@@ -99,6 +107,114 @@ test("a prepared booking link preserves dates and reconciles only to a recorded 
         },
       ],
       parsed.booking.confirmedAt,
+    ).confidence,
+  ).toBe("possible");
+});
+
+test("recipient link resolves only within its brand, send and delivered recipient", () => {
+  const key = emailRecipientKey("brand-one", " Guest@Example.com ");
+  expect(key).toBe(emailRecipientKey("brand-one", "guest@example.com"));
+  expect(key).not.toBe(emailRecipientKey("brand-two", "guest@example.com"));
+  expect(key).not.toContain("guest");
+  const metadata = emailRecipientMetadata({
+    sendId: "msg-one",
+    postId: "post-one",
+    recipientId: "recipient-one",
+    key,
+  });
+  expect(metadata.recipient_id).toBe("recipient-one");
+  expect(Object.keys(metadata).every((name) => name.length <= 20)).toBe(true);
+  expect(Object.values(metadata).every((value) => value.length <= 80)).toBe(
+    true,
+  );
+  const html = tagBookingLinks(
+    '<a href="https://customer.example/book">Book</a>',
+    {
+      siteUrl: "https://customer.example",
+      sendId: "msg-one",
+      campaign: "post-one",
+    },
+  );
+  const compiled = compilePostmarkTemplate({
+    subject: "Welcome {{first_name}}",
+    html,
+    text: toPlainText(html),
+  });
+  // Same placeholder substitution as the bulk sender, applied after personalizing copy is compiled.
+  const sentHtml = compiled.html.replaceAll(RECIPIENT_KEY_PLACEHOLDER, key);
+  const sentText = compiled.text.replaceAll(RECIPIENT_KEY_PLACEHOLDER, key);
+  expect(sentHtml).toContain(`utm_term=${key}`);
+  expect(sentText).toContain(`utm_term=${key}`);
+  expect(sentHtml).toContain("utm_id=msg-one");
+  expect(sentHtml).not.toContain("guest@example.com");
+  const attribution = {
+    event: { utm_medium: "email", utm_id: "msg-one", utm_term: key },
+    current: {},
+    last: {},
+    initial: {},
+  };
+  const sentAt = new Date("2026-10-18T00:00:00Z");
+  const messages = [
+    {
+      id: "msg-one",
+      providerBroadcastId: "bulk-one",
+      sentAt,
+      recipients: [{ id: "recipient-one", key, sentAt }],
+    },
+  ];
+  const bookedAt = new Date("2026-10-19T00:00:00Z");
+  const classified = classifyBookingAttribution(
+    attribution,
+    [],
+    messages,
+    bookedAt,
+  );
+  expect(classified.confidence).toBe("confirmed");
+  expect(classified.evidence).toContainEqual({
+    scope: "event",
+    channel: "email",
+    kind: "recipient_key",
+    matchedId: "recipient-one",
+  });
+  expect(
+    classifyBookingAttribution(
+      attribution,
+      [],
+      [{ ...messages[0]!, recipients: [] }],
+      bookedAt,
+    ).confidence,
+  ).toBe("possible");
+  expect(
+    classifyBookingAttribution(
+      {
+        ...attribution,
+        event: {
+          ...attribution.event,
+          utm_term: emailRecipientKey("brand-two", "guest@example.com"),
+        },
+      },
+      [],
+      messages,
+      bookedAt,
+    ).confidence,
+  ).toBe("possible");
+  expect(
+    classifyBookingAttribution(
+      attribution,
+      [],
+      [
+        {
+          ...messages[0]!,
+          recipients: [
+            {
+              id: "recipient-one",
+              key,
+              sentAt: new Date("2026-10-20T00:00:00Z"),
+            },
+          ],
+        },
+      ],
+      bookedAt,
     ).confidence,
   ).toBe("possible");
 });
