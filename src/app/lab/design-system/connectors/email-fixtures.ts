@@ -3,10 +3,49 @@ import type { getEmailDraftOutputSchema } from "@/server/ai/capabilities/outputs
 import type { ConnectorFixture } from "./fixtures";
 
 type EmailDraft = z.infer<typeof getEmailDraftOutputSchema>;
+const propertyImage = (asset: string) =>
+  `https://www.winterparkescapes.com/i/width=1200,format=jpeg?src=${encodeURIComponent(`https://assets.wander.com/${asset}/fullres.webp`)}`;
+
+// Public listing details, fixed here so Lab never reads or changes client drafts.
+export const previewHomes = [
+  {
+    name: "Roam River Mansion",
+    operated: false,
+    city: "Winter Park",
+    state: "Colorado",
+    sleeps: 18,
+    imageUrl: propertyImage("690289496721197648"),
+    href: "https://www.winterparkescapes.com/property/659508599432678800/roam-river-home",
+    note: "Riverfront with a hot tub, sauna and room for everyone.",
+  },
+  {
+    name: "Preserve Creekside Home 280",
+    operated: false,
+    city: "Winter Park",
+    state: "Colorado",
+    sleeps: 12,
+    imageUrl: propertyImage("659507632473640736"),
+    href: "https://www.winterparkescapes.com/property/659507205879369563/preserve-creekside-home-280",
+    note: "Five bedrooms, a private hot tub and mountain views.",
+  },
+  {
+    name: "Braidwood Condo 102",
+    operated: false,
+    city: "Winter Park",
+    state: "Colorado",
+    sleeps: 8,
+    imageUrl: propertyImage("659510796904041008"),
+    href: "https://www.winterparkescapes.com/property/659507793702683709/braidwood-condo-102",
+    note: "Game nights and cozy evenings with your favorite people.",
+  },
+];
+export const previewBanner =
+  "https://pub-d36f3d5f970e419ca42c69144058e8b8.r2.dev/brand_VLkkgvwXVLrBXANs/media_Pm8a3rYQnHjQPYNj/ski-season-is-almost-here-email-header-banner.jpg";
+
 const draft: EmailDraft = {
   brand: {
     id: "demo-brand",
-    name: "Mountain Escapes · Demo",
+    name: "Winter Park Escapes · Demo",
     slug: "demo-mountain",
     homeCount: 12,
     sendBlockers: [],
@@ -21,17 +60,35 @@ const draft: EmailDraft = {
     pillar: null,
     purpose: "Seasonal newsletter",
     plannedAt: "2026-10-23T16:00:00Z",
-    series: { id: "demo-series", name: "The Mountain Dispatch" },
+    series: { id: "demo-series", name: "The Grand County Dispatch" },
   },
   document: {
     id: "demo-email-document",
     platformPostId: "demo-email",
-    subject: "Your next mountain morning starts here",
+    subject: "Your Winter Park weekend starts here",
     preheader: "A cozy home, fresh air, and room for everyone.",
-    bodyMarkdown:
-      "![A quiet cabin in the trees](https://growth-red.vercel.app/auth-hero.jpg)\n\n## Make room for a mountain weekend\n\nSlow mornings by the fireplace. A long weekend with your favorite people. This edition brings together homes made for gathering, with space to settle in and time to explore.\n\n### Stay a little longer\n\nFind a place to reconnect, cook together, and head outside when the mood takes you.",
+    bodyMarkdown: `![Ski season in Winter Park](${previewBanner})
+
+Hi there,
+
+Find your home base for ski days and slow evenings in Grand County. Here are three homes with space to gather, private hot tubs, and mountain views.
+
+<!-- homes -->
+
+Book direct with Winter Park Escapes for local support and more time in the mountains.`,
+    digest: {
+      schema: "wander-growth.listings-digest.v1",
+      sections: [
+        {
+          heading: "Homes with room to gather",
+          layout: "grid",
+          showPrices: false,
+          properties: previewHomes,
+        },
+      ],
+    },
     ctaLabel: "Explore the homes",
-    ctaUrl: "https://www.wander.com",
+    ctaUrl: "https://www.winterparkescapes.com",
     templateKey: "newsletter",
     handoffTargetRepo: null,
     createdAt: "2026-10-19T14:00:00Z",
@@ -44,9 +101,7 @@ const draft: EmailDraft = {
     status: "draft",
     scheduledAt: "2026-10-23T16:00:00Z",
     publishedAt: null,
-    media: [
-      { type: "image", url: "https://growth-red.vercel.app/auth-hero.jpg" },
-    ],
+    media: [{ type: "image", url: previewBanner }],
   },
   messageSends: [],
   url: "/app/newsletters/demo-email",

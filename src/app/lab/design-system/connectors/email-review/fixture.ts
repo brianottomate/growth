@@ -1,5 +1,5 @@
 import "server-only";
-import { emailFixtures } from "../email-fixtures";
+import { emailFixtures, previewHomes } from "../email-fixtures";
 import { getEmailDraftOutputSchema } from "@/server/ai/capabilities/outputs/email";
 import { emailDocumentDraftSchema } from "@/lib/email-document";
 import { renderDesignSystemNewsletter } from "@/server/email/design-system-newsletter-renderer";
@@ -16,10 +16,18 @@ export async function clientReviewFixture(): Promise<EmailClientPreview> {
       subject: "The next chapter: a weekend made for gathering",
       preheader: "Your second newsletter edition.",
       bodyMarkdown:
-        "## A place for everyone\\n\\nFind room to gather and reconnect.\\n\\n![A quiet home](https://growth-red.vercel.app/auth-hero.jpg)\\n\\n### Before you go\\n\\nThis is the complete second edition, including the final paragraph and CTA.".replaceAll(
-          "\\n",
-          "\n",
-        ),
+        "Hi there,\n\nPlan a weekend made for gathering, with a creekside home base and room for game nights.\n\n<!-- homes -->\n\nFind the right fit for your next Grand County escape.",
+      digest: {
+        schema: "wander-growth.listings-digest.v1",
+        sections: [
+          {
+            heading: "Your next mountain stay",
+            layout: "list",
+            showPrices: false,
+            properties: [previewHomes[1], previewHomes[2]],
+          },
+        ],
+      },
     }),
   ];
   return {
