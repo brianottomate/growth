@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import {
+  attributionSignals,
   classifyBookingAttribution,
   parseSitesOrder,
   type BookingAttribution,
@@ -107,6 +108,58 @@ test("Sites normalizes webhook formats without accepting wrong projects, browser
     "2026-10-15T12:00:00.123Z",
   );
   expect(JSON.stringify(parsed.booking)).not.toContain("192.0.2.1");
+});
+
+test("Amplitude EMPTY attribution cannot create signals or hide real profile attribution", () => {
+  const raw = {
+    ...payload,
+    event_properties: {
+      ...payload.event_properties,
+      utm_source: "EMPTY",
+      utm_id: "EMPTY",
+      fbclid: "EMPTY",
+    },
+    user_properties: {
+      fbclid: "EMPTY",
+      last_fbclid: "EMPTY",
+      initial_fbclid: "EMPTY",
+      initial_utm_medium: " EMPTY ",
+    },
+  };
+  const parsed = parseSitesOrder(raw);
+  if (parsed.status !== "valid") throw new Error(parsed.status);
+  expect(parsed.booking.attribution).toEqual({
+    event: {},
+    current: {},
+    last: {},
+    initial: {},
+  });
+  expect(attributionSignals(parsed.booking.attribution)).toEqual([]);
+
+  const real = parseSitesOrder({
+    ...raw,
+    user_properties: {
+      ...raw.user_properties,
+      utm_medium: " email ",
+      utm_id: "sent-one",
+    },
+  });
+  if (real.status !== "valid") throw new Error(real.status);
+  expect(real.booking.attribution.current.utm_medium).toBe("email");
+  expect(
+    classifyBookingAttribution(
+      real.booking.attribution,
+      [],
+      [
+        {
+          id: "sent-one",
+          providerBroadcastId: "broadcast",
+          sentAt: new Date("2026-10-14"),
+        },
+      ],
+      real.booking.confirmedAt,
+    ).confidence,
+  ).toBe("confirmed");
 });
 
 test("generic Meta/email signals and acquisition history never become confirmed bookings", () => {

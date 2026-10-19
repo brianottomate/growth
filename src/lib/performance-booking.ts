@@ -83,8 +83,10 @@ function pick(input: Record<string, unknown>, prefix = "") {
   const out: Record<string, string> = {};
   for (const key of attributionKeys) {
     const value = input[`${prefix}${key}`];
-    if (typeof value === "string" && value.trim() && value.length <= 2000)
-      out[key] = value.trim();
+    if (typeof value !== "string" || value.length > 2000) continue;
+    const trimmed = value.trim();
+    // Amplitude uses "EMPTY" when no attribution value was captured.
+    if (trimmed && trimmed !== "EMPTY") out[key] = trimmed;
   }
   return out;
 }
