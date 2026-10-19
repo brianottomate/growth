@@ -6,35 +6,39 @@ const id = z.string().trim().min(1).max(256);
 const eventTime = z
   .string()
   .transform((value) =>
-    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,6})?$/.test(value)
+    /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?$/.test(value)
       ? `${value.replace(" ", "T")}Z`
       : value,
   )
   .pipe(z.iso.datetime({ offset: true }));
 const envelope = z.object({
-  data_type: z.literal("event"),
-  app: z.coerce.number().int(),
+  data_type: z.string().nullish(),
+  app: z.coerce.number().int().nullish(),
   event_type: z.string(),
   event_time: eventTime,
   event_properties: z.record(z.string(), z.unknown()),
-  user_properties: z.record(z.string(), z.unknown()).default({}),
+  user_properties: z.record(z.string(), z.unknown()).nullish(),
 });
+const amount = z
+  .union([z.number(), z.string().trim().min(1)])
+  .transform(Number)
+  .pipe(z.number().finite());
 const orderProperties = z.object({
-  event_source: z.literal("server"),
-  environment: z.literal("production"),
   website_id: id,
   order_id: id,
   product_id: id,
-  currency: z.string().regex(/^[A-Z]{3}$/),
-  total: z.number().finite().nonnegative().max(99999999999999.99),
-  revenue: z
-    .number()
-    .finite()
-    .min(-99999999999999.99)
-    .max(99999999999999.99)
-    .optional(),
-  checkin_date: z.iso.date().optional(),
-  checkout_date: z.iso.date().optional(),
+  currency: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{3}$/),
+  total: amount.pipe(z.number().nonnegative().max(99999999999999.99)),
+  revenue: amount
+    .pipe(z.number().min(-99999999999999.99).max(99999999999999.99))
+    .optional()
+    .catch(undefined),
+  checkin_date: z.iso.date().optional().catch(undefined),
+  checkout_date: z.iso.date().optional().catch(undefined),
 });
 const attributionKeys = [
   "utm_source",
@@ -128,19 +132,32 @@ export function attributionSignals(
 }
 export function parseSitesOrder(raw: unknown) {
   const parsed = envelope.safeParse(raw);
-  if (!parsed.success) return { status: "invalid_payload" } as const;
+  if (!parsed.success)
+    return { status: "invalid_payload", issues: parsed.error.issues } as const;
   const input = parsed.data;
-  if (input.app !== SITES_AMPLITUDE_PROJECT_ID)
+  if (input.app != null && input.app !== SITES_AMPLITUDE_PROJECT_ID)
     return { status: "wrong_project" } as const;
-  if (input.event_type !== "Order Completed")
+  if (
+    input.event_type !== "Order Completed" ||
+    (input.data_type != null && input.data_type !== "event")
+  )
+    return { status: "ignored_event" } as const;
+  // This authenticated route belongs to Sites. Missing transport metadata is
+  // allowed; explicit client/staging events still must not become real bookings.
+  const { event_source, environment } = input.event_properties;
+  if (
+    (event_source != null && event_source !== "server") ||
+    (environment != null && environment !== "production")
+  )
     return { status: "ignored_event" } as const;
   const props = orderProperties.safeParse(input.event_properties);
-  if (!props.success) return { status: "invalid_order" } as const;
+  if (!props.success)
+    return { status: "invalid_order", issues: props.error.issues } as const;
   const attribution: BookingAttribution = {
     event: pick(input.event_properties),
-    current: pick(input.user_properties),
-    last: pick(input.user_properties, "last_"),
-    initial: pick(input.user_properties, "initial_"),
+    current: pick(input.user_properties ?? {}),
+    last: pick(input.user_properties ?? {}, "last_"),
+    initial: pick(input.user_properties ?? {}, "initial_"),
   };
   return {
     status: "valid",

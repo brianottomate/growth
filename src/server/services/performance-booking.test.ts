@@ -48,7 +48,7 @@ const request = (body: unknown = payload, credential = token) =>
   });
 
 // These boundaries protect customer ownership, counts and attribution confidence.
-test("Sites rejects wrong projects, browser purchases and malformed amounts without requiring a guest user id", () => {
+test("Sites normalizes webhook formats without accepting wrong projects, browser purchases or invalid totals", () => {
   expect(parseSitesOrder({ ...payload, app: 707736 }).status).toBe(
     "wrong_project",
   );
@@ -57,19 +57,49 @@ test("Sites rejects wrong projects, browser purchases and malformed amounts with
       ...payload,
       event_properties: { ...payload.event_properties, event_source: "client" },
     }).status,
-  ).toBe("invalid_order");
+  ).toBe("ignored_event");
   expect(
     parseSitesOrder({
       ...payload,
       event_properties: { ...payload.event_properties, environment: "staging" },
     }).status,
-  ).toBe("invalid_order");
+  ).toBe("ignored_event");
   expect(
     parseSitesOrder({
       ...payload,
-      event_properties: { ...payload.event_properties, total: "123.45" },
+      event_properties: { ...payload.event_properties, total: "not-money" },
     }).status,
   ).toBe("invalid_order");
+  const relaxed = parseSitesOrder({
+    ...payload,
+    app: undefined,
+    data_type: undefined,
+    user_properties: null,
+    event_time: "2026-10-15T12:00:00.123000",
+    event_properties: {
+      ...payload.event_properties,
+      event_source: undefined,
+      environment: undefined,
+      total: "123.45",
+      currency: "usd",
+      revenue: null,
+      checkin_date: null,
+      checkout_date: "invalid",
+    },
+  });
+  if (relaxed.status !== "valid") throw new Error(JSON.stringify(relaxed));
+  expect(relaxed.booking.total).toBe(123.45);
+  expect(relaxed.booking.currency).toBe("USD");
+  expect(relaxed.booking.revenue).toBeNull();
+  expect(relaxed.booking.checkOut).toBeNull();
+  for (const total of [null, "", " ", -1]) {
+    expect(
+      parseSitesOrder({
+        ...payload,
+        event_properties: { ...payload.event_properties, total },
+      }).status,
+    ).toBe("invalid_order");
+  }
   const parsed = parseSitesOrder(payload);
   if (parsed.status !== "valid") throw new Error(parsed.status);
   expect(parsed.booking.confirmedAt.toISOString()).toBe(
