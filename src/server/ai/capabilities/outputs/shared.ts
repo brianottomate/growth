@@ -98,6 +98,7 @@ export const cardsSchema = z.strictObject({
     "stack-photo-above",
     "editorial-overlay",
     "product-proof",
+    "statement-dark",
     "brand-statement",
   ]),
   title: z.string(),

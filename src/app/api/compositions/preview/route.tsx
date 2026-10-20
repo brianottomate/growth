@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import sharp from "sharp";
 
-import { compositionPreviewFromParams } from "@/lib/compositions";
+import {
+  compositionPreviewFromParams,
+  PHOTO_FREE_TEMPLATES,
+} from "@/lib/compositions";
 import { getSession } from "@/server/better-auth/server";
 import {
   CompositionAccessError,
@@ -28,7 +31,7 @@ export async function GET(request: NextRequest) {
     );
   }
   if (
-    parsed.data.templateId !== "brand-statement" &&
+    !PHOTO_FREE_TEMPLATES.has(parsed.data.templateId) &&
     !parsed.data.sourceMediaAssetId &&
     !sourceUrl
   ) {

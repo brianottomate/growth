@@ -24,6 +24,7 @@ import {
   type CompositionFieldKey,
   type CompositionFormatId,
   type CompositionTemplateId,
+  PHOTO_FREE_TEMPLATES,
 } from "@/lib/compositions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -273,7 +274,7 @@ export function CompositionWorkbench({
   )
     ? sourceMediaAssetId
     : (hostedAssets[0]?.id ?? "");
-  const requiresImage = templateId !== "brand-statement";
+  const requiresImage = !PHOTO_FREE_TEMPLATES.has(templateId);
   const renderSourceId = requiresImage ? effectiveSourceId : "";
   const source = hostedAssets.find((asset) => asset.id === renderSourceId);
   const sourceMetadata = source?.metadata as {

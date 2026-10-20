@@ -14,6 +14,7 @@ import {
   getCompositionFormat,
   getCompositionIdentity,
   STORY_SAFE_ZONE,
+  PHOTO_FREE_TEMPLATES,
 } from "@/lib/compositions";
 import { R2 } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
@@ -276,7 +277,7 @@ export async function resolveCompositionContext(
     sourceUrl = options.sourceUrl;
   }
 
-  if (spec.templateId !== "brand-statement" && !sourceUrl) {
+  if (!PHOTO_FREE_TEMPLATES.has(spec.templateId) && !sourceUrl) {
     throw new CompositionAccessError(
       "This blueprint needs a source image",
       422,
@@ -1287,7 +1288,7 @@ export function renderComposition(
     const subtitle = spec.subtitle?.trim();
     const eyebrow = spec.eyebrow?.trim();
     const button = spec.cta?.trim();
-    const titleSize = stacked ? (square ? 64 : 78) : 54;
+    const titleSize = stacked ? (square ? 76 : 86) : 56;
     const copy = (
       <div
         key="copy"
@@ -1301,7 +1302,7 @@ export function renderComposition(
               ? `${pad}px ${pad}px ${pad}px`
               : `${pad}px ${pad}px 0`
             : pad,
-          color: "#111111",
+          color: "#1f1f1f",
         }}
       >
         {above ? (
@@ -1309,8 +1310,8 @@ export function renderComposition(
             <div
               style={{
                 display: "flex",
-                marginBottom: 22,
-                fontSize: 24,
+                marginBottom: 26,
+                fontSize: 26,
                 color: "#6b6b66",
               }}
             >
@@ -1331,9 +1332,9 @@ export function renderComposition(
             display: "flex",
             maxWidth: "84%",
             fontSize: titleSize,
-            fontWeight: 500,
-            lineHeight: 1.08,
-            letterSpacing: "-0.025em",
+            fontWeight: 400,
+            lineHeight: 0.98,
+            letterSpacing: "-0.015em",
             textWrap: "balance",
           }}
         >
@@ -1343,11 +1344,11 @@ export function renderComposition(
           <div
             style={{
               display: "flex",
-              marginTop: 26,
-              maxWidth: "66%",
-              fontSize: 27,
-              lineHeight: 1.35,
-              color: "#3a3a36",
+              marginTop: 30,
+              maxWidth: "64%",
+              fontSize: 34,
+              lineHeight: 1.32,
+              color: "#1f1f1f",
             }}
           >
             {clamp(subtitle, 160)}
@@ -1358,12 +1359,14 @@ export function renderComposition(
             style={{
               display: "flex",
               alignSelf: "flex-start",
-              marginTop: 32,
-              padding: "18px 30px",
+              alignItems: "center",
+              marginTop: 44,
+              height: 78,
+              padding: "0 26px",
               borderRadius: 999,
-              background: "#111111",
+              background: "#000000",
               color: "#ffffff",
-              fontSize: 23,
+              fontSize: 26,
               fontWeight: 600,
             }}
           >
@@ -1441,6 +1444,90 @@ export function renderComposition(
         {above ? [photo, copy] : [copy, photo]}
       </div>
     );
+  } else if (spec.templateId === "statement-dark") {
+    // Kyle's Performance dark card (2026-10): no photo, a charcoal fade to
+    // black, the logo top left and the message set low left.
+    const story = spec.formatId === "story";
+    const wide = format.width > format.height;
+    const pad = story ? 96 : wide ? 72 : 68;
+    const subtitle = spec.subtitle?.trim();
+    const button = spec.cta?.trim();
+    content = (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          width: "100%",
+          height: "100%",
+          padding: pad,
+          ...(story ? { paddingTop: 270, paddingBottom: 420 } : {}),
+          color: "#ffffff",
+          background:
+            "linear-gradient(180deg, #3b3e3c 0%, #1f2120 45%, #0a0a0a 100%)",
+        }}
+      >
+        <BrandMark
+          brandName={context.brand.name}
+          logo={context.logo}
+          tone={spec.mark}
+          inverse
+        />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            maxWidth: wide ? "70%" : "86%",
+            marginBottom: wide ? 0 : story ? 0 : 40,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              fontSize: wide ? 56 : square ? 80 : 86,
+              fontWeight: 400,
+              lineHeight: 0.98,
+              letterSpacing: "-0.015em",
+              textWrap: "balance",
+            }}
+          >
+            {clamp(spec.title, 90)}
+          </div>
+          {subtitle ? (
+            <div
+              style={{
+                display: "flex",
+                marginTop: 30,
+                maxWidth: "72%",
+                fontSize: 34,
+                lineHeight: 1.32,
+              }}
+            >
+              {clamp(subtitle, 160)}
+            </div>
+          ) : null}
+          {button ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginTop: 44,
+                height: 78,
+                padding: "0 26px",
+                borderRadius: 999,
+                background: "#ffffff",
+                color: "#111111",
+                fontSize: 26,
+                fontWeight: 600,
+              }}
+            >
+              {button}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
   } else if (spec.templateId === "hero-foot") {
     // Kyle's Performance ads (2026-10): the logo top left, the headline low
     // left just above a white pill, over a bottom scrim. Stories keep the
@@ -1449,15 +1536,16 @@ export function renderComposition(
     const wide = format.width > format.height;
     const link = spec.formatId === "landscape";
     const pad = story ? 96 : video ? 100 : wide ? 72 : 68;
+    // Kyle's spec: 86px on a 1080 card, regular weight, tight leading.
     const headlineSize = story
-      ? 76
+      ? 86
       : link
-        ? 54
+        ? 56
         : video
-          ? 100
+          ? 112
           : square
-            ? 66
-            : 72;
+            ? 80
+            : 86;
     const button = spec.cta?.trim();
     content = (
       <div
@@ -1490,7 +1578,7 @@ export function renderComposition(
             left: 0,
             width: "100%",
             height: "100%",
-            background: `linear-gradient(180deg, ${scrim(0.28)} 0%, ${scrim(0)} 22%, ${scrim(0)} 48%, ${scrim(0.3)} 68%, ${scrim(0.74)} 100%)`,
+            background: `linear-gradient(180deg, ${scrim(0.5)} 0%, ${scrim(0.34)} 24%, ${scrim(0.38)} 48%, ${scrim(0.62)} 70%, ${scrim(0.86)} 100%)`,
           }}
         />
         <div
@@ -1528,9 +1616,9 @@ export function renderComposition(
               style={{
                 display: "flex",
                 fontSize: headlineSize,
-                fontWeight: 700,
-                lineHeight: 1.08,
-                letterSpacing: "-0.02em",
+                fontWeight: 400,
+                lineHeight: 0.98,
+                letterSpacing: "-0.015em",
                 textWrap: "balance",
               }}
             >
@@ -1541,16 +1629,13 @@ export function renderComposition(
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  marginTop: story ? 40 : wide ? 28 : 34,
-                  padding: video
-                    ? "30px 58px"
-                    : wide
-                      ? "20px 38px"
-                      : "24px 44px",
+                  marginTop: wide ? 30 : 44,
+                  height: video ? 104 : wide ? 64 : 78,
+                  padding: video ? "0 36px" : "0 26px",
                   borderRadius: 999,
                   background: "#ffffff",
                   color: "#111111",
-                  fontSize: video ? 46 : wide ? 30 : 34,
+                  fontSize: video ? 36 : wide ? 22 : 26,
                   fontWeight: 600,
                 }}
               >

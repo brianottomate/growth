@@ -156,7 +156,7 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
   },
   {
     id: "hero-foot",
-    version: 1,
+    version: 2,
     label: "Hero · foot",
     description:
       "The photo full-bleed, the logo top left, a bold headline low left above the white pill button under a bottom scrim. Kyle's Performance ads, in every size.",
@@ -177,14 +177,14 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
   },
   {
     id: "stack-photo-below",
-    version: 1,
+    version: 2,
     label: "Stack · photo below",
     description:
       "A light card: logo, headline, supporting line and a black pill, the photo bleeding off the foot. Kyle's Performance feed card. Wide canvases put the photo on the right.",
   },
   {
     id: "stack-photo-above",
-    version: 1,
+    version: 2,
     label: "Stack · photo above",
     description:
       "A light card led by the photo, the logo in a white tab on it, then a small lead-in, headline, supporting line and a black pill. Kyle's Performance feed card. Wide canvases put the photo on the left.",
@@ -218,6 +218,13 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
       "An email's opening photo with the offer on it: a small eyebrow, the headline and a white pill, lower left over a soft scrim.",
   },
   {
+    id: "statement-dark",
+    version: 1,
+    label: "Statement · dark",
+    description:
+      "No photo: a charcoal-to-black card, the logo top left, a headline, supporting line and white pill set low left. Kyle's Performance dark card.",
+  },
+  {
     id: "brand-statement",
     version: 1,
     label: "Brand statement",
@@ -227,6 +234,12 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
 ] as const;
 
 export const COMPOSITION_TEMPLATES = COMPOSITION_TEMPLATE_DEFINITIONS;
+
+/** Blueprints that draw no source photo. */
+export const PHOTO_FREE_TEMPLATES: ReadonlySet<string> = new Set([
+  "brand-statement",
+  "statement-dark",
+]);
 
 /** Preserve the source photo when a saved composition has been retired or removed. */
 export function resolveCompositionTemplateId(
@@ -505,6 +518,12 @@ export const COMPOSITION_FIELDS: Record<
   ],
   "editorial-overlay": [mark, ...message, accent("colours the CTA")],
   "product-proof": [mark, ...message, accent("colours the card edge")],
+  "statement-dark": [
+    mark,
+    { key: "title", label: "Headline" },
+    { key: "subtitle", label: "Supporting line", hint: "Optional" },
+    { key: "cta", label: "Button", hint: "Optional" },
+  ],
   "brand-statement": [mark, ...message, accent("warms the ground")],
   "email-header": [
     { key: "eyebrow", label: "Eyebrow", hint: "Christmas & New Year's" },
@@ -620,7 +639,10 @@ function requireSourceImage(
   value: { templateId: CompositionTemplateId; sourceMediaAssetId?: string },
   context: z.RefinementCtx,
 ) {
-  if (value.templateId !== "brand-statement" && !value.sourceMediaAssetId) {
+  if (
+    !PHOTO_FREE_TEMPLATES.has(value.templateId) &&
+    !value.sourceMediaAssetId
+  ) {
     context.addIssue({
       code: "custom",
       path: ["sourceMediaAssetId"],
