@@ -28,7 +28,7 @@ export type WallCard = {
 /** The files a placement mock draws: the story variants where they exist. */
 export function cardsForSurface(
   cards: WallCard[],
-  surface: "facebook" | "instagram" | "story",
+  surface: "facebook" | "instagram" | "story" | "chat",
 ) {
   return cards.map((card) => {
     const shown = surface === "story" && card.story ? card.story : card;

@@ -18,6 +18,14 @@ export function adSupportsPlatform(
   }
   if (platform === "meta_ads" || platform === "linkedin_ads")
     return ad.type === "creative";
+  // A chat card is one static image; video and carousels have no shape here.
+  if (platform === "openai_ads")
+    return (
+      ad.type === "creative" &&
+      "media" in ad.content &&
+      ad.content.media.length === 1 &&
+      ad.content.media[0]?.type === "image"
+    );
   return true;
 }
 

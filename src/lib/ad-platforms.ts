@@ -42,6 +42,13 @@ export type AdPlatformZernio = {
   connectTarget: string | null;
   /** The value stored on `ad_account.platform`, the allowlist. */
   allowlistPlatform: string;
+  /**
+   * Where the platform's ad accounts come from. `list` enumerates them
+   * through GET /ads/accounts; `connection` is a platform whose credential
+   * is one ad account (OpenAI's API key), so the connection row itself names
+   * it and the list call is unsupported.
+   */
+  adAccounts: "list" | "connection";
   /** Canonical spelling of a platform ad-account id, so allowlist rows compare. */
   normalizeAccountId: (value: string) => string;
 };
@@ -114,6 +121,7 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       treePlatform: "facebook",
       connectTarget: "facebook",
       allowlistPlatform: "facebook",
+      adAccounts: "list",
       normalizeAccountId: (value) => value.replace(/^act_/i, ""),
     },
     features: {
@@ -144,6 +152,7 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       treePlatform: "google",
       connectTarget: "googleads",
       allowlistPlatform: "google",
+      adAccounts: "list",
       // Customer ids are shown as 123-456-7890 and stored bare.
       normalizeAccountId: (value) => value.replace(/-/g, ""),
     },
@@ -171,6 +180,7 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       treePlatform: "linkedin",
       connectTarget: "linkedin",
       allowlistPlatform: "linkedin",
+      adAccounts: "list",
       // Sponsored accounts are numeric on the live API; the URN form appears
       // in some docs and is accepted here so both spellings match.
       normalizeAccountId: (value) =>
@@ -192,16 +202,27 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
     key: "openai",
     label: "OpenAI Ads",
     shortLabel: "OpenAI",
-    stage: "plan",
+    stage: "push",
     zernio: {
       connectionPlatforms: ["openaiads", "openai_ads"],
       treePlatform: "openai",
       // Connected with an API key (POST /connect/openai-ads/credentials).
+      // One key is one ad account, so the connection names it.
       connectTarget: null,
       allowlistPlatform: "openai",
+      adAccounts: "connection",
       normalizeAccountId: identity,
     },
-    features: NO_FEATURES,
+    features: {
+      multiCreativeAdSet: false,
+      textAds: false,
+      // Static chat cards only; no video, no carousel, no custom audiences.
+      creativeAds: true,
+      targeting: { regions: false, age: false },
+      goals: ["traffic", "awareness", "conversions"],
+    },
+    // No documented deep links into ChatGPT Ads Manager; both levels open
+    // the platform home, as before.
     accountManageUrl: () => "https://platform.openai.com",
     campaignManageUrl: () => "https://platform.openai.com",
   },
@@ -227,6 +248,7 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       treePlatform: "twitter",
       connectTarget: "twitter",
       allowlistPlatform: "x",
+      adAccounts: "list",
       normalizeAccountId: identity,
     },
     features: NO_FEATURES,
@@ -244,6 +266,7 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       treePlatform: "tiktok",
       connectTarget: "tiktok",
       allowlistPlatform: "tiktok",
+      adAccounts: "list",
       normalizeAccountId: identity,
     },
     features: NO_FEATURES,
@@ -261,6 +284,7 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       treePlatform: "pinterest",
       connectTarget: "pinterest",
       allowlistPlatform: "pinterest",
+      adAccounts: "list",
       normalizeAccountId: identity,
     },
     features: NO_FEATURES,
@@ -289,15 +313,26 @@ export const PUSHABLE_AD_PLATFORMS = [
   "meta_ads",
   "google_ads",
   "linkedin_ads",
+  "openai_ads",
 ] as const satisfies readonly PlannableAdPlatform[];
 export type PushableAdPlatform = (typeof PUSHABLE_AD_PLATFORMS)[number];
 
 /** The pushable platforms by their short key: the destinations vocabulary. */
-export const ZERNIO_AD_PLATFORMS = ["meta", "google", "linkedin"] as const;
+export const ZERNIO_AD_PLATFORMS = [
+  "meta",
+  "google",
+  "linkedin",
+  "openai",
+] as const;
 export type ZernioAdPlatform = (typeof ZERNIO_AD_PLATFORMS)[number];
 
 /** `ad_account.platform` values the allowlist UI can decide on. */
-export const AD_ACCOUNT_PLATFORMS = ["facebook", "google", "linkedin"] as const;
+export const AD_ACCOUNT_PLATFORMS = [
+  "facebook",
+  "google",
+  "linkedin",
+  "openai",
+] as const;
 export type AdAccountPlatform = (typeof AD_ACCOUNT_PLATFORMS)[number];
 
 // ---- LOOKUPS -----------------------------------------------------------

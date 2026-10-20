@@ -165,6 +165,65 @@ export function linkedInCreativeRequirement(input: {
   return null;
 }
 
+// ---- OPENAI ------------------------------------------------------------
+//
+// ChatGPT ads through Zernio are chat cards: a headline, a body, one static
+// image and a link, under campaign → ad group → ad. Zernio builds all three in
+// one create and offers no attach on this platform (neither `adSetId` nor
+// `existingCampaignId`, checked live 2026-10-20), so one Growth platform row
+// compiles to exactly one card. Targeting is country only; custom audiences,
+// video and carousels do not exist here.
+// https://docs.zernio.com/platforms/openai-ads/create-ads
+
+export const OPENAI_PUSH_GOALS = [
+  "traffic",
+  "awareness",
+  "conversions",
+] as const satisfies readonly AdPushGoal[];
+
+export const OPENAI_HEADLINE = { min: 3, max: 50 } as const;
+export const OPENAI_BODY_MAX = 100;
+/** Minimum budget in whole account-currency units, daily or lifetime. */
+export const OPENAI_MIN_BUDGET = 1;
+
+export const OPENAI_BID_STRATEGIES = [
+  "LOWEST_COST_WITHOUT_CAP",
+  "LOWEST_COST_WITH_BID_CAP",
+  "COST_CAP",
+] as const;
+export type OpenAiBidStrategy = (typeof OPENAI_BID_STRATEGIES)[number];
+
+/**
+ * OpenAI bids automatically (Maximize Results) only for traffic and
+ * conversions on a daily budget. Awareness, and any lifetime budget, need a
+ * fixed bid: a capped strategy with its amount.
+ */
+export function openAiBiddingRequirement(input: {
+  goal: string;
+  budgetType: "daily" | "lifetime";
+  bidStrategy?: string | null;
+  bidAmount?: number | null;
+}): string | null {
+  const fixed =
+    input.bidStrategy === "LOWEST_COST_WITH_BID_CAP" ||
+    input.bidStrategy === "COST_CAP";
+  if (fixed && !(input.bidAmount != null && input.bidAmount > 0)) {
+    return `OpenAI's ${input.bidStrategy} bid needs a bid amount in whole currency units`;
+  }
+  const automatic =
+    input.budgetType === "daily" &&
+    (input.goal === "traffic" || input.goal === "conversions");
+  if (!automatic && !fixed) {
+    return `OpenAI bids automatically only for traffic and conversions on a daily budget; a ${input.goal} campaign on a ${input.budgetType} budget needs a fixed bid (LOWEST_COST_WITH_BID_CAP or COST_CAP with an amount) in the OpenAI settings`;
+  }
+  return null;
+}
+
+/** OpenAI pauses the campaign on `status: PAUSED`; ads under it read paused. */
+export function openAiDraftProviderControls() {
+  return { status: "PAUSED" as const };
+}
+
 /**
  * Idempotency key for a provider write.
  *

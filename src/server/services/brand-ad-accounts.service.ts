@@ -11,7 +11,7 @@ import { createId } from "@/server/db/utils";
 import {
   isZernioConfigured,
   listZernioAccounts,
-  listZernioAdAccounts,
+  listZernioConnectionAdAccounts,
   type ZernioAccount,
 } from "@/server/clients/zernio.client";
 
@@ -112,8 +112,7 @@ export async function listBrandAdAccounts(
         if (!accountId) return [];
         const platform =
           CONNECTION_PLATFORMS[connection.platform.toLowerCase()]!;
-        const reachable = await listZernioAdAccounts({
-          accountId,
+        const reachable = await listZernioConnectionAdAccounts(connection, {
           limit: 500,
         });
         return reachable.map((adAccount) => ({

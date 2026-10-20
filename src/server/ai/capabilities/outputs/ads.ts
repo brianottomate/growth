@@ -538,6 +538,15 @@ const linkedinSchema = z.strictObject({
   unitCost: z.number().optional(),
 });
 
+const openaiSchema = z.strictObject({
+  goal: z.enum(["traffic", "awareness", "conversions"]).optional(),
+  bidStrategy: z
+    .enum(["LOWEST_COST_WITHOUT_CAP", "LOWEST_COST_WITH_BID_CAP", "COST_CAP"])
+    .optional(),
+  bidAmount: z.number().optional(),
+  customEventType: z.string().optional(),
+});
+
 const importSourceSchema = z.strictObject({
   adSets: z.array(z.record(z.string(), jsonValueSchema)),
   campaignId: z.string(),
@@ -594,6 +603,7 @@ const settingsSchema = z.strictObject({
   google: googleSchema.optional(),
   linkedin: linkedinSchema.optional(),
   meta: metaSchema.optional(),
+  openai: openaiSchema.optional(),
 });
 
 const addAudienceSchema = z.strictObject({
@@ -694,7 +704,7 @@ export const listAdsDestinationsOutputSchema = z.strictObject({
         .optional(),
     }),
   ),
-  platform: z.enum(["meta", "google", "linkedin"]),
+  platform: z.enum(["meta", "google", "linkedin", "openai"]),
 });
 
 const campaignHandoffSchema = z.strictObject({
@@ -1132,6 +1142,15 @@ export const pushDraftActionOutputSchema = z.union([
     campaignId: z.string(),
     path: z.string(),
     platform: z.literal("meta_ads"),
+    platformCampaignRowId: z.string(),
+    warnings: z.array(z.string()),
+  }),
+  z.strictObject({
+    adsCreated: z.number(),
+    adSetsCreated: z.number(),
+    campaignId: z.string(),
+    path: z.string(),
+    platform: z.literal("openai_ads"),
     platformCampaignRowId: z.string(),
     warnings: z.array(z.string()),
   }),
@@ -1741,6 +1760,7 @@ export const pushDraftActionNativeResultSchema = z.union([
   }),
   pushDraftActionOutputSchema.options[1],
   pushDraftActionOutputSchema.options[2],
+  pushDraftActionOutputSchema.options[3],
 ]);
 
 /** Native service result; the existing wire contract validates its JSON projection. */

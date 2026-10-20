@@ -2,7 +2,11 @@ import type { adSectionSchema } from "@/lib/ad-section";
 import { resolveBookingTarget } from "./home-groups.service";
 import type { z } from "zod";
 import { textAdCopySchema, textAdReady } from "@/lib/ad-authoring";
-import { projectIdea, type IdeaShape } from "@/lib/ad-idea-studio";
+import {
+  IDEA_PLACEMENT_KEYS,
+  projectIdea,
+  type IdeaShape,
+} from "@/lib/ad-idea-studio";
 import {
   approveImageAd,
   assertAdNotPushed,
@@ -1250,7 +1254,18 @@ export async function setPlacementCopy(input: {
   patch: CopyPatch;
   via?: "manual" | "ai" | "director";
 }) {
-  const ad = await requireOwnedAd(input);
+  // The studio owns the Meta cells it projects from the idea; a cell for a
+  // platform it never draws (the ChatGPT card) is ordinary placement copy, so
+  // a studio ad takes it like any other, with the approval guard kept.
+  const studioOwned = Object.values(IDEA_PLACEMENT_KEYS)
+    .flat()
+    .includes(input.placementKey);
+  const ad = await requireOwnedAd(input, !studioOwned);
+  if (!studioOwned && ad.status === "approved")
+    throw new AdSetError(
+      422,
+      "Return this ad to Studio before editing or changing its review state.",
+    );
   creativeContent(ad); // 422 on a text ad
   requirePlacementSpec(input.placementKey);
   const next = withCopy(

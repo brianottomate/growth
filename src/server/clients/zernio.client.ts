@@ -1,7 +1,11 @@
 import "server-only";
 
 import { env } from "@/env";
-import { AD_PLATFORM_SPECS } from "@/lib/ad-platforms";
+import {
+  AD_PLATFORM_SPECS,
+  adPlatformFromZernioString,
+  requireAdPlatformSpec,
+} from "@/lib/ad-platforms";
 import { classifyFormatFromFields } from "@/server/content/formats";
 import type { MediaItem, PostStats } from "@/server/db/content-schema";
 import type { ExistingCustomConversion } from "@/lib/performance-ads";
@@ -1005,6 +1009,50 @@ export async function listZernioAdAccounts(options: {
 }
 
 /**
+ * The ad accounts one connection reaches, however the platform exposes them.
+ * Most platforms enumerate through GET /ads/accounts; an OpenAI connection
+ * IS its ad account (one API key per account, "Unsupported platform" on the
+ * list call), so the connection row names it: `platformUserId` is the
+ * adacct_ id, `displayName` its name, `metadata.currency` its currency.
+ */
+export async function listZernioConnectionAdAccounts(
+  connection: ZernioAccount,
+  options: { adAccountId?: string; limit?: number } = {},
+): Promise<ZernioAdAccount[]> {
+  const accountId = connection._id ?? connection.id;
+  if (!accountId) return [];
+  const spec = adPlatformFromZernioString(connection.platform);
+  if (spec && requireAdPlatformSpec(spec).zernio?.adAccounts === "connection") {
+    const id = connection.platformUserId;
+    if (!id) return [];
+    if (options.adAccountId && options.adAccountId !== id) return [];
+    const metadata = connection.metadata as
+      | { currency?: unknown; reviewStatus?: unknown }
+      | undefined;
+    return [
+      {
+        id,
+        name: connection.displayName ?? connection.name ?? connection.username,
+        currency:
+          typeof metadata?.currency === "string"
+            ? metadata.currency
+            : undefined,
+        status:
+          typeof metadata?.reviewStatus === "string"
+            ? metadata.reviewStatus
+            : undefined,
+        selectable: connection.isActive !== false,
+        unusableReason:
+          connection.isActive === false
+            ? "The connection is inactive at Zernio"
+            : undefined,
+      },
+    ];
+  }
+  return listZernioAdAccounts({ accountId, ...options });
+}
+
+/**
  * Delete a campaign on the platform, cascading to its ad sets and ads.
  *
  * `accountId` is the escape hatch for an EMPTY campaign: one with no ads has
@@ -1280,8 +1328,21 @@ export type CreateZernioStandaloneAdInput = {
   campaignType?: "search" | "display";
   /** Google new campaigns only; omit for existingCampaignId/adSetId attaches. */
   locationTargetingType?: "presence";
-  /** Google creation: explicit campaign bidding; omit when attaching groups or ads. */
-  bidStrategy?: "LOWEST_COST_WITHOUT_CAP";
+  /**
+   * Google creation: explicit campaign bidding; omit when attaching groups or
+   * ads. OpenAI: a capped strategy with `bidAmount` where automatic bidding
+   * is refused (awareness, lifetime budgets).
+   */
+  bidStrategy?:
+    | "LOWEST_COST_WITHOUT_CAP"
+    | "LOWEST_COST_WITH_BID_CAP"
+    | "COST_CAP";
+  /** Fixed bid in whole currency units, with a capped `bidStrategy`. */
+  bidAmount?: number;
+  /** Flat country targeting; OpenAI's only dimension. */
+  countries?: string[];
+  /** Zernio checks the request against the platform's limits and creates nothing. */
+  validateOnly?: boolean;
   leadGenFormId?: string;
   /** Google Search: the new ad group's keywords. A string is BROAD. */
   keywords?: ZernioKeyword[];

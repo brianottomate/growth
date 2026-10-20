@@ -29,7 +29,7 @@ export type AdPlacementCrop =
   | "story";
 
 /** The client mock that draws a placement. Ids match `AD_MOCK_SURFACES`. */
-export type AdPlacementSurface = "facebook" | "instagram" | "story";
+export type AdPlacementSurface = "facebook" | "instagram" | "story" | "chat";
 
 export type AdPlacementSpec = {
   key: AdPlacementKey;
@@ -49,10 +49,9 @@ export type AdPlacementSpec = {
 };
 
 /**
- * Every placement a creative can land in. Meta only for now, which is what
- * runs today; the shape is general so LinkedIn and Google add entries with
- * their own crops and copy rules, not a schema change. Order is the matrix's
- * column order.
+ * Every placement a creative can land in: Meta's four shapes and the ChatGPT
+ * chat card. LinkedIn and Google add entries with their own crops and copy
+ * rules, not a schema change. Order is the matrix's column order.
  */
 export const AD_PLACEMENT_SPECS = [
   {
@@ -102,7 +101,24 @@ export const AD_PLACEMENT_SPECS = [
     copy: { headlineMax: 40, bodyMax: 125, ctaRequired: true },
     formats: ["static", "carousel", "video"],
   },
+  {
+    // OpenAI's chat card: one static image, a 3–50 character title and a
+    // body of at most 100, under the answer in ChatGPT. The push takes this
+    // cell's copy, so the base ad's longer feed copy is overridden here.
+    key: "openai_ads:chat_card",
+    platform: "openai_ads",
+    placement: "chat_card",
+    label: "ChatGPT chat card",
+    shortLabel: "ChatGPT",
+    crop: "square",
+    surface: "chat",
+    copy: { headlineMax: 50, bodyMax: 100, ctaRequired: false },
+    formats: ["static"],
+  },
 ] as const satisfies readonly AdPlacementSpec[];
+
+/** The one cell an OpenAI push compiles. */
+export const OPENAI_CHAT_CARD_KEY: AdPlacementKey = "openai_ads:chat_card";
 
 /** The one placement ads drawn before the map already carried, per card. */
 export const LEGACY_STORY_KEY: AdPlacementKey = "meta_ads:story";

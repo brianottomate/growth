@@ -105,6 +105,8 @@ import {
   AD_CALL_TO_ACTIONS,
   LINKEDIN_CALL_TO_ACTIONS,
   LINKEDIN_COST_TYPES,
+  OPENAI_BID_STRATEGIES,
+  OPENAI_PUSH_GOALS,
 } from "@/lib/zernio-ads";
 
 import {
@@ -299,7 +301,7 @@ const schedulingSchema = {
 export const listAdsDestinations = growthAction({
   outputSchema: listAdsDestinationsOutputSchema,
   description:
-    "List the active Zernio Meta, Google or LinkedIn connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id. Each Meta destination carries the Facebook Page it runs as (pageId) and runsAsBrandPage; a false value means the connection cannot access the brand Page. Performance clients may use an explicitly shared managing-brand connection with their own Page identity. trackingDefaults contains the verified pixelId and customEventType inherited for this paying account; use these for campaign setup unless the operator requests an override.",
+    "List the active Zernio Meta, Google, LinkedIn or OpenAI connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id. Each Meta destination carries the Facebook Page it runs as (pageId) and runsAsBrandPage; a false value means the connection cannot access the brand Page. Performance clients may use an explicitly shared managing-brand connection with their own Page identity. trackingDefaults contains the verified pixelId and customEventType inherited for this paying account; use these for campaign setup unless the operator requests an override.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     platform: platformSchema,
@@ -1209,7 +1211,7 @@ export const setPlatformDraftAction = growthAction({
   nativeOutputSchema: setPlatformDraftActionNativeResultSchema,
   outputSchema: setPlatformDraftActionOutputSchema,
   description:
-    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — keywords live in delivery groups, with optional fallback keywords here); Meta takes pixel, conversion event, placements, budget mode, and optional schedule controls (startWhenLaunched/runUntilPaused). Daily budgets need no dates; lifetime budgets need an end. Read listDestinations for verified trackingDefaults instead of guessing a pixel; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
+    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — keywords live in delivery groups, with optional fallback keywords here); Meta takes pixel, conversion event, placements, budget mode, and optional schedule controls (startWhenLaunched/runUntilPaused). Daily budgets need no dates; lifetime budgets need an end. Read listDestinations for verified trackingDefaults instead of guessing a pixel; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional; OpenAI takes the goal, a fixed bid where automatic bidding is refused, and the conversion event. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
   inputSchema: z.object({
     platformCampaignId: z
       .string()
@@ -1343,6 +1345,32 @@ export const setPlatformDraftAction = growthAction({
         callToAction: z.enum(LINKEDIN_CALL_TO_ACTIONS).optional(),
       })
       .optional(),
+    openai: z
+      .object({
+        goal: z.enum(OPENAI_PUSH_GOALS).optional(),
+        bidStrategy: z
+          .enum(OPENAI_BID_STRATEGIES)
+          .optional()
+          .describe(
+            "Omit for Maximize Results, which OpenAI allows only for traffic and conversions on a daily budget; awareness and lifetime budgets need LOWEST_COST_WITH_BID_CAP or COST_CAP with bidAmount.",
+          ),
+        bidAmount: z
+          .number()
+          .positive()
+          .optional()
+          .describe(
+            "Fixed bid in whole currency units, with a capped strategy.",
+          ),
+        customEventType: z
+          .string()
+          .trim()
+          .max(64)
+          .optional()
+          .describe(
+            "conversions goal: the optimizable event on the account's OpenAI tracking tag (id, eventType or name).",
+          ),
+      })
+      .optional(),
   }),
   execute: async ({ startAt, endAt, ...input }, ctx) =>
     setPlatformDraft({
@@ -1438,7 +1466,7 @@ export const pushDraftAction = growthAction({
   nativeOutputSchema: pushDraftActionNativeResultSchema,
   outputSchema: pushDraftActionOutputSchema,
   description:
-    "COMPILE a LOCAL campaign onto one platform: each planned delivery group becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. There is no dry run: push for real. If the push fails partway, what it created stays paused and recorded as an incomplete push, and the error says where it stopped; report that and let the operator choose to finish it in the platform or delete it with adsWrite.deletePlatformCampaign before pushing again. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Meta uses the exact connection already pinned in brand settings; omit credential ids and use the saved goal (default conversions). Do not ask the operator to choose credentials. For other platforms call adsRead.listDestinations for the account ids; never guess them.",
+    "COMPILE a LOCAL campaign onto one platform: each planned delivery group becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. There is no dry run: push for real. If the push fails partway, what it created stays paused and recorded as an incomplete push, and the error says where it stopped; report that and let the operator choose to finish it in the platform or delete it with adsWrite.deletePlatformCampaign before pushing again. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. OpenAI: campaign → ad group → ONE chat card per push (Zernio has no attach there), from the ad's openai_ads:chat_card placement copy (title 3–50, body ≤100; set it with adsWrite.setPlacementCopy), country targeting only, goals traffic / awareness / conversions; the push refuses more than one included ad or delivery group. Meta uses the exact connection already pinned in brand settings; omit credential ids and use the saved goal (default conversions). Do not ask the operator to choose credentials. For other platforms call adsRead.listDestinations for the account ids; never guess them.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     platform: z

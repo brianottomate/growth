@@ -43,7 +43,12 @@ import {
 } from "@/lib/meta-placement-plan";
 import { ideaAwaitingArtwork } from "@/lib/ad-idea-studio";
 import { searchTerms, type SearchTerm } from "@/lib/search-terms";
-import { META_URL_TAGS, tagGoogleAdUrl } from "@/lib/ad-utm";
+import { META_URL_TAGS, tagGoogleAdUrl, tagOpenAiAdUrl } from "@/lib/ad-utm";
+import {
+  OPENAI_CHAT_CARD_KEY,
+  placementSpec,
+  resolveCell,
+} from "@/lib/ad-placements";
 import {
   createMetaPlacementCreative,
   META_LEAD_AD_LINK,
@@ -72,6 +77,12 @@ import {
   linkedInDraftProviderControls,
   metaCallToActionType,
   metaDraftProviderControls,
+  OPENAI_BODY_MAX,
+  OPENAI_HEADLINE,
+  OPENAI_MIN_BUDGET,
+  OPENAI_PUSH_GOALS,
+  openAiBiddingRequirement,
+  openAiDraftProviderControls,
   sameAdAccountId,
   type ZernioAdPlatform,
   ZERNIO_AD_PLATFORMS,
@@ -97,7 +108,7 @@ import {
   getZernioAdsTree,
   listZernioAccounts,
   listZernioAdPages,
-  listZernioAdAccounts,
+  listZernioConnectionAdAccounts,
   listZernioAdAudiences,
   generateZernioAdPreviews,
   generateZernioKeywordIdeas,
@@ -400,10 +411,10 @@ export async function listAdsWriteDestinations(input: {
   const destinationResults = await Promise.allSettled(
     connections.map(async (connection) => {
       const connectionId = zernioAccountId(connection)!;
-      const providerAccounts = await listZernioAdAccounts({
-        accountId: connectionId,
-        limit: 1000,
-      });
+      const providerAccounts = await listZernioConnectionAdAccounts(
+        connection,
+        { limit: 1000 },
+      );
       const tracking = new Map(
         await Promise.all(
           allowed.map(
@@ -592,8 +603,7 @@ async function requireAdDestination(input: {
     }
   }
 
-  const providerAccounts = await listZernioAdAccounts({
-    accountId: input.connectionAccountId,
+  const providerAccounts = await listZernioConnectionAdAccounts(connection, {
     adAccountId: input.adAccountId,
     limit: 1,
   });
@@ -1082,6 +1092,104 @@ async function createLinkedInAd(
   return createZernioStandaloneAd(payload, {
     idempotencyKey: options.idempotencyKey,
   });
+}
+
+// ---- OPENAI PAYLOAD RULES ----------------------------------------------
+
+/**
+ * Everything OpenAI (through Zernio) rejects, checked before the create.
+ * Zernio offers a `validateOnly` here that creates nothing, but it runs the
+ * same documented limits, so the push refuses locally and names the field.
+ * https://docs.zernio.com/platforms/openai-ads/reference
+ */
+export function assertOpenAiAdPayload(
+  payload: CreateZernioStandaloneAdInput,
+  adAccount: { currency?: string },
+) {
+  if (payload.adSetId || payload.existingCampaignId) {
+    throw new Error(
+      "OpenAI has no attach through Zernio — every create is a campaign, an ad group and one chat card",
+    );
+  }
+  if (payload.creatives || payload.carouselCards || payload.video) {
+    throw new Error(
+      "An OpenAI chat card is one static image — no video, carousel or multi-creative shape",
+    );
+  }
+  if (!(OPENAI_PUSH_GOALS as readonly string[]).includes(payload.goal)) {
+    throw new Error(
+      `OpenAI creates ${OPENAI_PUSH_GOALS.join(", ")} campaigns through Zernio, not ${payload.goal}`,
+    );
+  }
+  const headline = (payload.headline as string | undefined)?.trim() ?? "";
+  if (
+    headline.length < OPENAI_HEADLINE.min ||
+    headline.length > OPENAI_HEADLINE.max
+  ) {
+    throw new Error(
+      `OpenAI chat card titles are ${OPENAI_HEADLINE.min}–${OPENAI_HEADLINE.max} characters; "${headline}" is ${headline.length}. Override the ChatGPT placement copy on the ad.`,
+    );
+  }
+  const body = (payload.body as string | undefined)?.trim() ?? "";
+  if (!body || body.length > OPENAI_BODY_MAX) {
+    throw new Error(
+      `OpenAI chat card bodies are 1–${OPENAI_BODY_MAX} characters; this one is ${body.length}. Override the ChatGPT placement copy on the ad.`,
+    );
+  }
+  if (!payload.imageUrl) throw new Error("An OpenAI chat card needs an image");
+  if (!payload.linkUrl) throw new Error("An OpenAI chat card needs a link URL");
+  if (!payload.countries?.length) {
+    throw new Error(
+      "OpenAI targets by country only, and none is set — add countries to the delivery group",
+    );
+  }
+  const targeting = payload.targeting;
+  if (
+    targeting &&
+    (targeting.regions?.length ||
+      targeting.cities?.length ||
+      targeting.ageMin != null ||
+      targeting.ageMax != null ||
+      targeting.audienceInclude?.length)
+  ) {
+    throw new Error(
+      "OpenAI accepts no targeting beyond countries — regions, cities, ages and audiences must be left out",
+    );
+  }
+  if (payload.budgetAmount === undefined || !payload.budgetType) {
+    throw new Error("An OpenAI campaign needs a budget");
+  }
+  if (payload.budgetAmount < OPENAI_MIN_BUDGET) {
+    throw new Error(
+      `OpenAI budgets must be at least ${OPENAI_MIN_BUDGET} ${adAccount.currency ?? "USD"}`,
+    );
+  }
+  if (payload.budgetType === "lifetime" && !payload.endDate) {
+    throw new Error("OpenAI lifetime budgets require endDate");
+  }
+  const bidding = openAiBiddingRequirement({
+    goal: payload.goal,
+    budgetType: payload.budgetType,
+    bidStrategy: payload.bidStrategy,
+    bidAmount: payload.bidAmount,
+  });
+  if (bidding) throw new Error(bidding);
+  const promoted = payload.promotedObject;
+  if (promoted) {
+    const extra = Object.keys(promoted).filter(
+      (key) => key !== "customEventType",
+    );
+    if (extra.length) {
+      throw new Error(
+        `OpenAI's promotedObject takes customEventType only, not ${extra.join(", ")}`,
+      );
+    }
+  }
+  if (payload.goal === "conversions" && !promoted?.customEventType) {
+    throw new Error(
+      "An OpenAI conversions campaign needs the tracking tag's event: set customEventType in the OpenAI settings",
+    );
+  }
 }
 
 export type CreateGoogleAdInput = {
@@ -2290,12 +2398,22 @@ async function compileAudienceTargeting(input: {
     }
   }
 
-  const assetId = await platformAudienceExternalIdFor(
-    audience,
-    input.brandId,
-    input.platform,
-  );
-  if (assetId) spec.audienceInclude = [assetId];
+  // OpenAI has no custom audiences through its API (Ads Manager only), so
+  // a linked list or lookalike cannot ride along; say so rather than send it.
+  if (input.platform === "openai_ads") {
+    if (audience.type !== "segment") {
+      warnings.push(
+        `${audience.name}: OpenAI takes no custom audiences through Zernio — the ${audience.type} was left out and this ad group targets by country only`,
+      );
+    }
+  } else {
+    const assetId = await platformAudienceExternalIdFor(
+      audience,
+      input.brandId,
+      input.platform,
+    );
+    if (assetId) spec.audienceInclude = [assetId];
+  }
 
   const empty = Object.keys(spec).length === 0;
   if (empty) {
@@ -2547,7 +2665,9 @@ async function performPlatformPush(
   const goal =
     platform === "meta_ads"
       ? (input.goal ?? draft.settings?.meta?.goal ?? "conversions")
-      : input.goal;
+      : platform === "openai_ads"
+        ? (input.goal ?? draft.settings?.openai?.goal ?? "traffic")
+        : input.goal;
   if (!goal) throw new Error(`Choose a ${platformName} goal before pushing.`);
   if (!platformSpec.features.goals.includes(goal)) {
     throw new Error(
@@ -2750,6 +2870,7 @@ async function performPlatformPush(
   };
   if (platform === "google_ads") return pushToGoogle(pushArgs);
   if (platform === "linkedin_ads") return pushToLinkedIn(pushArgs);
+  if (platform === "openai_ads") return pushToOpenAi(pushArgs);
   const billingKey = metaBillingIssueKey(destination.adAccount.id);
   const result = await pushToMeta(pushArgs).catch(async (error: unknown) => {
     const issue = metaBillingIssueFrom(error);
@@ -4257,6 +4378,179 @@ async function pushToLinkedIn(args: PushArgs) {
     adSetsCreated: perSet.length,
     adsCreated: perSet.length * usable.length,
     path,
+    warnings,
+  };
+}
+
+// ---- OPENAI COMPILE -----------------------------------------------------
+//
+// ChatGPT's pyramid is campaign → ad group → chat card, and Zernio builds all
+// three in one create with no attach on this platform (neither adSetId nor
+// existingCampaignId, checked live 2026-10-20). So one Growth platform row is
+// exactly one card under one ad group: the push refuses a wider selection
+// rather than quietly sending the first ad, and the copy comes from the ad's
+// ChatGPT placement cell, where the 50/100 character limits are visible.
+async function pushToOpenAi(args: PushArgs) {
+  const {
+    input,
+    context,
+    campaign,
+    brand,
+    draft,
+    destination,
+    compiled,
+    ads,
+    budgetAmount,
+    budgetType,
+    settings,
+    startDate,
+    endDate,
+    warnings,
+  } = args;
+
+  const usable = creativeAds(ads).filter(
+    ({ content }) =>
+      content.media.length === 1 && content.media[0]!.type === "image",
+  );
+  if (usable.length === 0) {
+    throw new Error(
+      "OpenAI needs one approved creative ad with a single static image — text ads compile to Google, and video or carousel ads have no chat-card shape",
+    );
+  }
+  if (usable.length > 1) {
+    throw new Error(
+      `OpenAI takes one chat card per campaign through Zernio, and ${usable.length} ads are included: ${usable
+        .map(({ ad }) => ad.name)
+        .join(
+          ", ",
+        )}. Keep one in this platform's ad selection, or plan the others on their own OpenAI rows.`,
+    );
+  }
+  if (compiled.length > 1) {
+    throw new Error(
+      `OpenAI takes one ad group per campaign through Zernio, and ${compiled.length} delivery groups are planned: ${compiled
+        .map(({ audience }) => audience.name)
+        .join(", ")}. OpenAI targets by country only, so keep one group here.`,
+    );
+  }
+  const skippedText = textAds(ads).length;
+  if (skippedText > 0) {
+    warnings.push(
+      `${skippedText} text ad(s) were not sent to OpenAI — they compile to Google`,
+    );
+  }
+
+  const only = compiled[0] ?? null;
+  const { ad, content } = usable[0]!;
+  const cell = resolveCell(
+    { content, placements: ad.placements },
+    placementSpec(OPENAI_CHAT_CARD_KEY)!,
+  );
+  const linkUrl = cell.copy.linkUrl ?? campaign.landingUrl ?? undefined;
+  if (!linkUrl) {
+    throw new Error(
+      `${ad.name} has no link URL and the campaign has no landing page — a chat card needs a destination`,
+    );
+  }
+  // The approved square render when the studio made one; otherwise the
+  // placement's own file or the base card at its crop.
+  const imageUrl =
+    content.ideaStudio?.approval?.renders.square?.[0]?.url ??
+    cell.cards[0]?.url;
+  const openai = settings.openai ?? {};
+  const payload: CreateZernioStandaloneAdInput = {
+    accountId: input.connectionAccountId,
+    adAccountId: destination.adAccount.id,
+    name: campaign.name,
+    campaignName: campaign.name,
+    adSetName: only?.audience.name ?? campaign.name,
+    adName: ad.name,
+    goal: input.goal,
+    budgetAmount,
+    budgetType,
+    ...(openai.bidStrategy ? { bidStrategy: openai.bidStrategy } : {}),
+    ...(openai.bidAmount != null ? { bidAmount: openai.bidAmount } : {}),
+    headline: cell.copy.headline.trim(),
+    body: cell.copy.body.trim(),
+    imageUrl,
+    linkUrl: tagOpenAiAdUrl(linkUrl),
+    countries: only?.spec?.countries,
+    ...(input.goal === "conversions" && openai.customEventType
+      ? { promotedObject: { customEventType: openai.customEventType } }
+      : {}),
+    startDate,
+    endDate,
+    ...openAiDraftProviderControls(),
+  };
+  assertOpenAiAdPayload(payload, destination.adAccount);
+
+  const result = await createZernioStandaloneAd(payload, {
+    idempotencyKey: idempotencyKey(
+      context,
+      `push-adset:push:${campaign.id}:openai`,
+      payload,
+    ),
+  });
+  const written = result.ad ?? result.ads?.[0];
+  const externalAdId =
+    (typeof written?.platformAdId === "string" ? written.platformAdId : null) ??
+    written?.id ??
+    written?._id ??
+    null;
+  const record: CompiledCampaignRecord = {
+    adAccountId: destination.adAccount.id,
+    draft,
+    campaign,
+    status: "paused",
+    budgetAmount,
+    budgetType,
+    externalCampaignId: writtenCampaignId(result),
+    heroThumbnailUrl: imageUrl ?? null,
+    sets: [
+      {
+        audience: only?.audience ?? null,
+        name: only?.audience.name ?? campaign.name,
+        externalId: writtenAdSetId(result),
+        targetingSpec: only?.spec ?? null,
+        budget: budgetAmount,
+        budgetType,
+        ads: [
+          {
+            planAd: ad,
+            externalId: externalAdId,
+            headline: payload.headline,
+            body: payload.body,
+            linkUrl: payload.linkUrl ?? null,
+            media: content.media,
+          },
+        ],
+      },
+    ],
+  };
+  if (!record.externalCampaignId) {
+    return keepIncompletePush({
+      platformName: "OpenAI",
+      managedIn: "ChatGPT Ads Manager",
+      connectionAccountId: input.connectionAccountId,
+      stoppedAt: "reading the created campaign",
+      error: new Error(
+        `Zernio returned no campaign id. Response carried: ${Object.keys(result).join(", ")}${
+          written
+            ? ` (ad: ${Object.keys(written).join(", ")})`
+            : " (no ad object)"
+        }`,
+      ),
+      record,
+    });
+  }
+  await recordCompiledCampaign(record);
+  return {
+    campaignId: campaign.id,
+    platform: "openai_ads" as const,
+    platformCampaignRowId: draft.id,
+    adSetsCreated: 1,
+    adsCreated: 1,
+    path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
     warnings,
   };
 }

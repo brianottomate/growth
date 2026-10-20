@@ -34,6 +34,7 @@ export const AD_MOCK_SURFACES = [
   { id: "facebook", label: "Facebook feed" },
   { id: "instagram", label: "Instagram feed" },
   { id: "story", label: "Story / Reel" },
+  { id: "chat", label: "ChatGPT card" },
 ] as const;
 
 export type AdMockSurface = (typeof AD_MOCK_SURFACES)[number]["id"];
@@ -113,6 +114,13 @@ export function AdMock({
   className?: string;
 }) {
   const isStory = surface === "story";
+  if (surface === "chat")
+    return (
+      <ChatCardMock
+        {...{ brandName, brandLogo, headline, body, link, media, card }}
+        className={className}
+      />
+    );
   if (frame)
     return (
       <PlacementFrame
@@ -399,6 +407,63 @@ const FRAME_NOTE: Record<AdMockFrame, string> = {
  * One placement's frame: the first card, cropped square the way Meta crops
  * it (so a 4:5 card visibly loses its edges), with the text Meta adds.
  */
+/**
+ * OpenAI's chat card as ChatGPT shows it under an answer: a sponsored label,
+ * one square image, the title and a one-line body, then the destination
+ * domain. Local approximation; the real card is reviewed in Ads Manager.
+ */
+function ChatCardMock({
+  brandName,
+  brandLogo,
+  headline,
+  body,
+  link,
+  media,
+  card,
+  className,
+}: {
+  brandName: string;
+  brandLogo: string | null;
+  headline: string | null;
+  body: string | null;
+  link: string | null;
+  media: AdMockMedia[];
+  card: number;
+  className?: string;
+}) {
+  const current = media[Math.min(card, Math.max(0, media.length - 1))];
+  return (
+    <figure className={cn("space-y-2", className ?? "w-80")}>
+      <p className="text-[11px] text-muted-foreground">Sponsored</p>
+      <div className="flex gap-3 rounded-2xl border bg-card p-3 shadow-md">
+        {current ? (
+          // oxlint-disable-next-line nextjs/no-img-element
+          <img
+            src={posterForMedia(current) ?? current.url}
+            alt="Ad creative"
+            className="size-24 shrink-0 rounded-xl bg-muted object-cover"
+          />
+        ) : null}
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            {brandLogo ? (
+              // oxlint-disable-next-line nextjs/no-img-element
+              <img
+                src={brandLogo}
+                alt=""
+                className="size-4 shrink-0 rounded-full bg-white object-contain"
+              />
+            ) : null}
+            <span className="truncate">{domainOf(link) ?? brandName}</span>
+          </div>
+          <p className="line-clamp-2 text-sm font-semibold">{headline}</p>
+          <p className="line-clamp-2 text-xs text-muted-foreground">{body}</p>
+        </div>
+      </div>
+    </figure>
+  );
+}
+
 function PlacementFrame({
   frame,
   brandName,

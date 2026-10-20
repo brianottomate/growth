@@ -20,6 +20,8 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   LINKEDIN_MIN_DAILY_BUDGET,
   LINKEDIN_MIN_LIFETIME_BUDGET,
+  OPENAI_MIN_BUDGET,
+  openAiBiddingRequirement,
 } from "@/lib/zernio-ads";
 
 import { db, withTransaction } from "@/server/db";
@@ -360,6 +362,7 @@ export async function setPlatformDraft(input: {
   google?: PlatformCampaignSettings["google"] | null;
   meta?: PlatformCampaignSettings["meta"] | null;
   linkedin?: PlatformCampaignSettings["linkedin"] | null;
+  openai?: PlatformCampaignSettings["openai"] | null;
 }) {
   const row = await db.query.platformCampaignTable.findFirst({
     where: eq(platformCampaignTable.id, input.platformCampaignId),
@@ -448,6 +451,7 @@ export async function setPlatformDraft(input: {
         ...merge("google", input.google),
         ...merge("meta", input.meta),
         ...merge("linkedin", input.linkedin),
+        ...merge("openai", input.openai),
       },
     })
     .where(eq(platformCampaignTable.id, row.id))
@@ -486,6 +490,21 @@ export async function setPlatformDraft(input: {
     warnings.push(
       "This is a lifetime budget and the campaign has no end date, so the push will refuse it. Set an end date on the campaign, or switch to a daily budget.",
     );
+  }
+  if (saved.platform === "openai_ads") {
+    const openai = saved.settings?.openai ?? {};
+    if (saved.budget != null && saved.budget < OPENAI_MIN_BUDGET) {
+      warnings.push(
+        `OpenAI's minimum budget is ${OPENAI_MIN_BUDGET}, so the push will refuse ${saved.budget}.`,
+      );
+    }
+    const bidding = openAiBiddingRequirement({
+      goal: openai.goal ?? "traffic",
+      budgetType: saved.budgetType === "lifetime" ? "lifetime" : "daily",
+      bidStrategy: openai.bidStrategy,
+      bidAmount: openai.bidAmount,
+    });
+    if (bidding) warnings.push(`${bidding}, so the push will refuse it.`);
   }
   if (saved.platform === "linkedin_ads" && saved.budget != null) {
     const floor =

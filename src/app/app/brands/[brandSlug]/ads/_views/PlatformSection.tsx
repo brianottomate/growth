@@ -1,6 +1,7 @@
 import type { PlatformDeliveryGroup } from "@/server/db/schema";
 import { GooglePlatformCard } from "./GooglePlatformCard";
 import { LinkedInPlatformCard } from "./LinkedInPlatformCard";
+import { OpenAiPlatformCard } from "./OpenAiPlatformCard";
 import {
   campaignListPath,
   type CampaignWorkspace,
@@ -174,6 +175,20 @@ export async function PlatformSection({
   if (isDraft && platform === "linkedin_ads") {
     return (
       <LinkedInPlatformCard
+        pc={platformCampaign}
+        ads={draftAds ?? []}
+        audiences={deliveryAudiences}
+        campaignId={campaignId}
+        campaignName={campaignName ?? platformCampaign.name}
+        brandSlug={brandSlug}
+        brandName={brandName}
+        campaignEndAt={campaignEndAt}
+      />
+    );
+  }
+  if (isDraft && platform === "openai_ads") {
+    return (
+      <OpenAiPlatformCard
         pc={platformCampaign}
         ads={draftAds ?? []}
         audiences={deliveryAudiences}

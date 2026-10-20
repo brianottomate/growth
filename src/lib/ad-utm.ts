@@ -15,6 +15,18 @@ export const META_URL_TAGS = [
   { key: "utm_content", value: "{{ad.name}}" },
 ] as const;
 
+/**
+ * Click-URL parameters for a ChatGPT chat card. OpenAI's URL macros are not
+ * documented at Zernio, so the tags are literal: the source and medium are
+ * set here, and the author's own campaign and content tags stay.
+ */
+export function tagOpenAiAdUrl(linkUrl: string): string {
+  const url = new URL(linkUrl);
+  url.searchParams.set("utm_source", "chatgpt");
+  url.searchParams.set("utm_medium", "paid");
+  return url.toString();
+}
+
 /** Google expands ValueTrack in final URLs, including new campaigns and ad attaches.
  * https://support.google.com/google-ads/answer/6305348
  */

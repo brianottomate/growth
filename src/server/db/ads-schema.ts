@@ -374,6 +374,25 @@ export type PlatformCampaignSettings = {
     /** CTA button on every creative; LEARN_MORE when omitted and a link is set. */
     callToAction?: string;
   };
+  openai?: {
+    goal?: "traffic" | "awareness" | "conversions";
+    /**
+     * Fixed bidding. Omitted means Maximize Results, which OpenAI allows
+     * only for traffic and conversions on a daily budget.
+     */
+    bidStrategy?:
+      | "LOWEST_COST_WITHOUT_CAP"
+      | "LOWEST_COST_WITH_BID_CAP"
+      | "COST_CAP";
+    /** Bid in whole account-currency units; required with a capped strategy. */
+    bidAmount?: number;
+    /**
+     * conversions goal: the optimizable event on the account's tracking tag,
+     * by id, eventType or name. Set per campaign; OpenAI rejects anything
+     * else in promotedObject.
+     */
+    customEventType?: string;
+  };
 };
 
 // ---- CAMPAIGN (the plan) ---------------------------------------------

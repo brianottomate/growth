@@ -305,3 +305,33 @@ The copy is a draft with no external ids, so the ordinary push creates it paused
 and its ads carry no push record, which makes them editable again. Budget copies as
 is; pause the source before switching the copy on. This replaced the Zernio campaign
 duplicate endpoint, which cloned a live Meta campaign and left nothing in Growth.
+
+## OpenAI Ads: one chat card per campaign (2026-10-20)
+
+ChatGPT ads through Zernio are chat cards: a 3–50 character title, a body of at
+most 100, one static image and a link, under campaign → ad group → ad. OpenAI is
+a push platform in `lib/ad-platforms.ts` with goals traffic / awareness /
+conversions and country-only targeting. Two things differ from the others:
+
+- **The connection is the ad account.** An OpenAI connection is one API key for
+  one ad account, and `GET /ads/accounts` answers "Unsupported platform". The
+  platform table marks it `adAccounts: "connection"`, and
+  `listZernioConnectionAdAccounts` reads the account off the connection row
+  (`platformUserId` is the `adacct_` id, `displayName` its name). Destinations,
+  the push and the brand page's allowlist discovery all go through that helper.
+- **No attach.** Zernio's `adSetId` and `existingCampaignId` are refused for
+  OpenAI (checked live with `validateOnly`), so every create is a whole
+  campaign. One Growth platform row therefore compiles to exactly one card under
+  one ad group, and `pushToOpenAi` refuses a wider selection rather than sending
+  the first ad. Several cards mean several OpenAI rows, which needs the
+  platform-row-by-id work.
+
+The copy the push sends is the ad's `openai_ads:chat_card` placement cell
+(`lib/ad-placements.ts`), so the feed copy stays long and the ChatGPT cell is
+overridden to fit; the OpenAI card on the campaign page shows the counts.
+Custom audiences do not exist on this API, so a linked list or lookalike is
+reported and left out. Automatic bidding is allowed only for traffic and
+conversions on a daily budget; awareness and lifetime budgets need a capped bid
+in the OpenAI settings. Analytics sync daily (impressions, clicks, spend only),
+and the mirror reads them through the same tree as the other platforms once the
+ad account is allowlisted on the brand.
