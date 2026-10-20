@@ -30,9 +30,14 @@ export async function CampaignByHomePage({
   const org = { id: actor.orgId };
 
   const draft = await getDraftCampaign(org.id, campaignId).catch(() => null);
-  // Chat result cards link by brand id; the brand route resolves both.
-  if (draft?.brand.slug !== brandSlug && draft?.brand.id !== brandSlug)
-    notFound();
+  if (!draft) notFound();
+  // Chat result cards link by brand id; land on the slug URL.
+  if (draft.brand.slug !== brandSlug) {
+    if (draft.brand.id !== brandSlug || !draft.brand.slug) notFound();
+    redirect(
+      `/app/brands/${encodeURIComponent(draft.brand.slug)}/ads/${encodeURIComponent(campaignId)}/by-home`,
+    );
+  }
   const { campaign, brand, ads } = draft;
 
   const wall: WallAd[] = [...ads]

@@ -7,6 +7,7 @@ import {
   campaignDisplayName,
   campaignListPath,
   type CampaignWorkspace,
+  campaignPath,
 } from "@/lib/campaign-navigation";
 import { workspaceActor } from "@/server/workspace-actor";
 import { listBrandHomes } from "@/server/services/homes.service";
@@ -71,10 +72,14 @@ export async function CampaignView({
   if (!actor) notFound();
   const org = { id: actor.orgId };
 
-  const draft = await getDraftCampaign(org.id, campaignId);
-  // Chat result cards link by brand id; the brand route resolves both.
-  if (draft?.brand.slug !== brandSlug && draft?.brand.id !== brandSlug)
-    notFound();
+  const draft = await getDraftCampaign(org.id, campaignId).catch(() => null);
+  if (!draft) notFound();
+  // Chat result cards link by brand id. Downstream links are built from the
+  // slug, so land on the slug URL rather than serving the page under the id.
+  if (draft.brand.slug !== brandSlug) {
+    if (draft.brand.id !== brandSlug || !draft.brand.slug) notFound();
+    redirect(campaignPath(draft.brand.slug, campaignId, workspace));
+  }
 
   const { campaign, audiences, ads, platformCampaigns, platformAudiences } =
     draft;
