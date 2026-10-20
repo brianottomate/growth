@@ -4,8 +4,10 @@ export const WORK_ITEM_URI = "ui://wander-growth/work-item/v1.html";
 export const WORK_ITEM_HTML = compactResultDocument("workitem");
 export const CAMPAIGN_URI = "ui://wander-growth/campaign-overview/v1.html";
 export const CAMPAIGN_HTML = compactResultDocument("campaign");
-export const CREATIVE_URI = "ui://wander-growth/creative-review/v1.html";
-export const CREATIVE_HTML = compactResultDocument("creative");
+export {
+  CREATIVE_REVIEW_URI as CREATIVE_URI,
+  CREATIVE_REVIEW_HTML as CREATIVE_HTML,
+} from "./creative-review-ui";
 export const CATALOG_URI = "ui://wander-growth/catalog-review/v1.html";
 export const CATALOG_HTML = compactResultDocument("catalog");
 export const BRANDS_URI = "ui://wander-growth/brand-picker/v1.html";

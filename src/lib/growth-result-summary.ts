@@ -253,7 +253,8 @@ export function growthResultSummary(
     if (thumbnail(source))
       summary.rows = [
         {
-          title: text(d.campaignName, "Creative preview"),
+          title: text(d.campaignName, "Not in a campaign"),
+          detail: text(copy.description),
           thumbnail: thumbnail(source),
         },
       ];
