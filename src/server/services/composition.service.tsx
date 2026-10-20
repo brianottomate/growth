@@ -1288,7 +1288,7 @@ export function renderComposition(
     const subtitle = spec.subtitle?.trim();
     const eyebrow = spec.eyebrow?.trim();
     const button = spec.cta?.trim();
-    const titleSize = stacked ? (square ? 76 : 86) : 56;
+    const titleSize = stacked ? (square ? 76 : 86) : 44;
     const copy = (
       <div
         key="copy"
@@ -1319,7 +1319,7 @@ export function renderComposition(
             </div>
           ) : null
         ) : (
-          <div style={{ display: "flex", marginBottom: 84 }}>
+          <div style={{ display: "flex", marginBottom: stacked ? 84 : 28 }}>
             <BrandMark
               brandName={context.brand.name}
               logo={context.logo}
@@ -1344,9 +1344,9 @@ export function renderComposition(
           <div
             style={{
               display: "flex",
-              marginTop: 30,
-              maxWidth: "64%",
-              fontSize: 34,
+              marginTop: stacked ? 30 : 16,
+              maxWidth: stacked ? "64%" : "100%",
+              fontSize: stacked ? 34 : 22,
               lineHeight: 1.32,
               color: "#1f1f1f",
             }}
@@ -1360,13 +1360,13 @@ export function renderComposition(
               display: "flex",
               alignSelf: "flex-start",
               alignItems: "center",
-              marginTop: 44,
-              height: 78,
+              marginTop: stacked ? 44 : 22,
+              height: stacked ? 78 : 56,
               padding: "0 26px",
               borderRadius: 999,
               background: "#000000",
               color: "#ffffff",
-              fontSize: 26,
+              fontSize: stacked ? 26 : 20,
               fontWeight: 600,
             }}
           >
@@ -1385,14 +1385,8 @@ export function renderComposition(
           ...(stacked
             ? above
               ? { width: "100%", height: "47%" }
-              : { margin: `${pad - 16}px ${pad}px 0`, height: "46%" }
-            : above
-              ? { width: "50%", height: "100%" }
-              : {
-                  width: "50%",
-                  height: "100%",
-                  margin: `${pad}px ${pad}px ${pad}px 0`,
-                }),
+              : { width: "100%", marginTop: pad - 16, height: "46%" }
+            : { width: "50%", height: "100%" }),
         }}
       >
         {/* oxlint-disable-next-line nextjs/no-img-element */}

@@ -177,10 +177,10 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
   },
   {
     id: "stack-photo-below",
-    version: 2,
+    version: 3,
     label: "Stack · photo below",
     description:
-      "A light card: logo, headline, supporting line and a black pill, the photo bleeding off the foot. Kyle's Performance feed card. Wide canvases put the photo on the right.",
+      "A light card: logo, headline, supporting line and a black pill, the photo full width off the foot. Kyle's Performance feed card. Wide canvases put the photo on the right.",
   },
   {
     id: "stack-photo-above",
