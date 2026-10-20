@@ -245,42 +245,51 @@ export function growthResultSummary(
     const ad = d.ad ? obj(d.ad) : d,
       content = obj(ad.content),
       doc = obj(ad.document || obj(content.ideaStudio).document),
-      copy = obj(doc.copy || content);
+      copy = obj(doc.copy || content),
+      cards = list(doc.cards),
+      lead = obj(list(content.media)[0]),
+      video = content.format === "video" || lead.type === "video";
     summary.title = text(ad.name, "Creative draft");
-    summary.description = text(
-      copy.headline,
-      text(copy.body, "Creative saved for review."),
-    );
-    const lead = obj(list(content.media)[0]);
-    const video = content.format === "video" || lead.type === "video";
+    summary.description = "";
     summary.facts = [
       // `drawn` is the stored name of the draft state the studio calls Draft.
       ad.approved
         ? "Approved"
         : status(ad.status === "drawn" ? "draft" : ad.status || "draft"),
-      video
-        ? lead.story
-          ? "Video · Feed + Stories/Reels"
-          : "Video"
-        : `${list(doc.cards).length} slides`,
+      ...(video
+        ? [lead.story ? "Video · Feed + Stories/Reels" : "Video"]
+        : cards.length > 1
+          ? [`${cards.length} slides`]
+          : []),
     ];
+    // The creative itself, then its headline and the first line of body.
     const source =
-      obj(list(doc.cards)[0]).source ||
+      obj(cards[0]).source ||
       obj(list(d.images)[0]).source ||
       list(content.media)[0];
-    if (thumbnail(source))
-      summary.rows = [
-        {
-          title: text(d.campaignName, "Not in a campaign"),
-          detail: text(copy.description),
-          thumbnail: thumbnail(source),
-        },
-      ];
-    const campaignId = text(d.campaignId, text(ad.campaignId));
-    summary.href = campaignId
-      ? `/app/campaigns/${encodeURIComponent(campaignId)}`
-      : "/app/campaigns";
-    summary.linkLabel = "View creative";
+    const headlines = Array.isArray(content.headlines) ? content.headlines : [],
+      descriptions = Array.isArray(content.descriptions)
+        ? content.descriptions
+        : [];
+    summary.rows = [
+      {
+        title: text(copy.headline, text(headlines[0], "No headline yet")),
+        detail: text(copy.body, text(descriptions[0]))
+          .split(/\r?\n/)
+          .find((line) => line.trim())
+          ?.trim(),
+        thumbnail: thumbnail(source),
+      },
+    ];
+    const brandId = text(ad.brandId, text(brand.id)),
+      campaignId = text(d.campaignId, text(ad.campaignId)),
+      anchor = text(ad.id) ? `#ad-${encodeURIComponent(text(ad.id))}` : "";
+    summary.href = !brandId
+      ? "/app/campaigns"
+      : campaignId
+        ? `/app/performance/clients/${encodeURIComponent(brandId)}/campaigns/${encodeURIComponent(campaignId)}${anchor}`
+        : `/app/performance/clients/${encodeURIComponent(brandId)}/ads${anchor}`;
+    summary.linkLabel = "View ad";
   } else if (kind === "catalog") {
     const cards = list(obj(d.draft).cards),
       included = cards.filter((c) => c.included);

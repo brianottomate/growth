@@ -99,8 +99,8 @@ async function assertToolCatalog(client: Client) {
     ["brandRead__list", "brand-picker"],
     ["mediaLibraryRead__listingPhotos", "listing-photos"],
   ]) {
-    // The creative card was redrawn; its URI moved so hosts drop the cached v1.
-    const version = resourceName === "creative-review" ? "v2" : "v1";
+    // The creative card was redrawn; its URI moves so hosts drop the cached one.
+    const version = resourceName === "creative-review" ? "v3" : "v1";
     const uri = `ui://wander-growth/${resourceName}/${version}.html`;
     const tool = tools.find((entry) => entry.name === toolName);
     expect(tool?._meta?.ui).toEqual({

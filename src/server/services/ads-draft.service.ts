@@ -122,14 +122,22 @@ export async function resolveAdAuthoringScope(input: {
   campaignId?: string;
   brandId?: string;
 }) {
-  if (Boolean(input.campaignId) === Boolean(input.brandId))
-    throw new Error("Supply either campaignId or brandId.");
+  if (!input.campaignId && !input.brandId)
+    throw new Error(
+      "Pass campaignId (camp_…) or brandId (brand_…). Both together is fine when the campaign belongs to that brand.",
+    );
   if (input.campaignId) {
     const owned = await requireOwnedCampaign(
       input.campaignId,
       input.organizationId,
     );
     if (owned.campaign.deletedAt) throw new Error("Campaign not found");
+    // Agents often pass both. The campaign is the owner; a brandId that is
+    // not the campaign's brand is a wrong id, not a second owner.
+    if (input.brandId && input.brandId !== owned.brand.id)
+      throw new Error(
+        `Campaign ${input.campaignId} belongs to brand ${owned.brand.id}, not ${input.brandId}. Pass that brandId or leave brandId out.`,
+      );
     return owned;
   }
   return { campaign: null, brand: await requireOwnedBrand(input) };

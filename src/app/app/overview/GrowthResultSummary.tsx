@@ -20,7 +20,9 @@ export function GrowthResultSummary({
       {(kind !== "brands" || summary.rows.length === 0) && (
         <div>
           <h3 className="font-semibold">{summary.title}</h3>
-          <p className="mt-1 text-muted-foreground">{summary.description}</p>
+          {summary.description && (
+            <p className="mt-1 text-muted-foreground">{summary.description}</p>
+          )}
         </div>
       )}
       {summary.facts.length > 0 && (
@@ -46,10 +48,11 @@ export function GrowthResultSummary({
               src={row.thumbnail}
               alt={row.title}
               // A creative is the composition itself, so it gets the card's
-              // width; everything else is a thumbnail beside its line.
+              // width at its own aspect; everything else is a thumbnail
+              // beside its line.
               className={
                 kind === "creative"
-                  ? "aspect-square w-full max-w-[360px] rounded-xl border bg-muted object-cover"
+                  ? "w-full rounded-xl border bg-muted"
                   : "size-12 shrink-0 rounded-lg object-cover"
               }
               loading="lazy"

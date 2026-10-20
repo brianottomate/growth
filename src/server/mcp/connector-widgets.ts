@@ -57,7 +57,7 @@ export const CONNECTOR_WIDGETS = [
     id: "creative",
     title: "Creative review",
     description:
-      "A creative excerpt and thumbnail, with a link to review in Growth.",
+      "The creative at card width with its headline, first line and status, with a link to the ad in Growth.",
     tool: "adsRead__ideaContext",
     aliases: ["adsWrite__saveIdea", "adsWrite__draftAd"],
     uri: CREATIVE_URI,

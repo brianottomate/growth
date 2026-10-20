@@ -71,8 +71,9 @@ import {
 } from "./outputs/ads";
 
 import {
+  AD_OWNER_MESSAGE,
   adAuthoringFields,
-  hasOneAdOwner,
+  hasAdOwner,
   textAdCopySchema,
 } from "@/lib/ad-authoring";
 import { env } from "@/env";
@@ -645,7 +646,7 @@ export const draftAdAction = growthAction({
   nativeOutputSchema: draftAdResultSchema,
   outputSchema: draftAdActionOutputSchema,
   description:
-    "Add an unassigned draft to Ad Studio, using a brand or campaign as authoring context. Approval is required before the existing ad is consumed by a campaign. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video — for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
+    "Add an unassigned draft to Ad Studio, using a brand or campaign as authoring context (campaignId, brandId, or both). Approval is required before the existing ad is consumed by a campaign. Local only. Type creative (default) carries headline, body and media: a library assetId, one image url, several image urls (a carousel, in order), or a video url, for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
   inputSchema: z
     .object({
       ...adAuthoringFields,
@@ -720,9 +721,11 @@ export const draftAdAction = growthAction({
         .trim()
         .min(1)
         .optional()
-        .describe("media_asset id when the image comes from the library."),
+        .describe(
+          "creative only: a media_asset id (media_…) from the brand's library, as mediaLibraryRead.list returns it. Enough on its own for a single-image or video ad; its url is resolved here, so no imageUrl is needed.",
+        ),
     })
-    .refine(hasOneAdOwner, { message: "Supply either campaignId or brandId." })
+    .refine(hasAdOwner, { message: AD_OWNER_MESSAGE })
     .refine(
       (input) =>
         input.type === "text" ||
@@ -730,12 +733,13 @@ export const draftAdAction = growthAction({
           Boolean(input.body) &&
           ((input.imageUrls?.length ?? 0) > 0 ||
             Boolean(input.imageUrl) ||
-            Boolean(input.videoUrl))),
+            Boolean(input.videoUrl) ||
+            Boolean(input.assetId))),
       {
         // Name the actual fields: an error that says "imageUrl" teaches the
         // model to resend the wrong shape.
         error:
-          "A creative ad needs headline, body, and media: imageUrls (array, carousel-capable), imageUrl (single), or videoUrl.",
+          "A creative ad needs headline, body, and media: assetId (a library media_asset id), imageUrls (array, carousel-capable), imageUrl (single), or videoUrl.",
         path: ["imageUrls"],
       },
     )
@@ -755,8 +759,20 @@ export const draftAdAction = growthAction({
           (input.descriptions?.length ?? 0) > 0),
       { error: "A text ad needs headlines and descriptions." },
     ),
+  examples: [
+    {
+      campaignId: "camp_01",
+      brandId: "brand_01",
+      name: "Lake house weekend",
+      headline: "Room for everyone this fall",
+      body: "Book the lake house your whole crew fits in.",
+      assetId: "media_01",
+    },
+  ],
   execute: async (input, ctx) => {
     let media: AdCard[] = [];
+    // A library id is the whole media reference; the url lives on the row.
+    let videoUrl = input.videoUrl;
     if (input.type === "creative") {
       const { brand } = await resolveAdAuthoringScope({
         ...input,
@@ -769,8 +785,23 @@ export const draftAdAction = growthAction({
           url,
         });
 
-      if (input.videoUrl) {
-        const resolved = await resolve(input.videoUrl);
+      let imageUrls = input.imageUrls?.length
+        ? input.imageUrls
+        : input.imageUrl
+          ? [input.imageUrl]
+          : [];
+      if (input.assetId && !videoUrl && imageUrls.length === 0) {
+        const asset = await MediaService.get(input.assetId);
+        if (!asset || asset.brandId !== brand.id || !asset.url)
+          throw new Error(
+            `No library media ${input.assetId} on brand ${brand.id}. Pass an assetId from mediaLibraryRead.list for this brand, or the image's url.`,
+          );
+        if (asset.kind === "video") videoUrl = asset.url;
+        else imageUrls = [asset.url];
+      }
+
+      if (videoUrl) {
+        const resolved = await resolve(videoUrl);
         const item: MediaItem = {
           url: resolved.url,
           type: "video",
@@ -788,11 +819,8 @@ export const draftAdAction = growthAction({
         }
         media = [{ ...card, thumbnail }];
       } else {
-        const urls = input.imageUrls?.length
-          ? input.imageUrls
-          : [input.imageUrl!];
         media = await Promise.all(
-          urls.map(async (url) => {
+          imageUrls.map(async (url) => {
             const resolved = await resolve(url);
             return {
               url: resolved.url,
@@ -821,7 +849,7 @@ export const draftAdAction = growthAction({
               body: input.body!,
               linkUrl: input.linkUrl,
               callToAction: input.callToAction,
-              ...(input.videoUrl ? { format: "video" as const } : {}),
+              ...(videoUrl ? { format: "video" as const } : {}),
               media,
             },
       organizationId: ctx.orgId,
@@ -1529,7 +1557,7 @@ export const writeGoogleTextAdsAction = growthAction({
       keywords: z.array(z.string().trim().min(1)).max(40).optional(),
       count: z.number().int().min(1).max(3).default(2),
     })
-    .refine(hasOneAdOwner, { message: "Supply either campaignId or brandId." }),
+    .refine(hasAdOwner, { message: AD_OWNER_MESSAGE }),
   outputSchema: z.object({
     created: z.number(),
     adIds: z.array(z.string()),

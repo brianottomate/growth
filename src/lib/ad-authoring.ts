@@ -10,6 +10,12 @@ export function hasOneAdOwner(input: {
 }) {
   return Boolean(input.campaignId) !== Boolean(input.brandId);
 }
+/** Chat tools take both: the campaign is the owner and must belong to the brand. */
+export function hasAdOwner(input: { campaignId?: string; brandId?: string }) {
+  return Boolean(input.campaignId) || Boolean(input.brandId);
+}
+export const AD_OWNER_MESSAGE =
+  "Pass campaignId (camp_…) or brandId (brand_…). Both together is fine when the campaign belongs to that brand.";
 export const adAuthoringScopeSchema = z
   .object(adAuthoringFields)
   .refine(hasOneAdOwner, {

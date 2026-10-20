@@ -364,6 +364,31 @@ export const workspaceFixtures: Record<string, ConnectorFixture[]> = {
       "adsWrite__saveIdea",
     ),
     sample(
+      "image",
+      "Single-image draft response",
+      "draftAd",
+      {
+        ...ad,
+        campaignId: null,
+        status: "drawn",
+        content: {
+          ...copy,
+          media: media.slice(0, 1),
+          format: "static",
+          ideaStudio: {
+            document: {
+              ...document,
+              role: "hero_static",
+              cards: [
+                { ...document.cards[0], mode: "supplied", overrides: {} },
+              ],
+            },
+          },
+        },
+      },
+      "adsWrite__draftAd",
+    ),
+    sample(
       "text",
       "Text-only draft response",
       "draftAd",
