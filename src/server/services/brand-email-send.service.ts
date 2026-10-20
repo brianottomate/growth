@@ -12,17 +12,15 @@ import {
 import { createId } from "@/server/db/utils";
 import { broadcastJobCanRun } from "@/lib/broadcast-schedule";
 
-import { and, eq, inArray, lt, ne, or } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { emailDocumentDraftSchema } from "@/lib/email-document";
-import {
-  filterEmailAudienceBatch,
-  type EmailAudienceRecipient,
-} from "@/lib/email-audience";
+import { type EmailAudienceRecipient } from "@/lib/email-audience";
 import {
   brandSendBlockers,
   messageSendSummary,
   type MessageSendSnapshot,
+  type EmailDeliveryReceipt,
 } from "@/lib/email-delivery";
 import { UNSUBSCRIBE_PLACEHOLDER } from "@/lib/email-personalization";
 import { isBroadcastSeedRecipient } from "@/lib/email-seed-recipient";
@@ -46,8 +44,6 @@ import {
 } from "@/server/clients/postmark.client";
 import { db, withTransaction } from "@/server/db";
 import {
-  emailAudienceSnapshotTable,
-  emailAudienceTable,
   messageSendRecipientTable,
   messageSendTable,
   platformPostTable,
@@ -59,8 +55,9 @@ import {
   requireOwnedEmailSpot,
 } from "@/server/services/email-document.service";
 import {
-  getEmailAudienceSnapshot,
-  readEmailAudienceBatch,
+  getEmailAudience,
+  listEmailAudiences,
+  readEmailAudienceRecipients,
 } from "@/server/services/email-audience.service";
 import { requireEmailDeliveryOperator } from "@/server/services/email-delivery-authorization.service";
 
@@ -69,10 +66,8 @@ import { requireEmailDeliveryOperator } from "@/server/services/email-delivery-a
 // and the audience), approve (a person signs off), send (on demand, by an
 // owner or admin). Sending rechecks everything that can change after approval.
 
-/** Recipients per page and per Postmark bulk request; far under its 50 MB cap. */
-const PAGE_SIZE = 10_000;
-/** A `sending` row untouched this long belongs to a run that died. */
-const STALE_LEASE_MS = 15 * 60_000;
+/** Bound SQL parameters for custom-stream opt-out lookups. */
+const OPT_OUT_READ_SIZE = 10_000;
 
 type Actor = { organizationId: string; userId: string };
 type PreparedPostmarkSnapshot = MessageSendSnapshot & {
@@ -205,9 +200,9 @@ export async function sendBrandTestEmail(
 }
 
 /**
- * Send one frozen prepared broadcast to exactly one explicit test address.
- * This never reads the audience, creates a recipient ledger row, approves the
- * send, changes its status or schedules guest delivery.
+ * Send one frozen prepared broadcast to exactly one controlled seed address.
+ * This does not read the audience, create a recipient ledger row, approve the
+ * send, change its status or schedule guest delivery.
  */
 export async function sendPreparedBrandTestEmail(
   input: { messageSendId: string; recipientEmail: string } & Actor,
@@ -223,8 +218,7 @@ export async function sendPreparedBrandTestEmail(
   if (
     send?.provider !== "postmark" ||
     !["draft", "approved"].includes(send.status) ||
-    snapshot?.audience.provider !== "postmark" ||
-    !snapshot.sender
+    !snapshot
   )
     throw new Error("Prepared Postmark send not found.");
   const spot = await requireOwnedEmailSpot(
@@ -242,8 +236,6 @@ export async function sendPreparedBrandTestEmail(
   const own = ownUnsubscribe
     ? personalUnsubscribe(spot.brandId, recipientEmail)
     : null;
-  // Compile through the same path as live bulk, then materialize the one seed
-  // recipient. No guest audience or recipient ledger is touched.
   const template = compilePostmarkBroadcast({
     subject: snapshot.email.subject,
     html: snapshot.preview.html,
@@ -290,12 +282,10 @@ export async function sendPreparedBrandTestEmail(
 }
 
 /**
- * Freeze the current email and a compiled audience into a draft send. A
- * changed email or a new snapshot makes a new draft; the approval belongs to
- * exactly what was prepared.
+ * Freeze the current creative and reference a live audience in a draft send.
  */
 export async function prepareBrandSend(
-  input: { platformPostId: string; snapshotId: string } & Actor,
+  input: { platformPostId: string; audienceId: string } & Actor,
 ) {
   await requireEmailDeliveryOperator(input);
   const spot = await requireOwnedEmailSpot(
@@ -303,22 +293,17 @@ export async function prepareBrandSend(
     input.organizationId,
   );
   const blockers = brandSendBlockers(spot.brand);
-  // Published: an earlier wave of this email went out; the next one may follow.
-  if (!["approved", "published"].includes(spot.status))
+  // Scheduling and previous publication do not revoke creative approval.
+  if (!["approved", "scheduled", "published"].includes(spot.status))
     throw new Error("Approve the email creative before preparing delivery.");
   if (blockers.length) throw new Error(blockers.join(" "));
-  const snapshot = await getEmailAudienceSnapshot(
-    { snapshotId: input.snapshotId },
+  const audience = await getEmailAudience(
+    { audienceId: input.audienceId },
     input,
   );
-  const audience = await db.query.emailAudienceTable.findFirst({
-    where: eq(emailAudienceTable.id, snapshot.audienceId),
-  });
-  if (audience?.brandId !== spot.brandId)
+  if (audience.brandId !== spot.brandId)
     throw new Error("That audience belongs to another brand.");
-  if (snapshot.status !== "ready")
-    throw new Error("Compile the audience before preparing a send.");
-  if (!snapshot.definition.consentConfirmed)
+  if (!audience.definition.consentConfirmed)
     throw new Error("Confirm this audience's marketing permission first.");
 
   const { document } = await ensureEmailDocument(input);
@@ -332,7 +317,7 @@ export async function prepareBrandSend(
     hash,
     "postmark",
     delivery.serverId,
-    snapshot.id,
+    audience.id,
   ].join(":");
   const existing = await db.query.messageSendTable.findFirst({
     where: eq(messageSendTable.idempotencyKey, idempotencyKey),
@@ -350,7 +335,7 @@ export async function prepareBrandSend(
     sendId,
     campaign: spot.id,
   });
-  const label = `${audience.name} (${snapshot.recipientCount ?? 0} guests)`;
+  const label = audience.name;
   const snapshotRecord: MessageSendSnapshot = {
     schema: "wander-growth.message-send.v1",
     format: spot.format as MessageSendSnapshot["format"],
@@ -367,7 +352,7 @@ export async function prepareBrandSend(
     audience: {
       kind: "guests",
       provider: "postmark",
-      snapshotId: snapshot.id,
+      audienceId: audience.id,
       serverId: delivery.serverId,
       messageStream: delivery.messageStream,
       label,
@@ -391,7 +376,7 @@ export async function prepareBrandSend(
       provider: "postmark",
       providerBroadcastId: String(delivery.serverId),
       audienceKind: "guests",
-      audienceReference: snapshot.id,
+      audienceReference: audience.id,
       audienceLabel: label,
       snapshot: snapshotRecord,
       idempotencyKey,
@@ -400,36 +385,6 @@ export async function prepareBrandSend(
     .returning();
   if (!created) throw new Error("Could not prepare the send.");
   return messageSendSummary(created);
-}
-
-/** Every link in the email must open before a guest sees it. */
-async function brokenLinks(html: string) {
-  const links = [
-    ...new Set(
-      [...html.matchAll(/href="([^"]+)"/g)]
-        .map((match) => match[1]!.replace(/&amp;/g, "&"))
-        .filter((href) => /^https?:\/\//.test(href)),
-    ),
-  ];
-  const broken: string[] = [];
-  for (let index = 0; index < links.length; index += 6) {
-    await Promise.all(
-      links.slice(index, index + 6).map(async (href) => {
-        try {
-          const response = await fetch(href, {
-            redirect: "follow",
-            signal: AbortSignal.timeout(15_000),
-            headers: { "user-agent": "WanderGrowthLinkCheck/1.0" },
-          });
-          if (response.status >= 400)
-            broken.push(`${href} (${response.status})`);
-        } catch {
-          broken.push(`${href} (no response)`);
-        }
-      }),
-    );
-  }
-  return broken;
 }
 
 async function failSend(id: string, message: string) {
@@ -444,18 +399,7 @@ async function failSend(id: string, message: string) {
     .where(eq(messageSendTable.id, id));
 }
 
-/**
- * Send an approved Postmark send, or resume one that failed part way (approve
- * it again) or whose run died in `sending`. Pages of up to 10,000 guests each
- * go out as one Postmark bulk request: the email once as a template plus each
- * guest's fields, released at Postmark's pace. Before the first guest the
- * email must still be the approved revision and every link must open. Per
- * page: WanderOS opt-outs and anyone an earlier send of this email reached are
- * dropped, and each address is written to the ledger before Postmark is
- * called, so a resumed send never mails it twice. Postmark's own suppressions
- * (bounces, complaints, its unsubscribes) are filtered on its side and show up
- * in its delivery events, not here.
- */
+/** Submit an approved broadcast once. Postmark owns processing after acceptance. */
 export async function dispatchBrandSend(input: {
   messageSendId: string;
   organizationId: string;
@@ -486,7 +430,6 @@ export async function dispatchBrandSend(input: {
   assertPreparedPostmarkSetupCurrent(spot, snapshot);
   const audience = snapshot.audience;
 
-  const staleBefore = new Date(Date.now() - STALE_LEASE_MS);
   const claimed = await withTransaction(async (tx) => {
     const [current] = await tx
       .select({ status: platformPostTable.status })
@@ -520,13 +463,7 @@ export async function dispatchBrandSend(input: {
       .where(
         and(
           eq(messageSendTable.id, send.id),
-          or(
-            eq(messageSendTable.status, "approved"),
-            and(
-              eq(messageSendTable.status, "sending"),
-              lt(messageSendTable.updatedAt, staleBefore),
-            ),
-          ),
+          eq(messageSendTable.status, "approved"),
         ),
       )
       .returning();
@@ -540,7 +477,7 @@ export async function dispatchBrandSend(input: {
   };
 
   try {
-    if (!claimed.dispatchCursor) {
+    {
       const { document } = await ensureEmailDocument({
         platformPostId: spot.id,
         ...actor,
@@ -549,13 +486,20 @@ export async function dispatchBrandSend(input: {
         throw new Error(
           "The email changed after it was approved. Prepare and approve it again.",
         );
-      const broken = await brokenLinks(snapshot.preview.html);
-      if (broken.length) throw new Error(`Broken links: ${broken.join(", ")}`);
     }
 
-    const source = (
-      await getEmailAudienceSnapshot({ snapshotId: audience.snapshotId }, actor)
-    ).definition.source;
+    const currentAudience = await getEmailAudience(
+      { audienceId: audience.audienceId },
+      actor,
+    );
+    if (
+      currentAudience.brandId !== spot.brandId ||
+      !currentAudience.definition.consentConfirmed
+    )
+      throw new Error(
+        "The audience must belong to this brand and have marketing permission.",
+      );
+    const source = currentAudience.definition.source;
     let optedOut = new Set<string>();
     if (source !== "list") {
       const websiteId = spot.brand.wanderOsWebsiteId;
@@ -579,163 +523,166 @@ export async function dispatchBrandSend(input: {
       growthManagedUnsubscribe: ownUnsubscribe,
     });
 
-    const sendPage = async (recipients: EmailAudienceRecipient[]) => {
-      if (snapshot.schedule) {
-        const currentSend = await db.query.messageSendTable.findFirst({
-          where: eq(messageSendTable.id, claimed.id),
-        });
-        const currentSpot = await requireOwnedEmailSpot(
-          spot.id,
-          input.organizationId,
-        );
-        const { document } = await ensureEmailDocument({
-          platformPostId: spot.id,
-          ...actor,
-        });
-        if (
-          !input.scheduledJob ||
-          !broadcastJobCanRun(
-            currentSend?.snapshot.schedule,
-            input.scheduledJob,
-          ) ||
-          !["approved", "scheduled", "published"].includes(
-            currentSpot.status,
-          ) ||
-          contentHashOf(document).hash !== claimed.contentHash
-        )
-          throw new Error(
-            "Scheduled delivery paused or creative changed; inspect before resuming.",
-          );
-      }
-      const emails = [
-        ...new Set(
-          recipients.map((recipient) => recipient.email.trim().toLowerCase()),
-        ),
-      ];
-      // Growth's own unsubscribes for this brand, read fresh for every page.
-      const unsubscribed = await brandOptOuts(spot.brandId, emails);
-      const isOptedOut = (email: string) =>
-        optedOut.has(email) || unsubscribed.has(email);
-      // Waves of one email (100, then 1,000, then everyone) overlap by design.
-      const reached = new Set(
-        emails.length
-          ? (
-              await db
-                .select({ email: messageSendRecipientTable.email })
-                .from(messageSendRecipientTable)
-                .innerJoin(
-                  messageSendTable,
-                  eq(
-                    messageSendTable.id,
-                    messageSendRecipientTable.messageSendId,
-                  ),
-                )
-                .where(
-                  and(
-                    eq(messageSendTable.platformPostId, spot.id),
-                    ne(messageSendTable.id, claimed.id),
-                    inArray(messageSendRecipientTable.status, [
-                      "pending",
-                      "sent",
-                    ]),
-                    inArray(messageSendRecipientTable.email, emails),
-                  ),
-                )
-            ).map((row) => row.email)
-          : [],
-      );
-      const eligible = await filterEmailAudienceBatch(
-        recipients,
-        async (batch) =>
-          new Map(
-            batch.map((email) => [
-              email,
-              !isOptedOut(email) && !reached.has(email),
-            ]),
-          ),
-      );
-      const skipped = emails.flatMap((email) =>
-        isOptedOut(email)
-          ? [{ email, reason: "opted_out" }]
-          : reached.has(email)
-            ? [{ email, reason: "already_sent" }]
-            : [],
-      );
-      if (skipped.length)
-        await db
-          .insert(messageSendRecipientTable)
-          .values(
-            skipped.map((row) => ({
-              messageSendId: claimed.id,
-              ...row,
-              status: "skipped" as const,
-            })),
-          )
-          .onConflictDoNothing();
+    const recipients = await readEmailAudienceRecipients(
+      { audienceId: audience.audienceId },
+      actor,
+    );
 
-      // Only addresses this send has never claimed go out.
-      const fresh = eligible.length
-        ? await db
-            .insert(messageSendRecipientTable)
-            .values(
-              eligible.map((recipient) => ({
-                messageSendId: claimed.id,
-                email: recipient.email,
-              })),
-            )
-            .onConflictDoNothing()
-            .returning({
-              id: messageSendRecipientTable.id,
-              email: messageSendRecipientTable.email,
-            })
-        : [];
-      const byEmail = new Map<string, EmailAudienceRecipient>(
-        eligible.map((recipient) => [recipient.email, recipient]),
-      );
-      if (!fresh.length) return;
-      const recipientTemplate = (email: string, key: string) => {
-        const model = postmarkBroadcastModel(template, byEmail.get(email)!, {
-          recipientKey: key,
-        });
-        if (!ownUnsubscribe) return { TemplateModel: model };
-        const own = personalUnsubscribe(spot.brandId, email);
-        return {
-          TemplateModel: postmarkBroadcastModel(template, byEmail.get(email)!, {
-            recipientKey: key,
-            unsubscribeUrl: own.url,
-          }),
-          Headers: own.headers,
-        };
-      };
-      // One bulk request for the page: the email once, as a Postmark template,
-      // and each guest's fields. Postmark paces the release; its suppressed
-      // addresses are accepted and counted as failed on its side.
-      const bulk = await sendPostmarkBulk(token, {
-        From: fromHeader(sender),
-        ...(sender.replyTo ? { ReplyTo: sender.replyTo } : {}),
-        Subject: template.subject,
-        HtmlBody: template.html,
-        TextBody: template.text,
-        MessageStream: audience.messageStream,
-        Tag: spot.id,
-        TrackOpens: true,
-        TrackLinks: "HtmlAndText",
-        Messages: fresh.map((row) => {
-          const key = emailRecipientKey(spot.brandId, row.email);
-          return {
-            To: row.email,
-            ...recipientTemplate(row.email, key),
-            Metadata: emailRecipientMetadata({
-              sendId: claimed.id,
-              postId: spot.id,
-              recipientId: row.id,
-              key,
-            }),
-          };
-        }),
+    if (snapshot.schedule) {
+      const currentSend = await db.query.messageSendTable.findFirst({
+        where: eq(messageSendTable.id, claimed.id),
       });
-      // "sent" means handed to Postmark in this bulk request; delivery,
-      // bounces and suppressions arrive through its webhooks.
+      const currentSpot = await requireOwnedEmailSpot(
+        spot.id,
+        input.organizationId,
+      );
+      const { document } = await ensureEmailDocument({
+        platformPostId: spot.id,
+        ...actor,
+      });
+      if (
+        !input.scheduledJob ||
+        !broadcastJobCanRun(
+          currentSend?.snapshot.schedule,
+          input.scheduledJob,
+        ) ||
+        !["approved", "scheduled", "published"].includes(currentSpot.status) ||
+        contentHashOf(document).hash !== claimed.contentHash
+      )
+        throw new Error(
+          "Scheduled delivery paused or creative changed; review before sending.",
+        );
+    }
+    const emails = recipients.map((recipient) => recipient.email);
+    // Postmark-managed streams own suppressions; Custom streams use Growth preferences.
+    const unsubscribed = new Set<string>();
+    if (ownUnsubscribe) {
+      for (
+        let offset = 0;
+        offset < emails.length;
+        offset += OPT_OUT_READ_SIZE
+      ) {
+        const optedOutEmails = await brandOptOuts(
+          spot.brandId,
+          emails.slice(offset, offset + OPT_OUT_READ_SIZE),
+        );
+        for (const email of optedOutEmails) unsubscribed.add(email);
+      }
+    }
+    const isOptedOut = (email: string) =>
+      optedOut.has(email) || unsubscribed.has(email);
+    const eligible = recipients.filter(
+      (recipient) => !isOptedOut(recipient.email),
+    );
+    const skipped = emails
+      .filter(isOptedOut)
+      .map((email) => ({ email, reason: "opted_out" }));
+    for (let offset = 0; offset < skipped.length; offset += 1000)
+      await db
+        .insert(messageSendRecipientTable)
+        .values(
+          skipped.slice(offset, offset + 1000).map((row) => ({
+            messageSendId: claimed.id,
+            ...row,
+            status: "skipped" as const,
+          })),
+        )
+        .onConflictDoNothing();
+
+    // These rows support booking attribution and webhook identity, not send retries.
+    const recipientRows: Array<{ id: string; email: string }> = [];
+    for (let offset = 0; offset < eligible.length; offset += 1000) {
+      const rows = await db
+        .insert(messageSendRecipientTable)
+        .values(
+          eligible.slice(offset, offset + 1000).map((recipient) => ({
+            messageSendId: claimed.id,
+            email: recipient.email,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [
+            messageSendRecipientTable.messageSendId,
+            messageSendRecipientTable.email,
+          ],
+          set: {
+            status: "pending",
+            reason: null,
+            sentAt: null,
+            providerMessageId: null,
+          },
+        })
+        .returning({
+          id: messageSendRecipientTable.id,
+          email: messageSendRecipientTable.email,
+        });
+      recipientRows.push(...rows);
+    }
+    const byEmail = new Map<string, EmailAudienceRecipient>(
+      eligible.map((recipient) => [recipient.email, recipient]),
+    );
+    if (!recipientRows.length)
+      throw new Error("The audience has no eligible recipients.");
+    const recipientTemplate = (email: string, key: string) => {
+      const model = postmarkBroadcastModel(template, byEmail.get(email)!, {
+        recipientKey: key,
+      });
+      if (!ownUnsubscribe) return { TemplateModel: model };
+      const own = personalUnsubscribe(spot.brandId, email);
+      return {
+        TemplateModel: postmarkBroadcastModel(template, byEmail.get(email)!, {
+          recipientKey: key,
+          unsubscribeUrl: own.url,
+        }),
+        Headers: own.headers,
+      };
+    };
+    // One request for the entire broadcast; Postmark owns pacing and suppressions.
+    const bulk = await sendPostmarkBulk(token, {
+      From: fromHeader(sender),
+      ...(sender.replyTo ? { ReplyTo: sender.replyTo } : {}),
+      Subject: template.subject,
+      HtmlBody: template.html,
+      TextBody: template.text,
+      MessageStream: audience.messageStream,
+      Tag: spot.id,
+      TrackOpens: true,
+      TrackLinks: "HtmlAndText",
+      Messages: recipientRows.map((row) => {
+        const key = emailRecipientKey(spot.brandId, row.email);
+        return {
+          To: row.email,
+          ...recipientTemplate(row.email, key),
+          Metadata: emailRecipientMetadata({
+            sendId: claimed.id,
+            postId: spot.id,
+            recipientId: row.id,
+            key,
+          }),
+        };
+      }),
+    });
+
+    const receipt: EmailDeliveryReceipt = {
+      provider: "postmark",
+      messageSendId: claimed.id,
+      audienceReference: audience.audienceId,
+      bulkRequest: {
+        id: bulk.Id,
+        submittedAt: bulk.SubmittedAt,
+        recipientCount: bulk.TotalMessages,
+      },
+    };
+    // A receipt of the accepted request, not another scheduling or delivery status.
+    await db
+      .update(platformPostTable)
+      .set({
+        metadata: sql`coalesce(${platformPostTable.metadata}, '{}'::jsonb) || ${JSON.stringify({ emailDelivery: receipt })}::jsonb`,
+      })
+      .where(eq(platformPostTable.id, spot.id));
+    // "sent" means handed to Postmark in this bulk request; delivery,
+    // bounces and suppressions arrive through its webhooks.
+    for (let offset = 0; offset < recipientRows.length; offset += 1000) {
       await db
         .update(messageSendRecipientTable)
         .set({
@@ -746,31 +693,9 @@ export async function dispatchBrandSend(input: {
         .where(
           inArray(
             messageSendRecipientTable.id,
-            fresh.map((row) => row.id),
+            recipientRows.slice(offset, offset + 1000).map((row) => row.id),
           ),
         );
-    };
-
-    // "done" means a run sent the last page and died before marking it sent.
-    let cursor: string | null =
-      claimed.dispatchCursor === "done" ? null : claimed.dispatchCursor;
-    let more = claimed.dispatchCursor !== "done";
-    while (more) {
-      const page = await readEmailAudienceBatch(
-        {
-          snapshotId: audience.snapshotId,
-          pageSize: PAGE_SIZE,
-          ...(cursor ? { pageToken: cursor } : {}),
-        },
-        actor,
-      );
-      await sendPage(page.recipients);
-      cursor = page.nextPageToken;
-      more = cursor !== null;
-      await db
-        .update(messageSendTable)
-        .set({ dispatchCursor: cursor ?? "done", updatedAt: new Date() })
-        .where(eq(messageSendTable.id, claimed.id));
     }
 
     const now = new Date();
@@ -809,35 +734,16 @@ export async function brandSendProgress(
   return counts;
 }
 
-/** Ready snapshots of the brand's audiences, newest first, for the picker. */
+/** Current audiences for the brand's send picker. */
 export async function brandSendAudiences(
   input: { brandId: string } & Pick<Actor, "organizationId">,
 ) {
-  const audiences = await db.query.emailAudienceTable.findMany({
-    where: eq(emailAudienceTable.brandId, input.brandId),
-  });
-  if (!audiences.length) return [];
-  const snapshots = await db.query.emailAudienceSnapshotTable.findMany({
-    where: and(
-      inArray(
-        emailAudienceSnapshotTable.audienceId,
-        audiences.map((audience) => audience.id),
-      ),
-      eq(emailAudienceSnapshotTable.status, "ready"),
-    ),
-    orderBy: (table, { desc }) => [desc(table.createdAt)],
-    limit: 20,
-  });
-  const names = new Map(
-    audiences.map((audience) => [audience.id, audience.name]),
-  );
-  return snapshots
-    .filter((snapshot) => snapshot.expiresAt > new Date())
-    .map((snapshot) => ({
-      id: snapshot.id,
-      name: names.get(snapshot.audienceId) ?? "Audience",
-      recipientCount: snapshot.recipientCount,
-      consentConfirmed: Boolean(snapshot.definition.consentConfirmed),
-      createdAt: snapshot.createdAt,
-    }));
+  const audiences = await listEmailAudiences({ brandId: input.brandId }, input);
+  return audiences.map((audience) => ({
+    id: audience.id,
+    name: audience.name,
+    recipientCount: audience.recipientCount,
+    consentConfirmed: audience.definition.consentConfirmed,
+    createdAt: new Date(audience.createdAt),
+  }));
 }

@@ -353,9 +353,9 @@ export const growthActionPolicies = {
     get: read(),
     audiences: read(),
     previewAudience: read(),
-    audienceSnapshot: read(),
   },
   emailWrite: {
+    addAudienceMembers: write(),
     prepareBroadcast: write(),
     sendBroadcastTest: write({
       approval: "user",
@@ -407,7 +407,6 @@ export const growthActionPolicies = {
     }),
     cancelSequenceEnrollment: write({ idempotent: true, reversible: false }),
     saveAudience: write(),
-    compileAudience: write({ consequence: "background-run" }),
     createSlot: write(),
     createDigestFromRow: write(),
     draftFromTemplate: write({ consequence: "model-write" }),

@@ -39,7 +39,7 @@ export function SendCard({
         input: { platformPostId: workspace.spot.id },
       }),
     });
-  const [snapshotId, setSnapshotId] = useState<string>();
+  const [audienceId, setAudienceId] = useState<string>();
   const [confirming, setConfirming] = useState(false);
 
   const blockers = workspace.brand.sendBlockers;
@@ -119,12 +119,12 @@ export function SendCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={snapshotId} onValueChange={setSnapshotId}>
+            <Select value={audienceId} onValueChange={setAudienceId}>
               <SelectTrigger className="w-[260px]" aria-label="Audience">
                 <SelectValue
                   placeholder={
                     audiences.data?.length === 0
-                      ? "No compiled audience"
+                      ? "No saved audience"
                       : "Audience"
                   }
                 />
@@ -136,7 +136,10 @@ export function SendCard({
                     value={audience.id}
                     disabled={!audience.consentConfirmed}
                   >
-                    {audience.name} · {audience.recipientCount ?? 0} guests
+                    {audience.name} ·{" "}
+                    {audience.recipientCount === null
+                      ? "Live audience"
+                      : `${audience.recipientCount.toLocaleString()} guests`}
                     {audience.consentConfirmed
                       ? ""
                       : " · permission unconfirmed"}
@@ -147,14 +150,14 @@ export function SendCard({
             <button
               type="button"
               onClick={() =>
-                snapshotId &&
+                audienceId &&
                 prepare.mutate({
                   platformPostId: workspace.spot.id,
-                  snapshotId,
+                  audienceId,
                 })
               }
               disabled={
-                !snapshotId || prepare.isPending || dirty || !canDispatch
+                !audienceId || prepare.isPending || dirty || !canDispatch
               }
               className={buttonClass}
             >

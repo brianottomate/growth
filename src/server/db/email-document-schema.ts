@@ -44,7 +44,7 @@ export const messageSendStatusEnum = pgEnum("message_send_status", [
 /**
  * Immutable delivery intent and outcome for an approved email revision.
  * Customer.io sends keep membership in the provider; Postmark sends read a
- * compiled audience snapshot and record each guest in message_send_recipient.
+ * live audience and record each guest for booking attribution.
  */
 export const messageSendTable = pgTable(
   "message_send",
@@ -75,8 +75,6 @@ export const messageSendTable = pgTable(
     status: messageSendStatusEnum().default("draft").notNull(),
     snapshot: jsonb().$type<MessageSendSnapshot>().notNull(),
     idempotencyKey: t.text().notNull(),
-    /** Postmark sends: the audience page to resume from; null at the start. */
-    dispatchCursor: t.text(),
     error: t.text(),
     createdBy: t.text().references(() => userTable.id, {
       onDelete: "set null",
@@ -111,9 +109,8 @@ export const messageSendTable = pgTable(
 export type MessageSend = typeof messageSendTable.$inferSelect;
 
 /**
- * One row per guest a Postmark send reaches or deliberately skips. The row is
- * written before the provider call, so a retried or resumed send never emails
- * the same address twice.
+ * Recipient identity and outcomes used by webhooks and booking attribution.
+ * Broadcast execution is claimed once at the send level.
  */
 export const messageSendRecipientTable = pgTable(
   "message_send_recipient",

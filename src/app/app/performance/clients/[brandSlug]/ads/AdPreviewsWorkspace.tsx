@@ -30,6 +30,7 @@ import {
 } from "@/lib/ad-collection-groups";
 import { SendToCampaign } from "./SendToCampaign";
 import { WriteSearchAdsButton } from "@/app/app/brands/[brandSlug]/ads/_views/WriteSearchAdsButton";
+import { FromCarousels } from "./FromCarousels";
 import { StudioGeneration } from "./StudioGeneration";
 import { AddAdDialog } from "./AddAdDialog";
 import { StudioIdeas, type StudioIdea } from "./StudioIdeas";
@@ -134,6 +135,7 @@ export function AdPreviewsWorkspace({
         brandSlug={brandSlug}
         connected={connected}
       />
+      {!reviewPreview && <FromCarousels brandId={brandId} />}
       {!reviewPreview && (
         <SendToCampaign brandId={brandId} brandSlug={brandSlug} />
       )}

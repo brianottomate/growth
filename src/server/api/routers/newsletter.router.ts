@@ -14,9 +14,8 @@ import {
 import { emailAudienceDefinitionSchema } from "@/lib/email-audience";
 import {
   listEmailAudiencesAction,
+  addEmailAudienceMembersAction,
   saveEmailAudienceAction,
-  compileEmailAudienceAction,
-  emailAudienceSnapshotAction,
 } from "@/server/ai/capabilities/email-audiences";
 import {
   emailHeaderFormatIdSchema,
@@ -175,9 +174,8 @@ export const newsletterRouter = {
         userId: context.workspace.userId,
       }),
     ),
+  addAudienceMembers: actionProcedure(addEmailAudienceMembersAction),
   saveAudience: actionProcedure(saveEmailAudienceAction),
-  compileAudience: actionProcedure(compileEmailAudienceAction),
-  audienceSnapshot: actionProcedure(emailAudienceSnapshotAction),
   workspace: actionProcedure(getEmailDraftAction),
 
   generateDraft: actionProcedure(generateEmailDraftAction),
@@ -203,6 +201,7 @@ export const newsletterRouter = {
         viewAs: z.enum(["template", "full", "sparse"]).optional(),
         /** The editor's block ids stay on the preview's blocks. */
         blockIds: z.boolean().optional(),
+        checkLinks: z.boolean().optional(),
       }),
     )
     .handler(async ({ context: ctx, input }) => {
@@ -441,7 +440,7 @@ export const newsletterRouter = {
     }),
 
   prepareBrandSend: protectedProcedure
-    .input(z.object({ platformPostId: z.string(), snapshotId: z.string() }))
+    .input(z.object({ platformPostId: z.string(), audienceId: z.string() }))
     .handler(async ({ context: ctx, input }) => {
       const organizationId = await organizationIdForUser(
         ctx.db,

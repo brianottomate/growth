@@ -92,18 +92,20 @@ export async function intakeSetup(token: string) {
     try {
       metaChoice = await getMetaConnectChoice(brand.id);
       if (!metaChoice) metaUnavailable = true;
-      const summary = (
-        await loadPerformanceConnections(brand.organizationId!, [brand.id])
-      ).get(brand.id);
-      if (summary)
-        metaChecks = intakeSetupSummary(
-          summary,
-          "unknown",
-          "unknown",
-          true,
-        ).checks.filter((check) =>
-          ["meta", "billing", "pixel"].includes(check.key),
-        );
+      if (metaChoice?.selectedId) {
+        const summary = (
+          await loadPerformanceConnections(brand.organizationId!, [brand.id])
+        ).get(brand.id);
+        if (summary)
+          metaChecks = intakeSetupSummary(
+            summary,
+            "unknown",
+            "unknown",
+            true,
+          ).checks.filter((check) =>
+            ["meta", "billing", "pixel"].includes(check.key),
+          );
+      }
     } catch (error) {
       console.error("intake setup: meta accounts unavailable", error);
       metaUnavailable = true;
@@ -113,7 +115,11 @@ export async function intakeSetup(token: string) {
   return {
     sentAt: latest?.submittedAt.toISOString() ?? null,
     answers: latest?.answers ?? null,
-    connections,
+    connections: connections.map((row) =>
+      row.key === "meta-ads" && metaChoice && !metaChoice.selectedId
+        ? { ...row, connected: false, account: null }
+        : row,
+    ),
     metaChoice,
     metaChecks,
     metaUnavailable,
@@ -166,7 +172,7 @@ export async function startIntakeConnect(
 export async function syncIntakeConnect(token: string, connected: string) {
   const brand = await getBrandByConnectToken(token);
   if (!brand) return null;
-  await syncBrandConnect(brand.id, connected === "meta-ads");
+  await syncBrandConnect(brand.id);
   return { ok: true };
 }
 

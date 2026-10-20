@@ -22,7 +22,7 @@ import {
   completeMetaConnectSetup,
   loadMetaConnectAccounts,
 } from "./meta-connect-setup.service";
-import { selectMetaSetupAccount } from "@/lib/meta-setup-selection";
+import { selectSavedMetaAccount } from "@/lib/meta-setup-selection";
 
 // ---- BRAND CONNECT: the client-facing onboarding link ----------------
 //
@@ -201,7 +201,7 @@ export async function ensureBrandConnect(
  * constraint — the lookup must come first because profile create is NOT
  * idempotent, and it must never be auto-retried.
  */
-async function ensureBrandZernioProfile(brand: {
+export async function ensureBrandZernioProfile(brand: {
   id: string;
   name: string;
   zernioProfileId: string | null;
@@ -285,6 +285,9 @@ export async function startBrandConnect(
   );
   if (!channel) throw new Error("Unknown channel");
 
+  if (channelKey === "meta-ads") {
+    return `${env.NEXT_PUBLIC_BASE_URL}/connect/${token}/meta/start?returnTo=${returnTo}`;
+  }
   const profileId = await ensureBrandZernioProfile(brand);
   return getZernioConnectUrl({
     target: channel.target,
@@ -424,8 +427,13 @@ export async function selectMetaAccountByConnectToken(
   const context = await loadMetaConnectAccounts(brand.id);
   const account =
     context &&
-    selectMetaSetupAccount(context.accounts, adAccountId, context.blockedIds);
+    selectSavedMetaAccount(
+      context.accounts,
+      context.brand.performanceSettings?.metaAdsDestination?.adAccountId,
+      context.blockedIds,
+      adAccountId,
+    );
   if (!account || account.selectable === false)
-    throw new Error("Account unavailable");
+    throw new Error("Connect Meta before choosing an ad account");
   return completeMetaConnectSetup(brand.id, { clientAdAccountId: account.id });
 }

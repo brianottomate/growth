@@ -23,8 +23,8 @@ const actor = (ctx: { orgId: string; userId: string }) => ({
 const sendInput = z.object({ messageSendId: z.string().min(1) });
 export const prepareBroadcast = growthAction({
   description:
-    "Prepare an existing approved email with a compiled same-brand audience. Freezes the rendered creative, sender, booking links and audience. Does not send or schedule. Existing posts and series remain the content owners.",
-  inputSchema: z.object({ platformPostId: z.string(), snapshotId: z.string() }),
+    "Prepare an existing approved email with a saved same-brand audience. Freezes the rendered creative, sender, booking links and audience reference. Database-list membership is read live when sending. Does not send or schedule. Existing posts and series remain the content owners.",
+  inputSchema: z.object({ platformPostId: z.string(), audienceId: z.string() }),
   outputSchema: getEmailDraftOutputSchema.shape.messageSends.element,
   nativeOutputSchema:
     getEmailDraftOutputSchema.shape.messageSends.element.extend({
@@ -68,12 +68,13 @@ const previewSend = z.object({
     kind: z.enum(["wanderos_operators", "guests", "subscribers"]),
     provider: z.enum(["postmark", "customerio"]),
     label: z.string(),
-    snapshotId: z.string().optional(),
+    audienceId: z.string().optional(),
     serverId: z.number().optional(),
     messageStream: z.string().optional(),
     segmentId: z.number().optional(),
   }),
-  recipientCount: z.number(),
+  recipientCount: z.number().nullable(),
+  membership: z.literal("live"),
   scheduledAt: z.string(),
   localTime: z.string(),
 });
@@ -93,7 +94,6 @@ export const scheduleBroadcastsAction = growthAction({
     "Approve and queue exactly the reviewed prepared broadcasts at fixed calendar times using the shared sequence delivery queue. Requires explicit user approval and confirmation that conflicting Customer.io sends have stopped. One approval covers the supplied set. queued=false means saved but recovery is needed. Never substitute a guessed reviewedHash.",
   inputSchema: broadcastScheduleInput.extend({
     reviewedHash: z.string(),
-    customerIoStopped: z.literal(true),
   }),
   outputSchema: z.object({
     sends: z.array(
@@ -104,7 +104,7 @@ export const scheduleBroadcastsAction = growthAction({
 });
 export const pauseBroadcastAction = growthAction({
   description:
-    "Pause an existing scheduled broadcast before the next recipient page. Already accepted provider requests cannot be recalled. Reapprove a future date to resume unstarted work; investigate attempted work separately.",
+    "Pause an existing scheduled broadcast before its Postmark Bulk submission. Already accepted provider requests cannot be recalled. Reapprove a future date to resume unstarted work; investigate attempted work separately.",
   inputSchema: sendInput,
   outputSchema: z.object({ paused: z.boolean() }),
   execute: (input, ctx) => pauseBroadcast(input.messageSendId, actor(ctx)),
@@ -131,7 +131,6 @@ export const broadcastStatus = growthAction({
         runtimeId: z.string(),
         state: z.enum(["approved", "scheduled", "paused"]),
         queueMessageId: z.string().optional(),
-        customerIoStopped: z.literal(true),
       })
       .nullable(),
   }),

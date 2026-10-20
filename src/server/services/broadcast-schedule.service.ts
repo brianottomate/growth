@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { env } from "@/env";
 import { db, withTransaction } from "@/server/db";
 import { messageSendTable, platformPostTable } from "@/server/db/schema";
@@ -17,7 +17,7 @@ import {
   ensureEmailDocument,
   requireOwnedEmailSpot,
 } from "./email-document.service";
-import { getEmailAudienceSnapshot } from "./email-audience.service";
+import { getEmailAudience } from "./email-audience.service";
 import { dispatchBrandSend } from "./brand-email-send.service";
 import { getWanderMembership } from "@/server/wander-workspace";
 import {
@@ -81,17 +81,16 @@ export async function previewBroadcastSchedule(
     const audience = send.snapshot.audience;
     if (audience.provider !== "postmark")
       throw new Error("A Postmark audience is required.");
-    const snapshot = await getEmailAudienceSnapshot(
-      { snapshotId: audience.snapshotId },
+    const selectedAudience = await getEmailAudience(
+      { audienceId: audience.audienceId },
       actor,
     );
     if (
-      snapshot.status !== "ready" ||
-      !snapshot.definition.consentConfirmed ||
-      Date.parse(dueAt) >= new Date(snapshot.expiresAt).getTime()
+      selectedAudience.brandId !== spot.brandId ||
+      !selectedAudience.definition.consentConfirmed
     )
       throw new Error(
-        "The approved audience must be ready, consented and valid through the send date. Compile a fresh snapshot if needed.",
+        "The audience must belong to this brand and have marketing permission.",
       );
     sends.push({
       messageSendId: send.id,
@@ -102,7 +101,8 @@ export async function previewBroadcastSchedule(
       text: send.snapshot.preview.text,
       sender: send.snapshot.sender ?? null,
       audience: send.snapshot.audience,
-      recipientCount: snapshot.recipientCount ?? 0,
+      recipientCount: selectedAudience.recipientCount,
+      membership: "live" as const,
       scheduledAt: dueAt,
       localTime: new Intl.DateTimeFormat("en-US", {
         timeZone: input.timeZone,
@@ -116,7 +116,7 @@ export async function previewBroadcastSchedule(
     reviewedHash: sha({
       brandId: input.brandId,
       timeZone: input.timeZone,
-      sends,
+      sends: sends.map(({ recipientCount: _recipientCount, ...send }) => send),
     }),
     readiness: lifecycleReadiness(),
   };
@@ -162,6 +162,7 @@ async function queueSend(
     receipt = await publishEmailJob({
       path: "/api/jobs/email-broadcast",
       failurePath: "/api/jobs/email-broadcast/failure",
+      retries: 0,
       key: `broadcast-${messageSendId}-${Date.parse(dueAt)}`,
       body: { messageSendId, dueAt, runtimeId },
       dueAt: new Date(dueAt),
@@ -197,7 +198,6 @@ async function queueSend(
     await tx
       .update(messageSendTable)
       .set({
-        error: null,
         snapshot: {
           ...current.snapshot,
           schedule: {
@@ -220,7 +220,6 @@ async function queueSend(
 export async function scheduleBroadcasts(
   input: BroadcastScheduleInput & {
     reviewedHash: string;
-    customerIoStopped: true;
   },
   actor: Actor,
 ) {
@@ -297,7 +296,6 @@ export async function scheduleBroadcasts(
               timeZone: input.timeZone,
               runtimeId,
               state: "approved",
-              customerIoStopped: true,
             },
           },
           updatedAt: new Date(),
@@ -422,7 +420,7 @@ export async function recordBroadcastQueueFailure(input: {
       .set({
         status: "failed",
         error:
-          "QStash retries exhausted before delivery. Check the dead-letter queue before preparing a new send.",
+          "QStash delivery failed before Postmark handoff. Check the dead-letter queue before preparing a new send.",
         failedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -459,11 +457,28 @@ export async function executeBroadcastJob(input: {
     await queueSend(send.id, input.dueAt, input.runtimeId);
     return { status: "queued" };
   }
-  await dispatchBrandSend({
-    messageSendId: send.id,
-    organizationId: membership.organizationId,
-    userId: send.approvedBy,
-    scheduledJob: input,
-  });
+  try {
+    await dispatchBrandSend({
+      messageSendId: send.id,
+      organizationId: membership.organizationId,
+      userId: send.approvedBy,
+      scheduledJob: input,
+    });
+  } catch (error) {
+    // Preflight failures have not claimed a run. Keep them recoverable and visible.
+    await db
+      .update(messageSendTable)
+      .set({
+        error:
+          error instanceof Error ? error.message : "Scheduled delivery failed",
+      })
+      .where(
+        and(
+          eq(messageSendTable.id, send.id),
+          eq(messageSendTable.status, "approved"),
+        ),
+      );
+    throw error;
+  }
   return { status: "sent" };
 }

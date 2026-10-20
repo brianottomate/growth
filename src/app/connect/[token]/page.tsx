@@ -47,12 +47,7 @@ export default async function ConnectPage({
   const query = await searchParams;
   if (query.connected && !query.error) {
     try {
-      await syncBrandConnect(
-        brand.id,
-        [query.connected]
-          .flat()
-          .some((value) => value === "meta-ads" || value === "metaads"),
-      );
+      await syncBrandConnect(brand.id);
     } catch (error) {
       console.error("brand connect sync failed", error);
     }
@@ -75,18 +70,20 @@ export default async function ConnectPage({
     try {
       metaChoice = await getMetaConnectChoice(brand.id);
       if (!metaChoice) metaUnavailable = true;
-      const summary = (
-        await loadPerformanceConnections(brand.organizationId!, [brand.id])
-      ).get(brand.id);
-      if (summary)
-        setupChecks = intakeSetupSummary(
-          summary,
-          "unknown",
-          "unknown",
-          true,
-        ).checks.filter((check) =>
-          ["meta", "billing", "pixel"].includes(check.key),
-        );
+      if (metaChoice?.selectedId) {
+        const summary = (
+          await loadPerformanceConnections(brand.organizationId!, [brand.id])
+        ).get(brand.id);
+        if (summary)
+          setupChecks = intakeSetupSummary(
+            summary,
+            "unknown",
+            "unknown",
+            true,
+          ).checks.filter((check) =>
+            ["meta", "billing", "pixel"].includes(check.key),
+          );
+      }
     } catch (error) {
       console.error("Connect account choice unavailable", {
         brandId: brand.id,
@@ -107,8 +104,14 @@ export default async function ConnectPage({
     <ConnectView
       token={token}
       brand={brand}
-      status={status}
-      metaConnected={metaConnected}
+      status={status.map((row) =>
+        row.key === "meta-ads" && metaChoice && !metaChoice.selectedId
+          ? { ...row, connected: false, accounts: [], externalIds: [] }
+          : row,
+      )}
+      metaConnected={
+        metaConnected && (metaUnavailable || Boolean(metaChoice?.selectedId))
+      }
       metaChoice={metaChoice}
       metaUnavailable={metaUnavailable}
       setupChecks={setupChecks}

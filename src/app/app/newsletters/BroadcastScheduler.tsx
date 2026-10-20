@@ -65,9 +65,8 @@ export function BroadcastScheduler({
       ? "America/Denver"
       : Intl.DateTimeFormat().resolvedOptions().timeZone,
   );
-  const [snapshotId, setSnapshotId] = useState("");
+  const [selectedAudienceId, setSelectedAudienceId] = useState("");
   const [review, setReview] = useState<Review>();
-  const [cutover, setCutover] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -79,7 +78,8 @@ export function BroadcastScheduler({
   const usableAudiences =
     audiences.data?.filter((audience) => audience.consentConfirmed) ?? [];
   const audienceId =
-    snapshotId || (usableAudiences.length === 1 ? usableAudiences[0]!.id : "");
+    selectedAudienceId ||
+    (usableAudiences.length === 1 ? usableAudiences[0]!.id : "");
   const prepare = useMutation(
     orpc.newsletter.prepareBroadcast.mutationOptions(),
   );
@@ -109,7 +109,6 @@ export function BroadcastScheduler({
     setDates(initial);
     setSelected(eligible.map((email) => email.id));
     setReview(undefined);
-    setCutover(false);
     setError("");
     setOpen(true);
   };
@@ -127,7 +126,7 @@ export function BroadcastScheduler({
         const scheduledAt = resolveZonedDateTime({ localDateTime, timeZone });
         const send = await prepare.mutateAsync({
           platformPostId: email.id,
-          snapshotId: audienceId,
+          audienceId,
         });
         sends.push({ messageSendId: send.id, scheduledAt });
       }
@@ -153,7 +152,6 @@ export function BroadcastScheduler({
         timeZone,
         sends: prepared,
         reviewedHash: review.reviewedHash,
-        customerIoStopped: true,
       });
       const failed = result.sends.filter((send) => !send.queued).length;
       if (failed) {
@@ -211,7 +209,6 @@ export function BroadcastScheduler({
                 disabled={schedule.isPending}
                 onClick={() => {
                   setReview(undefined);
-                  setCutover(false);
                 }}
               >
                 <ChevronLeft className="size-4" />
@@ -233,9 +230,7 @@ export function BroadcastScheduler({
               </Button>
               {review ? (
                 <Button
-                  disabled={
-                    !cutover || !review.readiness.ready || schedule.isPending
-                  }
+                  disabled={!review.readiness.ready || schedule.isPending}
                   onClick={() => void approveSchedule()}
                 >
                   <Check className="size-4" />
@@ -269,10 +264,10 @@ export function BroadcastScheduler({
                       ? "Loading audiences…"
                       : "Choose an audience"
                   }
-                  onValueChange={setSnapshotId}
+                  onValueChange={setSelectedAudienceId}
                   options={usableAudiences.map((audience) => ({
                     value: audience.id,
-                    label: `${audience.name} · ${(audience.recipientCount ?? 0).toLocaleString()} people`,
+                    label: `${audience.name} · ${audience.recipientCount === null ? "Live audience" : `${audience.recipientCount.toLocaleString()} people`}`,
                   }))}
                 />
               </div>
@@ -383,6 +378,12 @@ export function BroadcastScheduler({
                 <p className="mt-1 text-xs text-muted-foreground">
                   From {review.sends[0]?.sender?.fromEmail}
                 </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {review.sends[0]?.recipientCount?.toLocaleString() ??
+                    "Calculated at send time"}{" "}
+                  current recipients.
+                  {" Membership is read when delivery starts."}
+                </p>
               </div>
               <div className="rounded-xl border p-4">
                 <p className="text-xs text-muted-foreground">Delivery</p>
@@ -418,17 +419,6 @@ export function BroadcastScheduler({
                 activated.
               </p>
             )}
-            <div className="flex items-start gap-3 rounded-lg border p-3">
-              <Checkbox
-                id="broadcast-cutover"
-                checked={cutover}
-                onCheckedChange={(checked) => setCutover(checked === true)}
-              />
-              <Label htmlFor="broadcast-cutover">
-                I’ve checked that no conflicting Customer.io emails are
-                scheduled.
-              </Label>
-            </div>
           </div>
         )}
         {error && (

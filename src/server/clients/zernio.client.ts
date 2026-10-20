@@ -215,11 +215,15 @@ export async function getZernioConnectUrl(input: {
   target: ZernioConnectPlatform;
   profileId: string;
   redirectUrl: string;
+  headless?: boolean;
+  force?: boolean;
 }): Promise<string> {
   const params = new URLSearchParams({
     profileId: input.profileId,
     redirect_url: input.redirectUrl,
   });
+  if (input.headless) params.set("headless", "true");
+  if (input.force) params.set("force", "true");
   if (input.target.kind === "posting" && input.target.loginMethod) {
     params.set("loginMethod", input.target.loginMethod);
   }
@@ -2210,4 +2214,59 @@ export async function deleteZernioAdAudience(
   await zernioFetch(`/ads/audiences/${encodeURIComponent(audienceId)}`, {
     method: "DELETE",
   });
+}
+
+/** Headless credentials are short-lived and come only from this browser's OAuth return. */
+type PendingMetaGrant = {
+  profileId: string;
+  tempToken: string;
+  connectToken: string;
+  userProfile: { id: string; name: string; profilePicture?: string };
+};
+export async function listPendingMetaPages(
+  grant: PendingMetaGrant,
+): Promise<{ id: string; name: string }[]> {
+  const data = await zernioFetch<{ pages: { id: string; name: string }[] }>(
+    `/connect/facebook/select-page?${new URLSearchParams({ profileId: grant.profileId })}`,
+    {
+      headers: {
+        "X-Connect-Token": grant.connectToken,
+        "X-Temp-Token": grant.tempToken,
+      },
+    },
+  );
+  if (!Array.isArray(data.pages)) throw new Error("Meta did not return Pages");
+  return data.pages.map((p) => ({ id: p.id, name: p.name }));
+}
+export async function finishPendingMetaPage(
+  grant: PendingMetaGrant,
+  pageId: string,
+) {
+  return zernioFetch(`/connect/facebook/select-page`, {
+    method: "POST",
+    headers: {
+      "X-Connect-Token": grant.connectToken,
+      "X-Temp-Token": grant.tempToken,
+    },
+    body: JSON.stringify({
+      profileId: grant.profileId,
+      pageId,
+      userProfile: grant.userProfile,
+    }),
+  });
+}
+export async function scopeZernioMetaAccount(
+  profileId: string,
+  adAccountId: string,
+  postingAccountId: string,
+) {
+  const result = await zernioFetch<{
+    alreadyConnected?: boolean;
+    accountId?: string;
+  }>(
+    `/connect/facebook/ads?${new URLSearchParams({ profileId, adAccountId, accountId: postingAccountId })}`,
+  );
+  if (!result.alreadyConnected || !result.accountId)
+    throw new Error("Meta account scope could not be saved");
+  return result.accountId;
 }

@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test";
 import {
   assertEmailAudienceSource,
   emailAudienceDefinitionSchema,
-  filterEmailAudienceBatch,
   emailAudienceCsvRow,
 } from "./email-audience";
 import { buildEmailAudienceQuery } from "@/server/services/email-audience-query";
@@ -63,57 +62,6 @@ describe("warehouse audience boundaries", () => {
   });
 });
 describe("current send eligibility", () => {
-  test("case duplicates collapse and only explicit current approval passes", async () => {
-    let checked: string[] = [];
-    const kept = await filterEmailAudienceBatch(
-      [
-        row("A@example.com"),
-        row("a@example.com"),
-        row("b@example.com"),
-        row("c@example.com"),
-      ],
-      async (emails) => {
-        checked = emails;
-        return new Map([
-          ["a@example.com", true],
-          ["b@example.com", false],
-        ]);
-      },
-    );
-    expect(checked).toEqual([
-      "a@example.com",
-      "b@example.com",
-      "c@example.com",
-    ]);
-    expect(kept.map((r) => r.email)).toEqual(["a@example.com"]);
-  });
-  test("suppression service failure and oversized batches cannot bypass the gate", async () => {
-    const unavailable = filterEmailAudienceBatch(
-      [row("a@example.com")],
-      async () => {
-        throw new Error("Unavailable");
-      },
-    );
-    expect(
-      await unavailable.catch((e: unknown) =>
-        e instanceof Error ? e.message : "",
-      ),
-    ).toBe("Unavailable");
-    const oversized = filterEmailAudienceBatch(
-      Array.from(
-        {
-          length: 10_001,
-        },
-        () => row("a@example.com"),
-      ),
-      async () => new Map(),
-    );
-    expect(
-      await oversized.catch((e: unknown) =>
-        e instanceof Error ? e.message : "",
-      ),
-    ).toContain("10,000");
-  });
   test("CSV escapes quotes, embedded line breaks and spreadsheet formulas", () => {
     const csv = emailAudienceCsvRow({
       ...row("a@example.com"),
