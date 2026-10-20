@@ -79,6 +79,8 @@ export type BroadcastSchedule = {
   timeZone: string;
   runtimeId: string;
   state: "approved" | "scheduled" | "paused";
+  /** Exact operator acknowledgement required for newly scheduled sends. */
+  customerIoStopped?: true;
   queueMessageId?: string;
 };
 

@@ -10,7 +10,10 @@ import {
   emailRecipientMetadata,
 } from "@/server/email/recipient-identity";
 import { createId } from "@/server/db/utils";
-import { broadcastJobCanRun } from "@/lib/broadcast-schedule";
+import {
+  broadcastCanEnterProviderHandoff,
+  broadcastJobCanRun,
+} from "@/lib/broadcast-schedule";
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 
@@ -41,6 +44,7 @@ import {
   postmarkServerToken,
   sendPostmarkBatch,
   sendPostmarkBulk,
+  type PostmarkBulkRequest,
 } from "@/server/clients/postmark.client";
 import { db, withTransaction } from "@/server/db";
 import {
@@ -429,52 +433,11 @@ export async function dispatchBrandSend(input: {
     );
   assertPreparedPostmarkSetupCurrent(spot, snapshot);
   const audience = snapshot.audience;
-
-  const claimed = await withTransaction(async (tx) => {
-    const [current] = await tx
-      .select({ status: platformPostTable.status })
-      .from(platformPostTable)
-      .where(eq(platformPostTable.id, spot.id))
-      .for("update");
-    if (
-      !current ||
-      !["approved", "scheduled", "published"].includes(current.status)
-    )
-      throw new Error("Approve the email creative before sending.");
-    if (snapshot.schedule) {
-      const [scheduled] = await tx
-        .select()
-        .from(messageSendTable)
-        .where(eq(messageSendTable.id, send.id))
-        .for("update");
-      if (
-        !input.scheduledJob ||
-        !broadcastJobCanRun(scheduled?.snapshot.schedule, input.scheduledJob)
-      )
-        throw new Error("The delivery schedule changed or paused.");
-    }
-    const [row] = await tx
-      .update(messageSendTable)
-      .set({
-        status: "sending",
-        sentBy: input.userId ?? send.approvedBy,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(messageSendTable.id, send.id),
-          eq(messageSendTable.status, "approved"),
-        ),
-      )
-      .returning();
-    return row;
-  });
-  if (!claimed)
-    throw new Error("This send is not approved or is already being sent.");
   const actor = {
     organizationId: input.organizationId,
-    userId: input.userId ?? claimed.approvedBy ?? claimed.createdBy ?? "",
+    userId: input.userId ?? send.approvedBy ?? send.createdBy ?? "",
   };
+  let claimed: typeof send | undefined;
 
   try {
     {
@@ -482,7 +445,7 @@ export async function dispatchBrandSend(input: {
         platformPostId: spot.id,
         ...actor,
       });
-      if (contentHashOf(document).hash !== claimed.contentHash)
+      if (contentHashOf(document).hash !== send.contentHash)
         throw new Error(
           "The email changed after it was approved. Prepare and approve it again.",
         );
@@ -528,31 +491,6 @@ export async function dispatchBrandSend(input: {
       actor,
     );
 
-    if (snapshot.schedule) {
-      const currentSend = await db.query.messageSendTable.findFirst({
-        where: eq(messageSendTable.id, claimed.id),
-      });
-      const currentSpot = await requireOwnedEmailSpot(
-        spot.id,
-        input.organizationId,
-      );
-      const { document } = await ensureEmailDocument({
-        platformPostId: spot.id,
-        ...actor,
-      });
-      if (
-        !input.scheduledJob ||
-        !broadcastJobCanRun(
-          currentSend?.snapshot.schedule,
-          input.scheduledJob,
-        ) ||
-        !["approved", "scheduled", "published"].includes(currentSpot.status) ||
-        contentHashOf(document).hash !== claimed.contentHash
-      )
-        throw new Error(
-          "Scheduled delivery paused or creative changed; review before sending.",
-        );
-    }
     const emails = recipients.map((recipient) => recipient.email);
     // Postmark-managed streams own suppressions; Custom streams use Growth preferences.
     const unsubscribed = new Set<string>();
@@ -582,7 +520,7 @@ export async function dispatchBrandSend(input: {
         .insert(messageSendRecipientTable)
         .values(
           skipped.slice(offset, offset + 1000).map((row) => ({
-            messageSendId: claimed.id,
+            messageSendId: send.id,
             ...row,
             status: "skipped" as const,
           })),
@@ -596,7 +534,7 @@ export async function dispatchBrandSend(input: {
         .insert(messageSendRecipientTable)
         .values(
           eligible.slice(offset, offset + 1000).map((recipient) => ({
-            messageSendId: claimed.id,
+            messageSendId: send.id,
             email: recipient.email,
           })),
         )
@@ -637,8 +575,7 @@ export async function dispatchBrandSend(input: {
         Headers: own.headers,
       };
     };
-    // One request for the entire broadcast; Postmark owns pacing and suppressions.
-    const bulk = await sendPostmarkBulk(token, {
+    const bulkRequest: PostmarkBulkRequest = {
       From: fromHeader(sender),
       ...(sender.replyTo ? { ReplyTo: sender.replyTo } : {}),
       Subject: template.subject,
@@ -654,14 +591,66 @@ export async function dispatchBrandSend(input: {
           To: row.email,
           ...recipientTemplate(row.email, key),
           Metadata: emailRecipientMetadata({
-            sendId: claimed.id,
+            sendId: send.id,
             postId: spot.id,
             recipientId: row.id,
             key,
           }),
         };
       }),
+    };
+
+    // This locked transition is the delivery linearization point. If pause or
+    // supersession wins first, no provider request is submitted. If this wins,
+    // pause cannot claim success while Postmark handoff is in progress.
+    claimed = await withTransaction(async (tx) => {
+      const [currentPost] = await tx
+        .select({ status: platformPostTable.status })
+        .from(platformPostTable)
+        .where(eq(platformPostTable.id, spot.id))
+        .for("update");
+      const [currentSend] = await tx
+        .select()
+        .from(messageSendTable)
+        .where(eq(messageSendTable.id, send.id))
+        .for("update");
+      if (
+        !currentPost ||
+        !["approved", "scheduled", "published"].includes(currentPost.status) ||
+        !currentSend ||
+        currentSend.contentHash !== send.contentHash ||
+        !broadcastCanEnterProviderHandoff(
+          {
+            status: currentSend.status,
+            schedule: currentSend.snapshot.schedule,
+          },
+          input.scheduledJob,
+        )
+      )
+        return undefined;
+      const [row] = await tx
+        .update(messageSendTable)
+        .set({
+          status: "sending",
+          sentBy: input.userId ?? currentSend.approvedBy,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(messageSendTable.id, currentSend.id),
+            eq(messageSendTable.status, "approved"),
+          ),
+        )
+        .returning();
+      return row;
     });
+    if (!claimed)
+      throw new Error(
+        "The delivery schedule changed, paused or was already claimed.",
+      );
+
+    // One request for the entire broadcast; Postmark owns pacing and suppressions.
+    const bulk = await sendPostmarkBulk(token, bulkRequest);
 
     const receipt: EmailDeliveryReceipt = {
       provider: "postmark",
@@ -711,7 +700,7 @@ export async function dispatchBrandSend(input: {
     return messageSendSummary(completed!);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Send failed";
-    await failSend(claimed.id, message);
+    if (claimed) await failSend(claimed.id, message);
     throw error;
   }
 }

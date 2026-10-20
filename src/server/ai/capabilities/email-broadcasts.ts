@@ -1,7 +1,10 @@
 import "server-only";
 import { z } from "zod";
 import { growthAction } from "./types";
-import { broadcastScheduleInput } from "@/lib/broadcast-schedule";
+import {
+  broadcastScheduleApprovalInput,
+  broadcastScheduleInput,
+} from "@/lib/broadcast-schedule";
 import {
   previewBroadcastSchedule,
   scheduleBroadcasts,
@@ -92,9 +95,7 @@ export const previewBroadcasts = growthAction({
 export const scheduleBroadcastsAction = growthAction({
   description:
     "Approve and queue exactly the reviewed prepared broadcasts at fixed calendar times using the shared sequence delivery queue. Requires explicit user approval and confirmation that conflicting Customer.io sends have stopped. One approval covers the supplied set. queued=false means saved but recovery is needed. Never substitute a guessed reviewedHash.",
-  inputSchema: broadcastScheduleInput.extend({
-    reviewedHash: z.string(),
-  }),
+  inputSchema: broadcastScheduleApprovalInput,
   outputSchema: z.object({
     sends: z.array(
       z.object({ messageSendId: z.string(), queued: z.boolean() }),
@@ -130,6 +131,7 @@ export const broadcastStatus = growthAction({
         timeZone: z.string(),
         runtimeId: z.string(),
         state: z.enum(["approved", "scheduled", "paused"]),
+        customerIoStopped: z.literal(true).optional(),
         queueMessageId: z.string().optional(),
       })
       .nullable(),

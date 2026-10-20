@@ -51,8 +51,9 @@ original full recipient list.
 Postmark-managed streams own suppressions. Custom streams retain Growth's own
 unsubscribe links/filtering; warehouse sends retain their website preferences.
 No provider configuration is changed. Link checking is an optional editor preview
-action; website failures do not block dispatch. Scheduling no longer requires
-a blanket Customer.io cutover checkbox.
+action; website failures do not block dispatch. Scheduling requires the operator
+to acknowledge `customerIoStopped: true`; the acknowledgement is saved on the
+schedule and rechecked by the exact queued job before provider handoff.
 
 ## Schema and verification
 
@@ -62,7 +63,8 @@ handoff receipt references to the owning audience, then drops
 Customer.io history intact. The earlier discarded two-column migration never
 ran in production. Migration `0046_simplify_email_delivery` removes the unused
 send cursor, audience revision and stored list count, converts single-request
-receipts and removes the retired cutover acknowledgement from saved schedules.
+receipts. New schedules persist the required cutover acknowledgement inside the
+typed schedule JSON without adding a database column.
 List counts are derived from membership rows, including in the seed-list picker.
 
 Verified on a production-derived Neon experiment with synthetic old send/receipt

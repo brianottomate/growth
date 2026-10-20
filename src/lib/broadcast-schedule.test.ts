@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  broadcastCanEnterProviderHandoff,
+  broadcastCanPause,
   broadcastJobCanRun,
+  broadcastScheduleApprovalInput,
   shouldPauseSupersededBroadcast,
   shouldPersistBroadcastJobFailure,
 } from "./broadcast-schedule";
@@ -11,6 +14,7 @@ describe("broadcast delivery authorization", () => {
     state: "scheduled",
     dueAt: "2026-11-06T17:00:00.000Z",
     runtimeId: "preview",
+    customerIoStopped: true as const,
   };
   const job = { dueAt: schedule.dueAt, runtimeId: "preview" };
   test("revoked or superseded queue messages cannot authorize a send", () => {
@@ -32,6 +36,62 @@ describe("broadcast delivery authorization", () => {
       broadcastJobCanRun(schedule, { ...job, runtimeId: "production" }),
     ).toBe(false);
     expect(broadcastJobCanRun(undefined, job)).toBe(false);
+    expect(
+      broadcastJobCanRun(
+        {
+          state: "scheduled",
+          dueAt: schedule.dueAt,
+          runtimeId: schedule.runtimeId,
+        },
+        job,
+      ),
+    ).toBe(false);
+  });
+
+  test("schedule approval requires the exact Customer.io cutover acknowledgement", () => {
+    const input = {
+      brandId: "brand",
+      timeZone: "America/Denver",
+      sends: [
+        {
+          messageSendId: "send",
+          scheduledAt: "2026-11-06T17:00:00.000Z",
+        },
+      ],
+      reviewedHash: "reviewed",
+    };
+    expect(
+      broadcastScheduleApprovalInput.safeParse({
+        ...input,
+        customerIoStopped: true,
+      }).success,
+    ).toBe(true);
+    expect(broadcastScheduleApprovalInput.safeParse(input).success).toBe(false);
+    expect(
+      broadcastScheduleApprovalInput.safeParse({
+        ...input,
+        customerIoStopped: false,
+      }).success,
+    ).toBe(false);
+  });
+
+  test("pause and provider handoff have one deterministic winner", () => {
+    const approved = { status: "approved", schedule };
+    expect(broadcastCanPause(approved)).toBe(true);
+    expect(broadcastCanEnterProviderHandoff(approved, job)).toBe(true);
+
+    // Pause wins the row lock first: the provider claim can no longer run.
+    const paused = {
+      status: "approved",
+      schedule: { ...schedule, state: "paused" },
+    };
+    expect(broadcastCanPause(paused)).toBe(false);
+    expect(broadcastCanEnterProviderHandoff(paused, job)).toBe(false);
+
+    // Provider claim wins the row lock first: pause cannot report success.
+    const sending = { status: "sending", schedule };
+    expect(broadcastCanPause(sending)).toBe(false);
+    expect(broadcastCanEnterProviderHandoff(sending, job)).toBe(false);
   });
   test("Winter Park's Friday time stays local across the fall clock change", () => {
     const before = resolveZonedDateTime({

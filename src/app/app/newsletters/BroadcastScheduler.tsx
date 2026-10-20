@@ -71,6 +71,7 @@ export function BroadcastScheduler({
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [customerIoStopped, setCustomerIoStopped] = useState(false);
   const audiences = useQuery({
     ...orpc.newsletter.sendAudiences.queryOptions({ input: { brandId } }),
     enabled: open,
@@ -109,6 +110,7 @@ export function BroadcastScheduler({
     setDates(initial);
     setSelected(eligible.map((email) => email.id));
     setReview(undefined);
+    setCustomerIoStopped(false);
     setError("");
     setOpen(true);
   };
@@ -152,6 +154,7 @@ export function BroadcastScheduler({
         timeZone,
         sends: prepared,
         reviewedHash: review.reviewedHash,
+        customerIoStopped: true,
       });
       const failed = result.sends.filter((send) => !send.queued).length;
       if (failed) {
@@ -230,7 +233,11 @@ export function BroadcastScheduler({
               </Button>
               {review ? (
                 <Button
-                  disabled={!review.readiness.ready || schedule.isPending}
+                  disabled={
+                    !review.readiness.ready ||
+                    !customerIoStopped ||
+                    schedule.isPending
+                  }
                   onClick={() => void approveSchedule()}
                 >
                   <Check className="size-4" />
@@ -419,6 +426,22 @@ export function BroadcastScheduler({
                 activated.
               </p>
             )}
+            <div className="flex items-start gap-3 rounded-xl border p-4">
+              <Checkbox
+                id="customer-io-stopped"
+                checked={customerIoStopped}
+                onCheckedChange={(checked) =>
+                  setCustomerIoStopped(checked === true)
+                }
+              />
+              <Label
+                htmlFor="customer-io-stopped"
+                className="leading-snug font-normal"
+              >
+                I confirmed this brand’s conflicting Customer.io sends are
+                stopped before Growth queues these emails.
+              </Label>
+            </div>
           </div>
         )}
         {error && (

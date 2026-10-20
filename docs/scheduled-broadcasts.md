@@ -1,16 +1,16 @@
 # Scheduled brand broadcasts
 
 Email posts and their optional editorial series remain the content model.
-Calendar broadcasts use existing `message_send` prepared creative/audience
-snapshots and recipient ledgers. `snapshot.schedule` owns delivery timing,
+Calendar broadcasts use existing `message_send` prepared creative and live
+audience references plus recipient ledgers. `snapshot.schedule` owns delivery timing,
 IANA timezone, active/paused state and runtime identity; platform-post dates
 remain the calendar projection. No new series, sequence or approval entity is
-created. Existing snapshots without a schedule retain on-demand behavior.
+created. Existing prepared sends without a schedule retain on-demand behavior.
 
 The queue transport and signature verification are shared with Sequences.
-Unlike recipient journeys, broadcasts use absolute dates and prepared audience
-snapshots. Database-list audiences page directly through persisted SQL rows;
-warehouse-backed snapshots remain compatible but are not required. Jobs re-read saved authorization; old dates, pauses, another runtime
+Unlike recipient journeys, broadcasts use absolute dates and live audience
+membership. Database-list audiences page directly through persisted rows;
+warehouse audiences use their saved rules. Jobs re-read saved authorization; old dates, pauses, another runtime
 and revoked membership cannot authorize a send. The ordinary on-demand path
 refuses a schedule-controlled send. A started/failed/uncertain send is never
 automatically retried by broadcast recovery. Existing Postmark delivery keeps
@@ -19,10 +19,12 @@ booking tags, fresh opt-outs, suppression handling and recipient deduplication.
 ## Native app and MCP workflow
 
 1. Use existing content review to approve the chosen email posts.
-2. Select a consent-confirmed database-list audience and prepare its snapshot. `emailWrite.compileAudience` accepts
-   `retentionDays` up to 90 for an eight-week schedule; default remains 30.
-   This sets the real warehouse table expiration too, not merely metadata.
-3. `emailWrite.prepareBroadcast` freezes each existing email and audience.
+2. Select or create a consent-confirmed same-brand audience with
+   `emailWrite.saveAudience`. For an uploaded list, add the reviewed contacts to
+   that audience with `emailWrite.addAudienceMembers`. Audience membership stays
+   live; scheduling does not compile or freeze a recipient snapshot.
+3. `emailWrite.prepareBroadcast` freezes each existing email, sender and the
+   live audience reference.
 4. `emailRead.previewBroadcasts` takes one brand, timezone and prepared-send IDs
    with explicit UTC/offset instants. Inspect all creative, sender, recipient
    counts, dates/local times and the returned reviewedHash.
@@ -33,7 +35,9 @@ booking tags, fresh opt-outs, suppression handling and recipient deduplication.
    claim and changes no schedule or send state. A changed sender, server or
    stream blocks both the seed and live delivery until the send is prepared again.
 6. After stopping conflicting Customer.io broadcasts, explicitly approve
-   `emailWrite.scheduleBroadcasts` with that hash and `customerIoStopped: true`.
+   `emailWrite.scheduleBroadcasts` with that hash and the exact acknowledgement
+   `customerIoStopped: true`. Missing or false acknowledgement is rejected, and
+   the true value is persisted with each schedule before a queue job can run.
    A false queued result means authorization was saved but queue recovery is needed.
 7. `emailRead.broadcastStatus`, `emailWrite.pauseBroadcast` and
    `emailWrite.recoverBroadcast` inspect, pause and recover unstarted work.

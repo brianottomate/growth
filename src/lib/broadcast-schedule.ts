@@ -22,16 +22,65 @@ export const broadcastScheduleInput = z.object({
 });
 export type BroadcastScheduleInput = z.infer<typeof broadcastScheduleInput>;
 
+export const broadcastScheduleApprovalInput = broadcastScheduleInput.extend({
+  reviewedHash: z.string().min(1),
+  customerIoStopped: z.literal(true),
+});
+export type BroadcastScheduleApprovalInput = z.infer<
+  typeof broadcastScheduleApprovalInput
+>;
+
 /** A queued wakeup cannot authorize a changed date, paused send or another runtime. */
 export function broadcastJobCanRun(
-  schedule: { state: string; dueAt: string; runtimeId: string } | undefined,
+  schedule:
+    | {
+        state: string;
+        dueAt: string;
+        runtimeId: string;
+        customerIoStopped?: true;
+      }
+    | undefined,
   job: { dueAt: string; runtimeId: string },
 ) {
   return Boolean(
     (schedule?.state === "approved" || schedule?.state === "scheduled") &&
+    schedule.customerIoStopped === true &&
     schedule.dueAt === job.dueAt &&
     schedule.runtimeId === job.runtimeId,
   );
+}
+
+/** Pause is allowed only before the final provider-handoff claim wins. */
+export function broadcastCanPause(send: {
+  status: string;
+  schedule?: { state: string };
+}) {
+  return Boolean(
+    send.status === "approved" &&
+    send.schedule &&
+    (send.schedule.state === "approved" || send.schedule.state === "scheduled"),
+  );
+}
+
+/**
+ * Final atomic transition into provider handoff. A schedule-controlled send
+ * must still match the exact authorized wakeup while its row is locked.
+ */
+export function broadcastCanEnterProviderHandoff(
+  send: {
+    status: string;
+    schedule?: {
+      state: string;
+      dueAt: string;
+      runtimeId: string;
+      customerIoStopped?: true;
+    };
+  },
+  job?: { dueAt: string; runtimeId: string },
+) {
+  if (send.status !== "approved") return false;
+  if (!send.schedule) return !job;
+  return Boolean(job && broadcastJobCanRun(send.schedule, job));
 }
 
 /** A newly approved send for one email revokes older unstarted queue authority. */

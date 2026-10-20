@@ -8,9 +8,11 @@ import { emailDocumentDraftSchema } from "@/lib/email-document";
 import { brandSendBlockers } from "@/lib/email-delivery";
 import { canOperateEmailDelivery } from "@/lib/email-delivery-role";
 import {
+  broadcastCanPause,
   broadcastJobCanRun,
   shouldPauseSupersededBroadcast,
   shouldPersistBroadcastJobFailure,
+  type BroadcastScheduleApprovalInput,
   type BroadcastScheduleInput,
 } from "@/lib/broadcast-schedule";
 import {
@@ -218,12 +220,14 @@ async function queueSend(
 }
 
 export async function scheduleBroadcasts(
-  input: BroadcastScheduleInput & {
-    reviewedHash: string;
-  },
+  input: BroadcastScheduleApprovalInput,
   actor: Actor,
 ) {
   await requireEmailDeliveryOperator(actor);
+  if (input.customerIoStopped !== true)
+    throw new Error(
+      "Confirm that conflicting Customer.io sends have stopped before scheduling.",
+    );
   requireLifecycleRuntime();
   const preview = await previewBroadcastSchedule(input, actor);
   if (preview.reviewedHash !== input.reviewedHash)
@@ -296,6 +300,7 @@ export async function scheduleBroadcasts(
               timeZone: input.timeZone,
               runtimeId,
               state: "approved",
+              customerIoStopped: true,
             },
           },
           updatedAt: new Date(),
@@ -333,9 +338,14 @@ export async function pauseBroadcast(messageSendId: string, actor: Actor) {
       .from(messageSendTable)
       .where(eq(messageSendTable.id, send.id))
       .for("update");
+    const schedule = current?.snapshot.schedule;
     if (
-      !current?.snapshot.schedule ||
-      !["approved", "sending"].includes(current.status)
+      !current ||
+      !schedule ||
+      !broadcastCanPause({
+        status: current.status,
+        schedule,
+      })
     )
       throw new Error("No active schedule to pause.");
     await tx
@@ -343,7 +353,7 @@ export async function pauseBroadcast(messageSendId: string, actor: Actor) {
       .set({
         snapshot: {
           ...current.snapshot,
-          schedule: { ...current.snapshot.schedule, state: "paused" },
+          schedule: { ...schedule, state: "paused" },
         },
         updatedAt: new Date(),
       })

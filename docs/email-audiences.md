@@ -20,17 +20,15 @@ audiences” returns to the cross-brand page.
    tab or assistant from overwriting another operator's changes. Confirming
    marketing permission is an explicit operator assertion, not a consent inference
    from a booking. Candidates can be inspected without that confirmation.
-4. Compile the saved revision. BigQuery runs asynchronously into a private named
-   table. The UI polls its status and can resume the latest snapshot after reload.
-   Changing rules does not change an existing snapshot.
-5. Download a streamed candidate CSV or let an internal worker read bounded pages
-   from the same table. CSV downloads use 10,000 rows per page; worker reads default
-   to 500. Neither path loads the whole population into application memory.
+4. Saved audiences are available directly to the email send picker. Database
+   lists read their current members; warehouse audiences read their saved rules.
+   There is no MCP compile step or expiring recipient snapshot.
+5. Download a streamed candidate CSV or let an internal worker read bounded pages.
+   Neither path loads the whole population into application memory.
 
 “Discuss in chat” hands over the brand and form rules. The canonical assistant/MCP
 catalog exposes `emailRead.audiences`, `emailRead.previewAudience`,
-`emailRead.audienceSnapshot`, `emailWrite.saveAudience`, and
-`emailWrite.compileAudience`. SQL and brand scope are owned by code; chat adjusts
+`emailWrite.saveAudience`, and `emailWrite.addAudienceMembers`. SQL and brand scope are owned by code; chat adjusts
 validated parameters rather than running arbitrary SQL. Customer.io API read tools
 are not added.
 
@@ -50,8 +48,8 @@ upload first.
 Any audience can set a random sample. Uploaded lists order members by
 `sha256(email)`, stored on the row at upload; warehouse audiences use
 `FARM_FINGERPRINT(email)`. Either way a sample of 100 always sits inside a
-sample of 1,000. An uploaded list's snapshot needs no compiling: its members
-are fixed, so the definition alone decides who is in it.
+sample of 1,000. An uploaded list needs no compiling: its current members and
+the audience definition decide who is in it.
 
 One email reaches an address at most once across all its sends: prepare the
 same issue against the 100 sample, then the 1,000, then everyone, and each wave
@@ -99,7 +97,7 @@ the generated-website channel. This avoids mixing brands that share an organizat
 `SaasGuestEmailOptOut` is not available in the audited datastream, so these lists
 are explicitly candidates with a live-opt-out blocker.
 
-A compiled snapshot **is not permission to send**. The future dispatcher must:
+A saved audience **is not permission to send**. The dispatcher must:
 
 - Verify the brand's readiness, marketing permission and active flow/campaign.
 - Recheck current source opt-outs and the correct brand/stream's Postmark
