@@ -1,3 +1,4 @@
+import { intakeSitePreview } from "@/lib/intake-site-preview";
 import { intakeSetupSummary } from "@/lib/intake-setup-status";
 import { loadPerformanceConnections } from "./performance-connections.service";
 import { getBrandEmailDns } from "./email-dns.service";
@@ -369,11 +370,7 @@ export async function intakePrefill(handle: { token: string }) {
     contact: account?.contactName ?? null,
     email: account?.contactEmail ?? null,
     site: brand.website,
-    sitePreview: {
-      title: brand.websiteMeta?.title ?? null,
-      description: brand.websiteMeta?.description ?? null,
-      image: brand.websiteMeta?.ogImage ?? null,
-    },
+    sitePreview: intakeSitePreview(brand.websiteMeta, brand.website),
     // URLs, because that is what the form collects and pre-ticks.
     properties: properties
       .map((row) => row.url)
