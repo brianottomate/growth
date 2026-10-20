@@ -1549,6 +1549,43 @@ export type CreateZernioCustomConversionInput = {
  * not mint a duplicate with none of the original's optimisation history.
  * https://docs.zernio.com/ad-campaigns/create-custom-conversion
  */
+export interface ZernioLeadForm {
+  id: string;
+  name: string;
+  status?: string;
+  questions?: {
+    key: string;
+    label: string;
+    type: string;
+    options?: { key: string; value: string }[];
+  }[];
+}
+
+/** A Meta instant form as Zernio reads it from the account's Page. */
+export async function getZernioLeadForm(
+  formId: string,
+  accountId: string,
+): Promise<ZernioLeadForm> {
+  const data = await zernioFetch<{ form?: ZernioLeadForm } & ZernioLeadForm>(
+    `/ads/lead-forms/${encodeURIComponent(formId)}?accountId=${encodeURIComponent(accountId)}`,
+  );
+  return data.form ?? data;
+}
+
+/** The Page a Facebook account is bound to and what Meta lets it hear. */
+export async function getZernioAccountWebhookSubscription(
+  accountId: string,
+): Promise<{
+  pageId: string;
+  appSubscribed: boolean;
+  leadgen: boolean;
+  subscribedFields: string[];
+}> {
+  return zernioFetch(
+    `/accounts/${encodeURIComponent(accountId)}/webhook-subscription`,
+  );
+}
+
 export async function listZernioCustomConversions(input: {
   accountId: string;
   adAccountId: string;

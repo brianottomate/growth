@@ -84,6 +84,27 @@ Measured on Meta's raw leads 2026-09-09 → 09-23: **782 leads, 92 qualified
 conversion, ~50 qualified events/week). HubSpot's view showed ~1 because it only
 maps the Conditional form's buckets.
 
+## Client Page leads via Zernio
+
+A Performance client's lead ads run on the client's own Facebook Page, which
+Growth's Page webhook above does not hear. When the client is connected in
+Zernio (their own profile, Facebook account bound to their Page, `leadgen`
+subscribed: `GET /v1/accounts/{id}/webhook-subscription`), Zernio forwards
+every submission as a `lead.received` event to Growth's existing Zernio
+webhook (`src/app/api/webhooks/zernio/route.ts`, webhook "Wander Growth" in
+Zernio's settings, with `lead.received` in its event list). Handler: `src/server/services/zernio-lead.service.ts`.
+
+The brand is the Zernio profile's brand (`brand.zernioProfileId`), and the
+brand's relationship decides the path: a `client` brand's lead is stored in
+`leads.meta_leadgen_lead` under its `brand_id` with `received_via = zernio`
+and the answers resolved to option labels from the form, then posted to
+#radio-core-inbound (the inbound-leads channel, redirected to the testing
+channel outside prod); `routed_at` marks the post. It never enters WanderOS qualification, the CAPI event or the
+inbound router. A lead for Wander's own brand is ignored here (the Page
+webhook owns it) and an unknown profile is acknowledged and logged, so Zernio
+does not retry. Duplicates dedupe on the Meta leadgen id like every other
+path. Verified 2026-10-19 with a Zernio test lead on Oasis Escapes' "Oct 2026
+- Owner Acquisition" form.
 ## Lead forms from Growth (ads side)
 
 A Meta instant form is a Page asset: Meta owns it, it cannot be edited after

@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import { index, pgSchema, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { userTable } from "./auth-schema";
+import { brandTable } from "./brand-schema";
 import { createId } from "./utils";
 
 // ---------------------------------------------------------------------------
@@ -845,12 +846,19 @@ export const metaLeadgenLeadTable = leadsSchema.table(
       .primaryKey()
       .$defaultFn(() => createId("mlead")),
     leadgenId: t.text().notNull(),
+    /**
+     * The brand whose Page the form belongs to. Null for Wander's own Page,
+     * whose leads the Graph webhook qualifies for WanderOS; set for a
+     * Performance client's Page, whose leads Zernio delivers and the
+     * Performance team works.
+     */
+    brandId: t.text().references(() => brandTable.id, { onDelete: "set null" }),
     pageId: t.text().notNull(),
     formId: t.text(),
     formName: t.text(),
     adId: t.text(),
     campaignName: t.text(),
-    receivedVia: t.text().notNull(), // "webhook" | "poll"
+    receivedVia: t.text().notNull(), // "webhook" | "poll" | "zernio"
     leadCreatedAt: t.timestamp(),
 
     fieldData: t.jsonb().$type<{ name: string; values: string[] }[]>(),

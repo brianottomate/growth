@@ -9,6 +9,10 @@ import {
 } from "@/lib/zernio-webhook";
 import { reconcileZernioPostDelivery } from "@/server/services/content-publishing.service";
 import { activatePublishedSourcePost } from "@/server/services/source-publication-activation.service";
+import {
+  receiveZernioLead,
+  zernioLeadReceivedSchema,
+} from "@/server/services/zernio-lead.service";
 
 import {
   queueMetaConnectWebhook,
@@ -50,6 +54,34 @@ export async function POST(request: NextRequest) {
       );
     const runId = await queueMetaConnectWebhook(parsed.data);
     if (runId) after(() => runMetaConnectWebhook(runId));
+    return NextResponse.json(
+      { accepted: true, eventId: payload.id },
+      { status: 202 },
+    );
+  }
+  if (payload.event === "lead.received") {
+    const parsed = zernioLeadReceivedSchema.safeParse(payload);
+    if (!parsed.success)
+      return NextResponse.json(
+        { error: "Invalid lead event" },
+        { status: 400 },
+      );
+    after(async () => {
+      try {
+        const outcome = await receiveZernioLead(parsed.data);
+        console.log("[zernio-webhook] lead", {
+          eventId: payload.id,
+          leadgenId: parsed.data.lead.leadgenId,
+          outcome,
+        });
+      } catch (error) {
+        console.error("[zernio-webhook] lead failed", {
+          eventId: payload.id,
+          leadgenId: parsed.data.lead.leadgenId,
+          error,
+        });
+      }
+    });
     return NextResponse.json(
       { accepted: true, eventId: payload.id },
       { status: 202 },

@@ -1,0 +1,2 @@
+ALTER TABLE "leads"."meta_leadgen_lead" ADD COLUMN "brand_id" text;--> statement-breakpoint
+ALTER TABLE "leads"."meta_leadgen_lead" ADD CONSTRAINT "meta_leadgen_lead_brand_id_brand_id_fk" FOREIGN KEY ("brand_id") REFERENCES "public"."brand"("id") ON DELETE set null ON UPDATE no action;
