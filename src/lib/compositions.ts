@@ -155,6 +155,13 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
       "The photo full-bleed, a bold headline top left under a soft scrim, a white pill button at the foot. Centred on the story canvas. The awareness card, in every size.",
   },
   {
+    id: "hero-foot",
+    version: 1,
+    label: "Hero · foot",
+    description:
+      "The photo full-bleed, the logo top left, a bold headline low left above the white pill button under a bottom scrim. Kyle's Performance ads, in every size.",
+  },
+  {
     id: "image-hero",
     version: 4,
     label: "Image hero",
@@ -162,11 +169,18 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
       "A full-bleed image with a restrained, readable message block.",
   },
   {
-    id: "split-frame",
-    version: 2,
-    label: "Split frame",
+    id: "split-frame-bottom",
+    version: 3,
+    label: "Split frame · image below",
     description:
-      "Copy and a framed source image share the canvas. Good for product UI.",
+      "Copy first, then a framed source image: below it on tall canvases, to its right on wide ones. Good for product UI.",
+  },
+  {
+    id: "split-frame-top",
+    version: 1,
+    label: "Split frame · image above",
+    description:
+      "A framed source image first, then the copy: above it on tall canvases, to its left on wide ones.",
   },
   {
     id: "editorial-overlay",
@@ -454,8 +468,14 @@ export const COMPOSITION_FIELDS: Record<
       hint: "Optional; plain text on the story canvas",
     },
   ],
+  "hero-foot": [
+    mark,
+    { key: "title", label: "Headline" },
+    { key: "cta", label: "Button", hint: "Optional" },
+  ],
   "image-hero": [mark, ...message],
-  "split-frame": [mark, ...message],
+  "split-frame-bottom": [mark, ...message],
+  "split-frame-top": [mark, ...message],
   "editorial-overlay": [mark, ...message, accent("colours the CTA")],
   "product-proof": [mark, ...message, accent("colours the card edge")],
   "brand-statement": [mark, ...message, accent("warms the ground")],

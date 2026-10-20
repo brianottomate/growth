@@ -227,7 +227,7 @@ import {
 } from "./brands";
 import {
   readBrandContext,
-  draftBrandMarketsAction,
+  suggestBrandMarketsAction,
   setBrandMarketsAction,
 } from "./brand-context";
 import { listPlaybooksAction, readPlaybookAction } from "./playbooks";
@@ -452,6 +452,7 @@ export const brandRead = growthDomainTool({
     next: nextForBrand,
     identity: readBrandIdentityAction,
     context: readBrandContext,
+    suggestMarkets: suggestBrandMarketsAction,
     recommendMark: recommendBrandMarkAction,
   },
 });
@@ -469,7 +470,6 @@ export const brandWrite = growthDomainTool({
     setPerformanceSettings: setPerformanceSettingsAction,
     update: updateBrandAction,
     updateStory: updateBrandStoryAction,
-    draftMarkets: draftBrandMarketsAction,
     setMarkets: setBrandMarketsAction,
   },
 });

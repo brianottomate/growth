@@ -20,7 +20,9 @@ export function DestinationsCard({
   towns: { town: string; homes: number }[];
 }) {
   const list = markets?.markets ?? [];
-  const write = useWorkspaceMutation(orpc.brand.draftMarkets.mutationOptions());
+  const write = useWorkspaceMutation(
+    orpc.brand.defineMarkets.mutationOptions(),
+  );
   const define = (primary = false) => (
     <Button
       size="sm"

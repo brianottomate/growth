@@ -7,8 +7,8 @@ import { creativeDirectionSchema } from "@/lib/brand-direction";
 import { brandMarketsSchema } from "@/lib/markets";
 import { steerSchema } from "@/lib/generation-steer";
 import {
-  draftBrandMarkets,
   setBrandMarkets,
+  suggestBrandMarkets,
 } from "@/server/services/brand-markets.service";
 import { growthAction } from "./types";
 
@@ -43,19 +43,19 @@ export const readBrandContext = growthAction({
   }),
   execute: (input, ctx) => ownedBrand(input.brandId, ctx.orgId),
 });
-export const draftBrandMarketsAction = growthAction({
+export const suggestBrandMarketsAction = growthAction({
   description:
-    "Regenerate and save a brand's destinations from imported home towns, listing evidence and current destinations. Pass steer with the operator's requested changes. Preserves matching destination IDs and rejects overlapping towns. Does not change campaign targeting.",
+    "Propose a regrouping of a brand's destinations from its imported home towns, listing evidence and current destinations, guided by steer. Read-only: returns the proposal with matching destination IDs preserved; show it against brandRead.context and save with brandWrite.setMarkets once the operator agrees. The WanderOS import creates the first set; a brand without imported homes has nothing to propose.",
   inputSchema: z.object({ brandId: z.string().min(1), steer: steerSchema }),
-  outputSchema: z.object({ markets: brandMarketsSchema }),
+  outputSchema: z.object({ markets: brandMarketsSchema.shape.markets }),
   execute: async (input, ctx) => {
     await ownedBrand(input.brandId, ctx.orgId);
-    return draftBrandMarkets(input);
+    return suggestBrandMarkets(input);
   },
 });
 export const setBrandMarketsAction = growthAction({
   description:
-    "Save precise edits to a brand's destinations. Read brandRead.context first, preserve IDs and entries not being changed, and pass the complete destination list. Use draftMarkets with steer for a generated revision.",
+    "Save precise edits to a brand's destinations. Read brandRead.context first, preserve IDs and entries not being changed, and pass the complete destination list. Use brandRead.suggestMarkets with steer for a proposed regrouping.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     markets: brandMarketsSchema.shape.markets,

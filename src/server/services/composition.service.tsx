@@ -1201,12 +1201,66 @@ export function renderComposition(
         </div>
       </div>
     );
-  } else if (spec.templateId === "split-frame") {
+  } else if (
+    spec.templateId === "split-frame-bottom" ||
+    spec.templateId === "split-frame-top"
+  ) {
+    // The copy block and the framed photo trade places between the two:
+    // "bottom" reads copy then photo (below on tall canvases, right on wide
+    // ones), "top" leads with the photo.
+    const imageFirst = spec.templateId === "split-frame-top";
+    const copy = (
+      <div
+        key="copy"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          width: portrait || square ? "100%" : "44%",
+          height: portrait || square ? "43%" : "100%",
+        }}
+      >
+        <BrandMark
+          brandName={context.brand.name}
+          logo={context.logo}
+          tone={spec.mark}
+        />
+        <Message spec={spec} color="#111111" titleSize={portrait ? 72 : 62} />
+      </div>
+    );
+    const frame = (
+      <div
+        key="frame"
+        style={{
+          display: "flex",
+          flex: 1,
+          padding: 14,
+          borderRadius: 34,
+          background: "#181818",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.24)",
+        }}
+      >
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+            borderRadius: 22,
+          }}
+        />
+      </div>
+    );
     content = (
       <div
         style={{
           display: "flex",
-          flexDirection: portrait ? "column" : "row",
+          flexDirection: portrait || square ? "column" : "row",
           width: "100%",
           height: "100%",
           padding,
@@ -1215,46 +1269,126 @@ export function renderComposition(
           color: "#111111",
         }}
       >
+        {imageFirst ? [frame, copy] : [copy, frame]}
+      </div>
+    );
+  } else if (spec.templateId === "hero-foot") {
+    // Kyle's Performance ads (2026-10): the logo top left, the headline low
+    // left just above a white pill, over a bottom scrim. Stories keep the
+    // block above Meta's sticker band.
+    const story = spec.formatId === "story";
+    const wide = format.width > format.height;
+    const link = spec.formatId === "landscape";
+    const pad = story ? 96 : video ? 100 : wide ? 72 : 68;
+    const headlineSize = story
+      ? 76
+      : link
+        ? 54
+        : video
+          ? 100
+          : square
+            ? 66
+            : 72;
+    const button = spec.cta?.trim();
+    content = (
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          background: "#111111",
+        }}
+      >
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: `linear-gradient(180deg, ${scrim(0.28)} 0%, ${scrim(0)} 22%, ${scrim(0)} 48%, ${scrim(0.3)} 68%, ${scrim(0.74)} 100%)`,
+          }}
+        />
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            width: portrait ? "100%" : "44%",
-            height: portrait ? "43%" : "100%",
+            alignItems: "flex-start",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: format.width,
+            height: format.height,
+            padding: pad,
+            ...(story ? { paddingTop: 270, paddingBottom: 420 } : {}),
           }}
         >
           <BrandMark
             brandName={context.brand.name}
             logo={context.logo}
             tone={spec.mark}
+            inverse
+            {...(video ? { markSize: 52, textSize: 36 } : {})}
           />
-          <Message spec={spec} color="#111111" titleSize={portrait ? 72 : 62} />
-        </div>
-        <div
-          style={{
-            display: "flex",
-            flex: 1,
-            padding: 14,
-            borderRadius: 34,
-            background: "#181818",
-            boxShadow: "0 24px 60px rgba(0,0,0,0.24)",
-          }}
-        >
-          {/* oxlint-disable-next-line nextjs/no-img-element */}
-          <img
-            src={context.sourceImage!}
-            alt=""
-            width={format.width}
-            height={format.height}
+          <div
             style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: imagePosition,
-              borderRadius: 22,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              maxWidth: link ? "72%" : video ? "76%" : "92%",
+              color: "#ffffff",
             }}
-          />
+          >
+            <div
+              style={{
+                display: "flex",
+                fontSize: headlineSize,
+                fontWeight: 700,
+                lineHeight: 1.08,
+                letterSpacing: "-0.02em",
+                textWrap: "balance",
+              }}
+            >
+              {clamp(spec.title, 90)}
+            </div>
+            {button ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginTop: story ? 40 : wide ? 28 : 34,
+                  padding: video
+                    ? "30px 58px"
+                    : wide
+                      ? "20px 38px"
+                      : "24px 44px",
+                  borderRadius: 999,
+                  background: "#ffffff",
+                  color: "#111111",
+                  fontSize: video ? 46 : wide ? 30 : 34,
+                  fontWeight: 600,
+                }}
+              >
+                {button}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     );

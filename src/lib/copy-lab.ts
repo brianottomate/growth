@@ -107,7 +107,7 @@ export const COPY_LAB_COMPOSITION_TEMPLATES = COMPOSITION_TEMPLATES.filter(
       "hero-overlay",
       "image-hero",
       "editorial-overlay",
-      "split-frame",
+      "split-frame-bottom",
       "tall-statement",
       "tall-welcome",
       "catalog-copy",

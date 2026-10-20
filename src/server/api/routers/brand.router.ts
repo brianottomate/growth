@@ -1,13 +1,11 @@
 import { creativeDirectionSchema } from "@/lib/brand-direction";
 import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
 import { getClientPageActivity } from "@/server/services/client-page-activity.service";
+import { draftBrandMarkets } from "@/server/services/brand-markets.service";
 import { brandEmailThemeSchema } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import { z } from "zod";
-import {
-  draftBrandMarketsAction,
-  setBrandMarketsAction,
-} from "@/server/ai/capabilities/brand-context";
+import { setBrandMarketsAction } from "@/server/ai/capabilities/brand-context";
 import { waitUntil } from "@vercel/functions";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
@@ -691,7 +689,13 @@ export const brandRouter = {
 
   /** Setup: generate or revise the brand story and direction, guided by steer. */
   updateStory: actionProcedure(updateBrandStoryAction),
-  draftMarkets: actionProcedure(draftBrandMarketsAction),
+  /** Setup: first destinations from the imported homes, when the import left none. */
+  defineMarkets: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(async ({ context: ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      return draftBrandMarkets({ brandId: brand.id });
+    }),
   setMarkets: actionProcedure(setBrandMarketsAction),
 
   /** Setup: tick a home into the featured set, or out of it. */

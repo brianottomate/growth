@@ -64,11 +64,15 @@ const draftSchema = z.object({
     .max(12),
 });
 
-/** Draft the brand's markets from its homes' towns and listings; used at once. */
-export async function draftBrandMarkets(input: {
+/**
+ * Propose the brand's markets from its homes' towns and listings. Pure: the
+ * caller saves with setBrandMarkets once the operator agrees, or the WanderOS
+ * import saves the first set through draftBrandMarkets.
+ */
+export async function suggestBrandMarkets(input: {
   brandId: string;
   steer?: string;
-}) {
+}): Promise<{ markets: BrandMarkets["markets"] }> {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, input.brandId),
     columns: {
@@ -85,7 +89,7 @@ export async function draftBrandMarkets(input: {
   const towns = await brandTowns(brand.id);
   if (!towns.length)
     throw new Error(
-      "Import homes with city or town details before defining destinations.",
+      "No imported homes yet, so there are no towns to group. Destinations come from importWanderOs.",
     );
   const websiteId = await brandWebsiteId(brand.id);
   let reads = 0;
@@ -163,8 +167,14 @@ export async function draftBrandMarkets(input: {
     throw new Error(
       "Destination generation returned overlapping or unknown towns. Existing destinations were preserved.",
     );
+  return { markets };
+}
+
+/** First destinations for a brand: propose and save; the WanderOS import step. */
+export async function draftBrandMarkets(input: { brandId: string }) {
+  const { markets } = await suggestBrandMarkets(input);
   return saveBrandMarkets({
-    brandId: brand.id,
+    brandId: input.brandId,
     value: { markets, draftedAt: new Date().toISOString(), confirmedAt: null },
   });
 }

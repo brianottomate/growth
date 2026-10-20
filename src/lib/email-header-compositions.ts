@@ -6,7 +6,8 @@ export const emailHeaderTemplateIdSchema = z.enum([
   "photo-only",
   "email-header",
   "image-hero",
-  "split-frame",
+  "split-frame-bottom",
+  "split-frame-top",
   "editorial-overlay",
 ]);
 export type EmailHeaderTemplateId = z.infer<typeof emailHeaderTemplateIdSchema>;

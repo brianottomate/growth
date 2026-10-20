@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, memberTable, personaTable } from "@/server/db/schema";
 import { updateBrandStory } from "@/server/services/brand-story.service";
-import { draftBrandMarkets } from "@/server/services/brand-markets.service";
+import { suggestBrandMarkets } from "@/server/services/brand-markets.service";
 import {
   suggestPersonas,
   updatePersona,
@@ -44,14 +44,14 @@ if (!process.argv.includes("--skip-story")) {
     throw new Error("Story generation failed to respect explicit steer");
   console.log("Story steering respected", story.creativeDirection.voice);
 }
-const markets = await draftBrandMarkets({
+const markets = await suggestBrandMarkets({
   brandId: brand.id,
   steer:
     "Preserve the existing town grouping. Explain guest origins as suggestions, never measured bookings.",
 });
 console.log(
-  "Destinations generated",
-  markets.markets.markets.map((m) => m.label),
+  "Destinations proposed",
+  markets.markets.map((m) => m.label),
 );
 const existing = await db.query.personaTable.findFirst({
   where: and(
