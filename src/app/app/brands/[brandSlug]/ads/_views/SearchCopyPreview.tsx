@@ -20,14 +20,18 @@ export function SearchCopyPreview({
       {showExample && (
         <div className="max-w-2xl rounded-xl border bg-background p-4">
           <p className="text-xs font-medium">Sponsored · {hostname}</p>
+          {/* The lead pairing, which is the pool's first headline and first
+            description. Google assembles up to three headlines per auction;
+            the rest of the pool are the alternates it draws on. */}
           <p className="mt-2 text-lg leading-snug text-primary">
-            {copy.headlines.slice(0, 3).join(" | ")}
+            {copy.headlines[0]}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {copy.descriptions.slice(0, 2).join(" ")}
+            {copy.descriptions[0]}
           </p>
           <p className="mt-3 text-xs text-muted-foreground">
-            Example combination · Google chooses which supplied assets to show.
+            Lead pairing · Google rotates the other headlines and descriptions
+            in as alternates.
           </p>
         </div>
       )}
