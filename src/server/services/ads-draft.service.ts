@@ -71,6 +71,7 @@ import {
   type IdeaShape,
 } from "@/lib/ad-idea-studio";
 import { campaignDraftName } from "@/lib/performance-ads";
+import { AD_OWNER_MESSAGE } from "@/lib/ad-authoring";
 import { importRemoteImage } from "@/server/services/media.service";
 
 // ---- THE PLAN'S CRUD ---------------------------------------------------
@@ -122,10 +123,7 @@ export async function resolveAdAuthoringScope(input: {
   campaignId?: string;
   brandId?: string;
 }) {
-  if (!input.campaignId && !input.brandId)
-    throw new Error(
-      "Pass campaignId (camp_…) or brandId (brand_…). Both together is fine when the campaign belongs to that brand.",
-    );
+  if (!input.campaignId && !input.brandId) throw new Error(AD_OWNER_MESSAGE);
   if (input.campaignId) {
     const owned = await requireOwnedCampaign(
       input.campaignId,

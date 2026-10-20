@@ -250,7 +250,6 @@ export function growthResultSummary(
       lead = obj(list(content.media)[0]),
       video = content.format === "video" || lead.type === "video";
     summary.title = text(ad.name, "Creative draft");
-    summary.description = "";
     summary.facts = [
       // `drawn` is the stored name of the draft state the studio calls Draft.
       ad.approved

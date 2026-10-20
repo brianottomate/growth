@@ -797,7 +797,12 @@ export const draftAdAction = growthAction({
             `No library media ${input.assetId} on brand ${brand.id}. Pass an assetId from mediaLibraryRead.list for this brand, or the image's url.`,
           );
         if (asset.kind === "video") videoUrl = asset.url;
-        else imageUrls = [asset.url];
+        else if (asset.kind === "image" || asset.kind === "gif")
+          imageUrls = [asset.url];
+        else
+          throw new Error(
+            `Library media ${input.assetId} is ${asset.kind}; an ad takes an image, gif or video asset.`,
+          );
       }
 
       if (videoUrl) {

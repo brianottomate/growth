@@ -72,7 +72,9 @@ export async function CampaignView({
   const org = { id: actor.orgId };
 
   const draft = await getDraftCampaign(org.id, campaignId);
-  if (draft?.brand.slug !== brandSlug) notFound();
+  // Chat result cards link by brand id; the brand route resolves both.
+  if (draft?.brand.slug !== brandSlug && draft?.brand.id !== brandSlug)
+    notFound();
 
   const { campaign, audiences, ads, platformCampaigns, platformAudiences } =
     draft;
