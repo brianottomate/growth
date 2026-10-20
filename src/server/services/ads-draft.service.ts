@@ -149,8 +149,37 @@ export async function requireOwnedCampaign(
     where: eq(campaignTable.id, campaignId),
   });
   if (!campaign) throw new Error("Campaign not found");
-  const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, campaign.brandId),
+  const brand = await campaignBrand(campaign.brandId);
+  if (brand?.organizationId !== organizationId) {
+    throw new Error("No access to this campaign");
+  }
+  return { campaign, brand };
+}
+
+/**
+ * The campaign and its brand for a page: null when the campaign is missing,
+ * deleted or another organization's, which the page turns into a 404. Any
+ * other failure, such as a database outage, surfaces so it is reported.
+ */
+export async function findOwnedCampaign(
+  campaignId: string,
+  organizationId: string,
+) {
+  const campaign = await db.query.campaignTable.findFirst({
+    where: and(
+      eq(campaignTable.id, campaignId),
+      isNull(campaignTable.deletedAt),
+    ),
+  });
+  if (!campaign) return null;
+  const brand = await campaignBrand(campaign.brandId);
+  if (brand?.organizationId !== organizationId) return null;
+  return { campaign, brand };
+}
+
+function campaignBrand(brandId: string) {
+  return db.query.brandTable.findFirst({
+    where: eq(brandTable.id, brandId),
     columns: {
       id: true,
       name: true,
@@ -163,10 +192,6 @@ export async function requireOwnedCampaign(
       relationship: true,
     },
   });
-  if (brand?.organizationId !== organizationId) {
-    throw new Error("No access to this campaign");
-  }
-  return { campaign, brand };
 }
 
 /**
@@ -1067,15 +1092,29 @@ export async function addDraftAd(input: {
   return ad!;
 }
 
+/** The whole plan for a page, or null when `findOwnedCampaign` finds none. */
+export async function findDraftCampaign(
+  organizationId: string,
+  campaignId: string,
+) {
+  const owned = await findOwnedCampaign(campaignId, organizationId);
+  return owned ? loadDraftCampaign(owned) : null;
+}
+
 /** The whole plan, for the campaign page. */
 export async function getDraftCampaign(
   organizationId: string,
   campaignId: string,
 ) {
-  const { campaign, brand } = await requireOwnedCampaign(
-    campaignId,
-    organizationId,
+  return loadDraftCampaign(
+    await requireOwnedCampaign(campaignId, organizationId),
   );
+}
+
+async function loadDraftCampaign({
+  campaign,
+  brand,
+}: Awaited<ReturnType<typeof requireOwnedCampaign>>) {
   const [audiences, ads, platformCampaigns, personas, platformAudiences] =
     await Promise.all([
       db.query.audienceTable.findMany({

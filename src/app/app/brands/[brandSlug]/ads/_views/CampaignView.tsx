@@ -28,7 +28,7 @@ import { getSession } from "@/server/better-auth/server";
 import { platformLabel } from "@/components/channel-logos";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
-import { getDraftCampaign } from "@/server/services/ads-draft.service";
+import { findDraftCampaign } from "@/server/services/ads-draft.service";
 
 import { type AdState } from "@/lib/ad-wall";
 import { targetedAsset } from "@/lib/audience-asset";
@@ -72,13 +72,15 @@ export async function CampaignView({
   if (!actor) notFound();
   const org = { id: actor.orgId };
 
-  const draft = await getDraftCampaign(org.id, campaignId).catch(() => null);
+  const draft = await findDraftCampaign(org.id, campaignId);
   if (!draft) notFound();
   // Chat result cards link by brand id. Downstream links are built from the
   // slug, so land on the slug URL rather than serving the page under the id.
-  if (draft.brand.slug !== brandSlug) {
-    if (draft.brand.id !== brandSlug || !draft.brand.slug) notFound();
-    redirect(campaignPath(draft.brand.slug, campaignId, workspace));
+  // A brand without a slug is addressed by its id, as the layouts do.
+  const slug = draft.brand.slug ?? draft.brand.id;
+  if (slug !== brandSlug) {
+    if (draft.brand.id !== brandSlug) notFound();
+    redirect(campaignPath(slug, campaignId, workspace));
   }
 
   const { campaign, audiences, ads, platformCampaigns, platformAudiences } =

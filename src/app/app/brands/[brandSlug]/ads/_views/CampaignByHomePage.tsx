@@ -2,7 +2,11 @@ import { notFound, redirect } from "next/navigation";
 import { workspaceActor } from "@/server/workspace-actor";
 
 import { getSession } from "@/server/better-auth/server";
-import { getDraftCampaign } from "@/server/services/ads-draft.service";
+import { findDraftCampaign } from "@/server/services/ads-draft.service";
+import {
+  type CampaignWorkspace,
+  campaignPath,
+} from "@/lib/campaign-navigation";
 import { groupWall, toWallAd, type WallAd } from "@/lib/ad-wall";
 
 import { ByHomeView } from "./ByHomeView";
@@ -15,9 +19,11 @@ import { ByHomeView } from "./ByHomeView";
 export async function CampaignByHomePage({
   params,
   searchParams,
+  workspace,
 }: {
   params: Promise<{ brandSlug: string; campaignId: string }>;
   searchParams: Promise<{ home?: string }>;
+  workspace: CampaignWorkspace;
 }) {
   const [{ brandSlug, campaignId }, query] = await Promise.all([
     params,
@@ -29,14 +35,16 @@ export async function CampaignByHomePage({
   if (!actor) notFound();
   const org = { id: actor.orgId };
 
-  const draft = await getDraftCampaign(org.id, campaignId).catch(() => null);
+  const draft = await findDraftCampaign(org.id, campaignId);
   if (!draft) notFound();
-  // Chat result cards link by brand id; land on the slug URL.
-  if (draft.brand.slug !== brandSlug) {
-    if (draft.brand.id !== brandSlug || !draft.brand.slug) notFound();
-    redirect(
-      `/app/brands/${encodeURIComponent(draft.brand.slug)}/ads/${encodeURIComponent(campaignId)}/by-home`,
-    );
+  // Chat result cards link by brand id; land on the slug URL, in the same
+  // workspace and still on the one house when `?home=` was given. A brand
+  // without a slug is addressed by its id, as the layouts do.
+  const slug = draft.brand.slug ?? draft.brand.id;
+  if (slug !== brandSlug) {
+    if (draft.brand.id !== brandSlug) notFound();
+    const home = query.home ? `?home=${encodeURIComponent(query.home)}` : "";
+    redirect(`${campaignPath(slug, campaignId, workspace)}/by-home${home}`);
   }
   const { campaign, brand, ads } = draft;
 
