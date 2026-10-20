@@ -1,3 +1,8 @@
+import { adsFromCarouselsSchema } from "@/lib/ads-from-carousels";
+import {
+  approvedCarouselOptions,
+  createAdsFromCarousels,
+} from "@/server/services/ads-from-carousels.service";
 import { STARTER_AD_TYPES } from "@/lib/starter-ad-ideas";
 import { adSectionSchema } from "@/lib/ad-section";
 import { saveAdSection } from "@/server/services/ad-set.service";
@@ -80,6 +85,19 @@ import {
 } from "@/server/ai/capabilities/ads";
 
 export const adsRouter = {
+  approvedCarousels: workspaceProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(({ input, context }) =>
+      approvedCarouselOptions(input.brandId, context.workspace.orgId),
+    ),
+  fromCarousels: workspaceProcedure
+    .input(adsFromCarouselsSchema)
+    .handler(({ input, context }) =>
+      createAdsFromCarousels(input, {
+        orgId: context.workspace.orgId,
+        userId: context.session.user.id,
+      }),
+    ),
   saveSection: workspaceProcedure
     .input(adSectionSchema)
     .handler(({ input, context }) =>
