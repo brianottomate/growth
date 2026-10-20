@@ -434,10 +434,7 @@ export function BroadcastScheduler({
                   setCustomerIoStopped(checked === true)
                 }
               />
-              <Label
-                htmlFor="customer-io-stopped"
-                className="leading-snug font-normal"
-              >
+              <Label htmlFor="customer-io-stopped">
                 I confirmed this brand’s conflicting Customer.io sends are
                 stopped before Growth queues these emails.
               </Label>
