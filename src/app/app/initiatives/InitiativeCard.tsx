@@ -13,7 +13,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/components/ui/lib/utils";
 import type { listInitiatives } from "@/server/services/initiative.service";
 
 export type InitiativeCardData = Awaited<
@@ -49,45 +48,15 @@ function dateLabel(i: InitiativeCardData) {
 const plural = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
 
-function Panel({
-  icon: Icon,
-  label,
-  count,
-  wide = false,
-  children,
-}: {
-  icon: LucideIcon;
-  label: string;
-  count: number;
-  wide?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 flex-col gap-1.5 rounded-lg border bg-background p-2",
-        wide ? "flex-[1.5]" : "flex-1",
-      )}
-    >
-      <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
-        <Icon className="size-3 shrink-0" aria-hidden="true" />
-        <span className="truncate">{label}</span>
-        <span className="ml-auto tabular-nums">{count}</span>
-      </span>
-      {children}
-    </div>
-  );
-}
-
-/** Thumbnail-sized stand-ins for the first ads or posts; the rest as a count. */
-function MiniTiles({ items, count }: { items: Item[]; count: number }) {
+/** The first few ads or posts as thumbnails, the rest as a count. */
+function Thumbs({ items, count }: { items: Item[]; count: number }) {
   const more = count - items.length;
   return (
-    <div className="grid grid-cols-2 gap-1">
+    <span className="flex shrink-0 items-center gap-1">
       {items.map((item, index) => (
         <span
           key={item.media?.url ?? `${item.text}-${index}`}
-          className="relative aspect-square min-w-0 overflow-hidden rounded-md border bg-muted"
+          className="size-7 overflow-hidden rounded-md border bg-muted"
           title={item.text ?? undefined}
         >
           {item.media ? (
@@ -99,69 +68,82 @@ function MiniTiles({ items, count }: { items: Item[]; count: number }) {
               className="size-full object-cover"
             />
           ) : (
-            <span className="line-clamp-4 p-1 text-[7px] leading-tight text-muted-foreground">
-              {item.text}
-            </span>
+            <span className="block size-full bg-muted" />
           )}
-          {more > 0 && index === items.length - 1 ? (
-            <span className="absolute right-0.5 bottom-0.5 rounded bg-background/90 px-1 text-[9px] font-medium tabular-nums">
-              +{more}
-            </span>
-          ) : null}
         </span>
       ))}
-    </div>
+      {more > 0 ? (
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          +{more}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
-function SectionBoard({ sections }: { sections: Sections }) {
-  const { ads, social, editorial } = sections;
-  if (!ads.count && !social.count && !editorial.count)
-    return (
-      <div className="grid h-full place-items-center text-muted-foreground/60">
-        <Megaphone className="size-5" aria-hidden="true" />
-      </div>
-    );
-  const moreEditorial = editorial.count - editorial.items.length;
+/**
+ * One line per kind of work in the initiative: what it is, how much, and a
+ * glimpse. Stacked under the brand line so the card leads with the push
+ * itself rather than its parts.
+ */
+function SectionRow({
+  icon: Icon,
+  label,
+  count,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  count: number;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex h-full gap-2">
+    <li className="flex min-w-0 items-center gap-2 rounded-lg border bg-background px-2 py-1.5 text-xs">
+      <Icon
+        className="size-3.5 shrink-0 text-muted-foreground"
+        aria-hidden="true"
+      />
+      <span className="shrink-0 font-medium whitespace-nowrap">{label}</span>
+      <span className="shrink-0 text-muted-foreground tabular-nums">
+        {count}
+      </span>
+      <span className="ml-auto flex min-w-0 items-center">{children}</span>
+    </li>
+  );
+}
+
+function SectionRows({ sections }: { sections: Sections }) {
+  const { ads, social, editorial } = sections;
+  if (!ads.count && !social.count && !editorial.count) return null;
+  const lead = editorial.items[0];
+  const moreEditorial = editorial.count - (lead ? 1 : 0);
+  const LeadIcon = lead?.kind === "blog" ? FileText : Mail;
+  return (
+    <ul className="flex flex-col gap-1.5">
       {ads.count ? (
-        <Panel icon={Megaphone} label="Ads" count={ads.count}>
-          <MiniTiles items={ads.items} count={ads.count} />
-        </Panel>
+        <SectionRow icon={Megaphone} label="Ads" count={ads.count}>
+          <Thumbs items={ads.items.slice(0, 3)} count={ads.count} />
+        </SectionRow>
       ) : null}
       {social.count ? (
-        <Panel icon={MessageSquare} label="Social" count={social.count}>
-          <MiniTiles items={social.items} count={social.count} />
-        </Panel>
+        <SectionRow icon={MessageSquare} label="Social" count={social.count}>
+          <Thumbs items={social.items.slice(0, 3)} count={social.count} />
+        </SectionRow>
       ) : null}
       {editorial.count ? (
-        <Panel icon={Mail} label="Email & blog" count={editorial.count} wide>
-          <ul className="flex min-w-0 flex-col gap-1">
-            {editorial.items.map((item, index) => {
-              const Icon = item.kind === "blog" ? FileText : Mail;
-              return (
-                <li
-                  key={`${item.title}-${index}`}
-                  className="flex min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-[9px] leading-tight"
-                >
-                  <Icon
-                    className="size-2.5 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <span className="truncate">{item.title}</span>
-                </li>
-              );
-            })}
-            {moreEditorial > 0 ? (
-              <li className="text-[9px] text-muted-foreground tabular-nums">
-                +{moreEditorial} more
-              </li>
-            ) : null}
-          </ul>
-        </Panel>
+        <SectionRow icon={Mail} label="Email & blog" count={editorial.count}>
+          {lead ? (
+            <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+              <LeadIcon className="size-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{lead.title}</span>
+              {moreEditorial > 0 ? (
+                <span className="shrink-0 tabular-nums">+{moreEditorial}</span>
+              ) : null}
+            </span>
+          ) : null}
+        </SectionRow>
       ) : null}
-    </div>
+    </ul>
   );
 }
 
@@ -178,9 +160,6 @@ export function InitiativeCard({
       href={`/app/initiatives/${i.id}`}
       className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card transition-colors hover:border-foreground/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
     >
-      <div className="border-b bg-muted/40 p-2.5">
-        <SectionBoard sections={sections} />
-      </div>
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-3">
           <h3
@@ -200,48 +179,51 @@ export function InitiativeCard({
           </p>
         ) : null}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t px-4 py-2.5 text-xs text-muted-foreground">
-        <span className="flex min-w-0 items-center gap-2">
-          {brands.length ? (
-            <>
-              <span className="flex shrink-0 -space-x-1.5">
-                {brands.slice(0, 4).map((brand) => (
-                  <span
-                    key={brand.id}
-                    title={brand.name}
-                    className="grid size-5 place-items-center overflow-hidden rounded-full border bg-background text-[9px] font-semibold text-foreground"
-                  >
-                    {brand.logo ? (
-                      // oxlint-disable-next-line nextjs/no-img-element
-                      <img
-                        src={brand.logo}
-                        alt=""
-                        className="size-full object-contain p-0.5"
-                      />
-                    ) : (
-                      brand.name.slice(0, 1)
-                    )}
-                  </span>
-                ))}
-              </span>
-              <span className="truncate">
-                {brands.length === 1
-                  ? brands[0]!.name
-                  : plural(brands.length, "brand")}
-              </span>
-            </>
-          ) : (
-            <span>No brand</span>
-          )}
-        </span>
-        <span className="flex shrink-0 items-center gap-1.5">
-          {i.startAt || i.endAt ? (
-            <CalendarDays className="size-3.5" aria-hidden="true" />
-          ) : (
-            <Clock3 className="size-3.5" aria-hidden="true" />
-          )}
-          {dateLabel(i)}
-        </span>
+      <div className="flex flex-col gap-2.5 border-t bg-muted/40 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+          <span className="flex min-w-0 items-center gap-2">
+            {brands.length ? (
+              <>
+                <span className="flex shrink-0 -space-x-1.5">
+                  {brands.slice(0, 4).map((brand) => (
+                    <span
+                      key={brand.id}
+                      title={brand.name}
+                      className="grid size-5 place-items-center overflow-hidden rounded-full border bg-background text-[9px] font-semibold text-foreground"
+                    >
+                      {brand.logo ? (
+                        // oxlint-disable-next-line nextjs/no-img-element
+                        <img
+                          src={brand.logo}
+                          alt=""
+                          className="size-full object-contain p-0.5"
+                        />
+                      ) : (
+                        brand.name.slice(0, 1)
+                      )}
+                    </span>
+                  ))}
+                </span>
+                <span className="truncate">
+                  {brands.length === 1
+                    ? brands[0]!.name
+                    : plural(brands.length, "brand")}
+                </span>
+              </>
+            ) : (
+              <span>No brand</span>
+            )}
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            {i.startAt || i.endAt ? (
+              <CalendarDays className="size-3.5" aria-hidden="true" />
+            ) : (
+              <Clock3 className="size-3.5" aria-hidden="true" />
+            )}
+            {dateLabel(i)}
+          </span>
+        </div>
+        <SectionRows sections={sections} />
       </div>
     </Link>
   );
