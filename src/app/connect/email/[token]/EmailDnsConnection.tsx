@@ -136,7 +136,7 @@ export function EmailDnsConnection({
         dmarc={dmarc}
         rootDomain={connection.rootDomain}
         sendingDomain={status.sendingDomain}
-        automaticAvailable={connection.automaticAvailable}
+        automaticAvailable={connection.automaticAvailable && !status.verified}
         includeStarter={includeStarter}
         onIncludeStarter={setIncludeStarter}
         busy={busy !== null}
@@ -145,7 +145,7 @@ export function EmailDnsConnection({
       <section className="mt-8 space-y-4 rounded-xl border p-5">
         <h2 className="text-lg font-semibold">
           {status.verified
-            ? "Email authentication verified"
+            ? "Your domain is connected"
             : "Finish email authentication"}
         </h2>
         <ul className="space-y-2 text-sm">
@@ -158,20 +158,18 @@ export function EmailDnsConnection({
             {status.returnPathVerified ? "Verified" : "Pending"}
           </li>
         </ul>
-        <div className="flex flex-wrap gap-3">
-          {connection.automaticAvailable && (
-            <Button onClick={connect} disabled={busy !== null}>
-              {busy === "connect"
-                ? "Opening…"
-                : status.verified
-                  ? "Manage DNS with Entri"
-                  : "Connect with Entri"}
+        {!status.verified && (
+          <div className="flex flex-wrap gap-3">
+            {connection.automaticAvailable && (
+              <Button onClick={connect} disabled={busy !== null}>
+                {busy === "connect" ? "Opening…" : "Connect with Entri"}
+              </Button>
+            )}
+            <Button variant="outline" onClick={verify} disabled={busy !== null}>
+              {busy === "verify" ? "Checking…" : "Check again"}
             </Button>
-          )}
-          <Button variant="outline" onClick={verify} disabled={busy !== null}>
-            {busy === "verify" ? "Checking…" : "Check verification"}
-          </Button>
-        </div>
+          </div>
+        )}
         {!connection.automaticAvailable && !status.verified && (
           <p className="text-sm text-muted-foreground">
             Automatic connection is not available yet. You can use the manual
@@ -179,9 +177,9 @@ export function EmailDnsConnection({
           </p>
         )}
         <p className="text-sm text-muted-foreground">
-          DNS changes can take time to appear. After finishing setup, check
-          verification here. Authentication does not launch a campaign or send
-          any email.
+          {!status.verified &&
+            "DNS changes can take time to appear. After finishing setup, check verification here. "}
+          Authentication does not launch a campaign or send any email.
         </p>
         {error && (
           <p role="alert" className="text-sm text-destructive">
@@ -191,7 +189,9 @@ export function EmailDnsConnection({
       </section>
 
       <section className="mt-8 space-y-4">
-        <h2 className="text-lg font-semibold">Set up manually</h2>
+        <h2 className="text-lg font-semibold">
+          {status.verified ? "DNS records" : "Set up manually"}
+        </h2>
         <p className="text-sm text-muted-foreground">
           Add these records in the {connection.rootDomain} DNS zone. Hosts below
           are relative to that domain; some DNS providers ask for the full
