@@ -44,6 +44,25 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * Materialize one compiled Postmark template string with the same escaping
+ * rules Postmark applies: double braces escape HTML and triple braces do not.
+ * Built-in Postmark expressions (for example `pm:unsubscribe`) are left for
+ * Postmark because they are not keys in the supplied model.
+ */
+export function materializePostmarkTemplate(
+  content: string,
+  model: Record<string, string>,
+) {
+  return content
+    .replace(/\{\{\{([a-zA-Z0-9_]+)\}\}\}/g, (match, key: string) =>
+      Object.hasOwn(model, key) ? model[key]! : match,
+    )
+    .replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (match, key: string) =>
+      Object.hasOwn(model, key) ? escapeHtml(model[key]!) : match,
+    );
+}
+
 /** Every field an email uses that Growth does not know. */
 export function unknownFields(text: string) {
   return [...text.matchAll(FIELD)]

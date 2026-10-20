@@ -56,9 +56,20 @@ export function shouldPauseSupersededBroadcast(
 export function shouldPersistBroadcastJobFailure(
   send: {
     status: string;
-    schedule?: { state: string; dueAt: string; runtimeId: string };
+    schedule?: {
+      state: string;
+      dueAt: string;
+      runtimeId: string;
+      queueMessageId?: string;
+    };
   },
-  job: { dueAt: string; runtimeId: string },
+  job: { dueAt: string; runtimeId: string; sourceMessageId?: string },
 ) {
-  return send.status === "approved" && broadcastJobCanRun(send.schedule, job);
+  return Boolean(
+    send.status === "approved" &&
+    broadcastJobCanRun(send.schedule, job) &&
+    (!job.sourceMessageId ||
+      !send.schedule?.queueMessageId ||
+      send.schedule.queueMessageId === job.sourceMessageId),
+  );
 }

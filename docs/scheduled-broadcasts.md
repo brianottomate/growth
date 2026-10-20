@@ -27,8 +27,11 @@ booking tags, fresh opt-outs, suppression handling and recipient deduplication.
    with explicit UTC/offset instants. Inspect all creative, sender, recipient
    counts, dates/local times and the returned reviewedHash.
 5. Explicitly approve `emailWrite.sendBroadcastTest` with one prepared-send ID
-   and one seed-inbox address. It sends the frozen prepared creative to only
-   that address, creates no audience claim and changes no schedule or send state.
+   and the server-approved seed inbox (`thisisbriansun@gmail.com`). It compiles
+   and materializes the frozen creative through the same field fallback, HTML
+   escaping, tracked-link and unsubscribe path as live bulk, creates no audience
+   claim and changes no schedule or send state. A changed sender, server or
+   stream blocks both the seed and live delivery until the send is prepared again.
 6. After stopping conflicting Customer.io broadcasts, explicitly approve
    `emailWrite.scheduleBroadcasts` with that hash and `customerIoStopped: true`.
    A false queued result means authorization was saved but queue recovery is needed.
@@ -66,6 +69,9 @@ No production content, approval, queue or provider state was changed.
 Uses the existing sequence queue/runtime configuration, including its enable
 flag, signing keys, base URL and runtime ID. Local env currently lacks the
 lifecycle enable/base/runtime configuration; local sends remain unavailable.
+Broadcast jobs register the shared signed QStash failure callback. Only an
+exhausted callback for the exact active runtime, date and queue message can mark
+an unstarted approved send failed; stale or superseded receipts are ignored.
 Before activation verify the deployed queue endpoint, intended runtime,
 Customer.io cutover, approved cohort and consent, final creative and seed-inbox
 results. These checks were not performed by the local implementation. The cutover

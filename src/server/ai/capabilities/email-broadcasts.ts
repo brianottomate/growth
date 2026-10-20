@@ -15,6 +15,7 @@ import {
 } from "@/server/services/brand-email-send.service";
 import { getEmailDraftOutputSchema } from "./outputs/email";
 import { emailSchema } from "@/lib/validators";
+import { BROADCAST_SEED_RECIPIENTS } from "@/lib/email-seed-recipient";
 const actor = (ctx: { orgId: string; userId: string }) => ({
   organizationId: ctx.orgId,
   userId: ctx.userId,
@@ -35,10 +36,10 @@ export const prepareBroadcast = growthAction({
 });
 export const sendBroadcastTest = growthAction({
   description:
-    "Send exactly one frozen prepared Postmark broadcast to one explicitly supplied seed-inbox address. Uses the prepared sender, creative, links, stream and unsubscribe handling, but never reads or claims the guest audience, changes delivery state or schedules guests. Requires explicit user approval.",
+    "Send exactly one frozen prepared Postmark broadcast to an explicitly supplied server-approved seed inbox. Uses the same prepared sender, personalization, markup, links, stream and unsubscribe handling as live bulk, but never reads or claims the guest audience, changes delivery state or schedules guests. Requires explicit user approval.",
   inputSchema: z.object({
     messageSendId: z.string().min(1),
-    recipientEmail: emailSchema,
+    recipientEmail: z.enum(BROADCAST_SEED_RECIPIENTS),
   }),
   outputSchema: z.object({
     to: emailSchema,

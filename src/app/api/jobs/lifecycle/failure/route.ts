@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseQstashFailureCallback } from "@/lib/qstash-failure-callback";
 import {
   lifecycleUrl,
   verifyLifecycleJob,
@@ -8,11 +9,6 @@ import { recordLifecycleQueueFailure } from "@/server/services/lifecycle-runtime
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const callbackSchema = z.object({
-  sourceMessageId: z.string().min(1),
-  sourceBody: z.string().min(1).max(4_096),
-  url: z.string().url(),
-});
 const jobSchema = z.object({
   deliveryId: z.string().min(1),
   runtimeId: z.string().min(1),
@@ -30,13 +26,12 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid signature" }, { status: 401 });
   let input;
   try {
-    const callback = callbackSchema.parse(JSON.parse(body));
-    if (callback.url !== lifecycleUrl("/api/jobs/lifecycle"))
-      return Response.json({ error: "Unexpected source" }, { status: 400 });
-    const job = jobSchema.parse(
-      JSON.parse(Buffer.from(callback.sourceBody, "base64").toString("utf8")),
-    );
-    input = { ...job, sourceMessageId: callback.sourceMessageId };
+    const callback = parseQstashFailureCallback({
+      body,
+      expectedSourceUrl: lifecycleUrl("/api/jobs/lifecycle"),
+      jobSchema,
+    });
+    input = { ...callback.job, sourceMessageId: callback.sourceMessageId };
   } catch {
     return Response.json({ error: "Invalid callback" }, { status: 400 });
   }

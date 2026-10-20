@@ -24,10 +24,14 @@ import {
   messageSendSummary,
   type MessageSendSnapshot,
 } from "@/lib/email-delivery";
+import { UNSUBSCRIBE_PLACEHOLDER } from "@/lib/email-personalization";
+import { isBroadcastSeedRecipient } from "@/lib/email-seed-recipient";
 import {
-  compilePostmarkTemplate,
-  UNSUBSCRIBE_PLACEHOLDER,
-} from "@/lib/email-personalization";
+  compilePostmarkBroadcast,
+  materializePostmarkBroadcast,
+  postmarkBroadcastModel,
+  postmarkSetupMatches,
+} from "@/lib/postmark-broadcast-content";
 import {
   brandOptOuts,
   growthHandlesUnsubscribes,
@@ -71,6 +75,10 @@ const PAGE_SIZE = 10_000;
 const STALE_LEASE_MS = 15 * 60_000;
 
 type Actor = { organizationId: string; userId: string };
+type PreparedPostmarkSnapshot = MessageSendSnapshot & {
+  audience: Extract<MessageSendSnapshot["audience"], { provider: "postmark" }>;
+  sender: NonNullable<MessageSendSnapshot["sender"]>;
+};
 
 function contentHashOf(document: unknown) {
   const current = emailDocumentDraftSchema.parse(document);
@@ -109,6 +117,33 @@ function senderOf(spot: Awaited<ReturnType<typeof requireOwnedEmailSpot>>) {
     fromEmail: sender.fromEmail,
     replyTo: sender.replyTo ?? null,
   };
+}
+
+function assertPreparedPostmarkSetupCurrent(
+  spot: Awaited<ReturnType<typeof requireOwnedEmailSpot>>,
+  snapshot: MessageSendSnapshot,
+): asserts snapshot is PreparedPostmarkSnapshot {
+  if (snapshot.audience.provider !== "postmark" || !snapshot.sender)
+    throw new Error("This send has no Postmark audience.");
+  const audience = snapshot.audience;
+  if (
+    brandSendBlockers(spot.brand).length ||
+    !postmarkSetupMatches(
+      {
+        sender: snapshot.sender,
+        serverId: audience.serverId,
+        messageStream: audience.messageStream,
+      },
+      {
+        sender: senderOf(spot),
+        serverId: spot.brand.emailDelivery?.serverId,
+        messageStream: spot.brand.emailDelivery?.messageStream,
+      },
+    )
+  )
+    throw new Error(
+      "The approved sender or Postmark destination changed. Review delivery again.",
+    );
 }
 
 /**
@@ -179,6 +214,8 @@ export async function sendPreparedBrandTestEmail(
 ) {
   await requireEmailDeliveryOperator(input);
   const recipientEmail = input.recipientEmail.trim().toLowerCase();
+  if (!isBroadcastSeedRecipient(recipientEmail))
+    throw new Error("That address is not an approved broadcast seed inbox.");
   const send = await db.query.messageSendTable.findFirst({
     where: eq(messageSendTable.id, input.messageSendId),
   });
@@ -194,8 +231,7 @@ export async function sendPreparedBrandTestEmail(
     send.platformPostId,
     input.organizationId,
   );
-  const blockers = brandSendBlockers(spot.brand);
-  if (blockers.length) throw new Error(blockers.join(" "));
+  assertPreparedPostmarkSetupCurrent(spot, snapshot);
   const audience = snapshot.audience;
   const sender = snapshot.sender;
   const token = await postmarkServerToken(audience.serverId);
@@ -206,22 +242,31 @@ export async function sendPreparedBrandTestEmail(
   const own = ownUnsubscribe
     ? personalUnsubscribe(spot.brandId, recipientEmail)
     : null;
-  // Seed tests prove the final tracked link shape without creating a guest
-  // attribution identity or a recipient-ledger claim.
-  const exactBody = (body: string) =>
-    body.replaceAll(RECIPIENT_KEY_PLACEHOLDER, "seed-test");
+  // Compile through the same path as live bulk, then materialize the one seed
+  // recipient. No guest audience or recipient ledger is touched.
+  const template = compilePostmarkBroadcast({
+    subject: snapshot.email.subject,
+    html: snapshot.preview.html,
+    text: snapshot.preview.text,
+    recipientKeyPlaceholder: RECIPIENT_KEY_PLACEHOLDER,
+    growthManagedUnsubscribe: ownUnsubscribe,
+  });
+  const seed = materializePostmarkBroadcast(
+    template,
+    { email: recipientEmail },
+    {
+      recipientKey: "seed-test",
+      ...(own ? { unsubscribeUrl: own.url } : {}),
+    },
+  );
   const [result] = await sendPostmarkBatch(token, [
     {
       From: fromHeader(sender),
       To: recipientEmail,
       ...(sender.replyTo ? { ReplyTo: sender.replyTo } : {}),
-      Subject: `[Test] ${snapshot.email.subject}`,
-      HtmlBody: own
-        ? withUnsubscribeUrl(exactBody(snapshot.preview.html), own.url)
-        : exactBody(snapshot.preview.html),
-      TextBody: own
-        ? withUnsubscribeUrl(exactBody(snapshot.preview.text), own.url)
-        : exactBody(snapshot.preview.text),
+      Subject: `[Test] ${seed.subject}`,
+      HtmlBody: seed.html,
+      TextBody: seed.text,
       ...(own ? { Headers: own.headers } : {}),
       MessageStream: audience.messageStream,
       Tag: "growth-test",
@@ -357,18 +402,6 @@ export async function prepareBrandSend(
   return messageSendSummary(created);
 }
 
-/**
- * Postmark templates refuse <link> stylesheets. The renderer's only one is
- * the web font, so it moves into an @import, which the same mail apps load.
- */
-export function bulkSafeHtml(html: string) {
-  return html.replace(
-    /<link\b[^>]*href="([^"]+)"[^>]*rel="stylesheet"[^>]*\/?>/g,
-    (_tag, href: string) =>
-      `<style>@import url("${href.replace(/&amp;/g, "&")}");</style>`,
-  );
-}
-
 /** Every link in the email must open before a guest sees it. */
 async function brokenLinks(html: string) {
   const links = [
@@ -450,19 +483,8 @@ export async function dispatchBrandSend(input: {
     throw new Error(
       "Approve the email creative before sending. Reopened drafts cannot be sent.",
     );
-  if (snapshot.audience.provider !== "postmark" || !snapshot.sender)
-    throw new Error("This send has no Postmark audience.");
+  assertPreparedPostmarkSetupCurrent(spot, snapshot);
   const audience = snapshot.audience;
-  if (
-    snapshot.schedule &&
-    (brandSendBlockers(spot.brand).length ||
-      JSON.stringify(senderOf(spot)) !== JSON.stringify(snapshot.sender) ||
-      spot.brand.emailDelivery?.serverId !== audience.serverId ||
-      spot.brand.emailDelivery?.messageStream !== audience.messageStream)
-  )
-    throw new Error(
-      "The approved sender or Postmark destination changed. Review delivery again.",
-    );
 
   const staleBefore = new Date(Date.now() - STALE_LEASE_MS);
   const claimed = await withTransaction(async (tx) => {
@@ -549,28 +571,13 @@ export async function dispatchBrandSend(input: {
       token,
       audience.messageStream,
     );
-    const compiled = compilePostmarkTemplate({
+    const template = compilePostmarkBroadcast({
       subject: snapshot.email.subject,
-      html: bulkSafeHtml(snapshot.preview.html),
+      html: snapshot.preview.html,
       text: snapshot.preview.text,
+      recipientKeyPlaceholder: RECIPIENT_KEY_PLACEHOLDER,
+      growthManagedUnsubscribe: ownUnsubscribe,
     });
-    // Postmark fills its placeholder on a Postmark-managed stream; otherwise
-    // each guest's own link goes in through the template model.
-    const unsubscribeKey = (content: string) =>
-      ownUnsubscribe
-        ? content.replaceAll(UNSUBSCRIBE_PLACEHOLDER, "{{{unsubscribe_url}}}")
-        : content;
-    const template = {
-      ...compiled,
-      html: unsubscribeKey(compiled.html).replaceAll(
-        RECIPIENT_KEY_PLACEHOLDER,
-        "{{{growth_recipient_key}}}",
-      ),
-      text: unsubscribeKey(compiled.text).replaceAll(
-        RECIPIENT_KEY_PLACEHOLDER,
-        "{{{growth_recipient_key}}}",
-      ),
-    };
 
     const sendPage = async (recipients: EmailAudienceRecipient[]) => {
       if (snapshot.schedule) {
@@ -687,14 +694,16 @@ export async function dispatchBrandSend(input: {
       );
       if (!fresh.length) return;
       const recipientTemplate = (email: string, key: string) => {
-        const model = {
-          ...template.modelFor(byEmail.get(email)!),
-          growth_recipient_key: key,
-        };
+        const model = postmarkBroadcastModel(template, byEmail.get(email)!, {
+          recipientKey: key,
+        });
         if (!ownUnsubscribe) return { TemplateModel: model };
         const own = personalUnsubscribe(spot.brandId, email);
         return {
-          TemplateModel: { ...model, unsubscribe_url: own.url },
+          TemplateModel: postmarkBroadcastModel(template, byEmail.get(email)!, {
+            recipientKey: key,
+            unsubscribeUrl: own.url,
+          }),
           Headers: own.headers,
         };
       };

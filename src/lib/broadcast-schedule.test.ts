@@ -84,5 +84,23 @@ describe("broadcast delivery authorization", () => {
         { ...job, dueAt: "2026-11-13T17:00:00.000Z" },
       ),
     ).toBe(false);
+    expect(
+      shouldPersistBroadcastJobFailure(
+        {
+          status: "approved",
+          schedule: { ...schedule, queueMessageId: "current-message" },
+        },
+        { ...job, sourceMessageId: "stale-message" },
+      ),
+    ).toBe(false);
+    expect(
+      shouldPersistBroadcastJobFailure(
+        {
+          status: "approved",
+          schedule: { ...schedule, queueMessageId: "current-message" },
+        },
+        { ...job, sourceMessageId: "current-message" },
+      ),
+    ).toBe(true);
   });
 });

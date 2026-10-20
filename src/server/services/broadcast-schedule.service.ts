@@ -161,6 +161,7 @@ async function queueSend(
   try {
     receipt = await publishEmailJob({
       path: "/api/jobs/email-broadcast",
+      failurePath: "/api/jobs/email-broadcast/failure",
       key: `broadcast-${messageSendId}-${Date.parse(dueAt)}`,
       body: { messageSendId, dueAt, runtimeId },
       dueAt: new Date(dueAt),
@@ -389,10 +390,14 @@ export async function recoverBroadcast(messageSendId: string, actor: Actor) {
   return { queued: true };
 }
 
-async function persistActiveJobFailure(
-  input: { messageSendId: string; dueAt: string; runtimeId: string },
-  error: unknown,
-) {
+/** Called only after verifying the QStash callback's signature and source. */
+export async function recordBroadcastQueueFailure(input: {
+  messageSendId: string;
+  dueAt: string;
+  runtimeId: string;
+  sourceMessageId: string;
+}) {
+  if (input.runtimeId !== env.LIFECYCLE_RUNTIME_ID) return;
   await withTransaction(async (tx) => {
     const [current] = await tx
       .select()
@@ -407,12 +412,12 @@ async function persistActiveJobFailure(
       )
     )
       return;
-    const message = error instanceof Error ? error.message : "Send failed";
     await tx
       .update(messageSendTable)
       .set({
         status: "failed",
-        error: message,
+        error:
+          "QStash retries exhausted before delivery. Check the dead-letter queue before preparing a new send.",
         failedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -444,16 +449,11 @@ export async function executeBroadcastJob(input: {
     await queueSend(send.id, input.dueAt, input.runtimeId);
     return { status: "queued" };
   }
-  try {
-    await dispatchBrandSend({
-      messageSendId: send.id,
-      organizationId: membership.organizationId,
-      userId: send.approvedBy,
-      scheduledJob: input,
-    });
-  } catch (error) {
-    await persistActiveJobFailure(input, error);
-    throw error;
-  }
+  await dispatchBrandSend({
+    messageSendId: send.id,
+    organizationId: membership.organizationId,
+    userId: send.approvedBy,
+    scheduledJob: input,
+  });
   return { status: "sent" };
 }
