@@ -55,6 +55,14 @@ export default async function ReportPage({
           ...highlight,
           imageUrl: imageUrl(highlight.imageUrl),
         })),
+        caseStudy: report.caseStudy && {
+          ...report.caseStudy,
+          heroImageUrl: imageUrl(report.caseStudy.heroImageUrl),
+          sections: report.caseStudy.sections.map((section) => ({
+            ...section,
+            imageUrl: imageUrl(section.imageUrl),
+          })),
+        },
       }}
     />
   );

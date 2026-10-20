@@ -38,6 +38,7 @@ const blank = (): Draft => ({
     deliverables: [],
     narrative: null,
     recommendations: null,
+    caseStudy: null,
   },
 });
 
@@ -171,9 +172,11 @@ function Rows<T extends object>({
 
 export function ReportsEditor({
   brandId,
+  brandSlug,
   initial,
 }: {
   brandId: string;
+  brandSlug: string;
   initial: Workspace;
 }) {
   const [workspace, setWorkspace] = useState(initial);
@@ -385,7 +388,13 @@ export function ReportsEditor({
             {
               key: "via",
               label: "Collected through",
-              options: ["manual", "growth", "meta_api", "meta_cli"],
+              options: [
+                "manual",
+                "growth",
+                "warehouse",
+                "meta_api",
+                "meta_cli",
+              ],
             },
             {
               key: "fetchedAt",
@@ -494,19 +503,25 @@ export function ReportsEditor({
         <Button disabled={busy} onClick={() => void run(saveDraft)}>
           {save.isPending ? "Saving…" : "Save draft"}
         </Button>
-        <Button
-          variant="outline"
-          disabled={busy || dirty || !draft.id}
-          onClick={() =>
-            void run(async () => {
-              setReview(
-                await inspect.mutateAsync({ brandId, reportId: draft.id }),
-              );
-            })
-          }
-        >
-          Review saved report
-        </Button>
+        {draft.id && content.caseStudy ? (
+          <Button variant="outline" disabled={dirty} asChild>
+            <a href={`/case-study/${brandSlug}/${draft.id}`}>Open case study</a>
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            disabled={busy || dirty || !draft.id}
+            onClick={() =>
+              void run(async () => {
+                setReview(
+                  await inspect.mutateAsync({ brandId, reportId: draft.id }),
+                );
+              })
+            }
+          >
+            Review saved report
+          </Button>
+        )}
         <span className="text-sm text-muted-foreground">
           {dirty ? "Unsaved changes" : draft.id ? "Draft saved" : "New report"}
         </span>

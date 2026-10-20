@@ -98,7 +98,7 @@ export type PerformanceReportChannel = z.infer<typeof performanceReportChannel>;
 export const performanceReportSource = z
   .object({
     label: z.string(), // "Meta Ads insights"
-    via: z.enum(["meta_api", "meta_cli", "growth", "manual"]),
+    via: z.enum(["meta_api", "meta_cli", "growth", "warehouse", "manual"]),
     /** Meta attribution setting, e.g. "7d_click,1d_view". */
     attribution: z.string().optional(),
     /** The conversion counted as a booking, e.g. the brand's purchase event. */
@@ -122,6 +122,144 @@ export const performanceReportOtherBookingsList = z.array(
 export const performanceReportChannels = z
   .array(performanceReportChannel)
   .min(1);
+
+/**
+ * A case study is a report written for prospects instead of the client: a
+ * before/after comparison, a story, and who approved sharing it. It is sales
+ * material, exported as a PDF: the page shows only changes (+32%), never the
+ * client's revenue or counts, and the writer stores only the figures it
+ * should show. The figures are copied in from whatever the writer pulled
+ * (warehouse, Meta, booking data), like the rest of the report.
+ *
+ * `scope` says what a figure counts, because a case study mixes them:
+ * `site` is every booking or visit on the client's own website, `all_channels`
+ * also counts OTA and phone bookings from their PMS, `paid` is what an ad
+ * platform attributes to the ads.
+ */
+const caseStudyScope = z.enum(["site", "all_channels", "paid"]);
+/** `percent` values are fractions (0.42), like the report's derived rates. */
+const caseStudyUnit = z.enum(["count", "usd", "percent", "days"]);
+const caseStudyWindow = z
+  .object({
+    label: z.string().min(1), // "Before Performance"
+    startDate: z.iso.date(),
+    endDate: z.iso.date(),
+  })
+  .strict()
+  .refine((value) => value.startDate <= value.endDate, {
+    message: "Window start must be on or before its end",
+  });
+
+export const performanceCaseStudyMeasure = z
+  .object({
+    label: z.string().min(1), // "Direct bookings"
+    scope: caseStudyScope,
+    unit: caseStudyUnit,
+    before: z.number().nonnegative(),
+    after: z.number().nonnegative(),
+    /** Lead figures, shown large at the top. */
+    featured: z.boolean().optional(),
+    note: z.string().optional(),
+  })
+  .strict();
+export type PerformanceCaseStudyMeasure = z.infer<
+  typeof performanceCaseStudyMeasure
+>;
+
+/** Weekly values, so the page can show the shape around the change. */
+export const performanceCaseStudySeries = z
+  .object({
+    label: z.string().min(1), // "Site sessions per week"
+    scope: caseStudyScope,
+    unit: caseStudyUnit,
+    points: z
+      .array(
+        z
+          .object({
+            start: z.iso.date(), // first day of the week
+            value: z.number().nonnegative(),
+            partial: z.boolean().optional(),
+          })
+          .strict(),
+      )
+      .min(2),
+  })
+  .strict();
+export type PerformanceCaseStudySeries = z.infer<
+  typeof performanceCaseStudySeries
+>;
+
+export const performanceCaseStudy = z
+  .object({
+    headline: z.string().trim().min(1).max(160),
+    summary: z.string().trim().min(1),
+    /** The report's ad highlights, shown as a creative section. */
+    showCreative: z.boolean().default(false),
+    /** Null until the client agrees; the page then says approval is required. */
+    approval: z
+      .object({
+        approvedBy: z.string().min(1),
+        approvedOn: z.iso.date(),
+        scope: z.enum(["sales", "public"]),
+      })
+      .strict()
+      .nullable(),
+    heroImageUrl: z.url({ protocol: /^https$/ }).optional(),
+    heroCaption: z.string().optional(),
+    comparison: z
+      .object({
+        before: caseStudyWindow,
+        after: caseStudyWindow,
+        measures: z.array(performanceCaseStudyMeasure).min(1),
+      })
+      .strict()
+      .refine((value) => value.before.endDate < value.after.startDate, {
+        message: "The before window must end before the after window starts",
+      }),
+    series: z.array(performanceCaseStudySeries).default([]),
+    /** Moments drawn on the weekly charts: launches, setting changes. */
+    events: z
+      .array(
+        z.object({ date: z.iso.date(), label: z.string().min(1) }).strict(),
+      )
+      .default([]),
+    sections: z
+      .array(
+        z
+          .object({
+            heading: z.string().min(1),
+            body: z.string().min(1),
+            imageUrl: z.url({ protocol: /^https$/ }).optional(),
+            imageCaption: z.string().optional(),
+          })
+          .strict(),
+      )
+      .default([]),
+  })
+  .strict();
+export type PerformanceCaseStudy = z.infer<typeof performanceCaseStudy>;
+
+/** Shares change in points; everything else changes relative to before. */
+export function caseStudyChange(measure: PerformanceCaseStudyMeasure) {
+  if (measure.unit === "percent") {
+    const points = (measure.after - measure.before) * 100;
+    return `${points >= 0 ? "+" : "−"}${Math.abs(points).toFixed(1)} pts`;
+  }
+  if (!measure.before) return "New";
+  const rounded = Math.round(
+    ((measure.after - measure.before) / measure.before) * 100,
+  );
+  return `${rounded >= 0 ? "+" : "−"}${Math.abs(rounded)}%`;
+}
+
+/** Every image a case study shows, for the stable-URL check and the media proxy. */
+export function caseStudyImageUrls(caseStudy: PerformanceCaseStudy | null) {
+  if (!caseStudy) return [];
+  return [
+    caseStudy.heroImageUrl,
+    ...caseStudy.sections.map((section) => section.imageUrl),
+  ].filter((url): url is string => Boolean(url));
+}
 
 /** A rate, or null when the denominator is missing or zero. */
 export function ratio(
@@ -147,6 +285,7 @@ export const performanceReportContent = z
     sources: performanceReportSources.min(1),
     narrative: z.string().nullable().default(null),
     recommendations: z.string().nullable().default(null),
+    caseStudy: performanceCaseStudy.nullable().default(null),
   })
   .strict()
   .refine((value) => value.startDate <= value.endDate, {

@@ -16,6 +16,7 @@ import type {
   PerformanceReportHighlight,
   PerformanceReportMetrics,
   PerformanceReportOtherBookings,
+  PerformanceCaseStudy,
   PerformanceReportSource,
 } from "@/lib/performance-report";
 import { createId } from "./utils";
@@ -346,6 +347,8 @@ export const performanceReportTable = pgTable(
     sources: t.jsonb().$type<PerformanceReportSource[]>().default([]).notNull(),
     narrative: t.text(),
     recommendations: t.text(), // shown as "Next steps"
+    /** Present when the report is a case study for prospects. */
+    caseStudy: t.jsonb().$type<PerformanceCaseStudy>(),
 
     status: performanceReportStatusEnum().default("draft").notNull(),
     publishedAt: t.timestamp(),

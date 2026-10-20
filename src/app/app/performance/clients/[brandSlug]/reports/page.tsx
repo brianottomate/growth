@@ -32,5 +32,11 @@ export default async function ReportsPage({
       </p>
     );
   const workspace = await getReportWorkspace(org.id, brand.id);
-  return <ReportsEditor brandId={brand.id} initial={workspace} />;
+  return (
+    <ReportsEditor
+      brandId={brand.id}
+      brandSlug={brandSlug}
+      initial={workspace}
+    />
+  );
 }

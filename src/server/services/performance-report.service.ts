@@ -14,6 +14,7 @@ import {
   type PerformanceReport,
 } from "@/server/db/schema";
 import {
+  caseStudyImageUrls,
   performanceReportContent,
   performanceReportSnapshot,
   savePerformanceReportSchema,
@@ -59,6 +60,7 @@ function draft(row: PerformanceReport) {
       sources: row.sources,
       narrative: row.narrative,
       recommendations: row.recommendations,
+      caseStudy: row.caseStudy,
     }),
   };
 }
@@ -119,8 +121,11 @@ export async function saveReportDraft(
   input: z.input<typeof savePerformanceReportSchema>,
 ) {
   const parsed = savePerformanceReportSchema.parse(input);
-  for (const highlight of parsed.content.highlights) {
-    if (highlight.imageUrl && !r2IsPublicUrl(highlight.imageUrl)) {
+  for (const imageUrl of [
+    ...parsed.content.highlights.map((highlight) => highlight.imageUrl),
+    ...caseStudyImageUrls(parsed.content.caseStudy),
+  ]) {
+    if (imageUrl && !r2IsPublicUrl(imageUrl)) {
       throw new Error(
         "Report images must use a stable Growth media URL. Upload the image before adding it.",
       );
@@ -398,9 +403,10 @@ export function reportPage(snapshot: PerformanceReportSnapshot) {
 }
 export type PerformanceReportPage = ReturnType<typeof reportPage>;
 export function performanceReportImageUrls(report: PerformanceReportPage) {
-  return new Set(
-    report.highlights.flatMap((highlight) =>
+  return new Set([
+    ...report.highlights.flatMap((highlight) =>
       highlight.imageUrl ? [highlight.imageUrl] : [],
     ),
-  );
+    ...caseStudyImageUrls(report.caseStudy),
+  ]);
 }

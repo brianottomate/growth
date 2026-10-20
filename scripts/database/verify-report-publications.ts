@@ -117,6 +117,7 @@ const content: PerformanceReportContent = {
   ],
   narrative: "Reviewed original",
   recommendations: null,
+  caseStudy: null,
 };
 try {
   await assert.rejects(() =>

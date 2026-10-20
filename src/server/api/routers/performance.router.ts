@@ -11,6 +11,7 @@ import {
   draftPitchAction,
 } from "@/server/ai/capabilities/pitch";
 import { z } from "zod";
+import { writeCaseStudyLead } from "@/server/services/case-study-lead.service";
 import { generateBillingCycles } from "@/server/services/billing-cycles.service";
 import { PIPELINE_COLUMNS } from "@/lib/performance-pipeline";
 import { movePipelineCard } from "@/server/services/pipeline-order.service";
@@ -63,6 +64,13 @@ export const performanceRouter = {
   reviewReport: actionProcedure(reviewReportAction),
   publishReport: actionProcedure(publishReportAction),
   revokeReportShare: actionProcedure(revokeReportShareAction),
+  writeCaseStudyLead: workspaceProcedure
+    .input(
+      z.object({ brandId: z.string().min(1), reportId: z.string().min(1) }),
+    )
+    .handler(({ context: ctx, input }) =>
+      writeCaseStudyLead(ctx.workspace.orgId, input),
+    ),
   movePipelineCard: workspaceProcedure
     .input(
       z.object({

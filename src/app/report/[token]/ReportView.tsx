@@ -14,6 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { PerformanceReportPage } from "@/server/services/performance-report.service";
 
+import { CaseStudyView } from "./CaseStudyView";
+
 const usd = (value: number, cents = false) =>
   value.toLocaleString("en-US", {
     style: "currency",
@@ -163,6 +165,10 @@ export function ReportView({
   token?: string;
   report: PerformanceReportPage;
 }) {
+  if (report.caseStudy)
+    return (
+      <CaseStudyView token={token} report={report} study={report.caseStudy} />
+    );
   const { metrics } = report;
   const roas = ratio(metrics.purchaseValue, metrics.spend);
   const costPerBooking = ratio(metrics.spend, metrics.bookings);
