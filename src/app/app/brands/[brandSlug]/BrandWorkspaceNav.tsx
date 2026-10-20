@@ -11,6 +11,7 @@ const tabs = [
   ["newsletters", "Newsletters"],
   ["previews", "Organic previews"],
   ["ads", "Paid campaigns"],
+  ["initiatives", "Initiatives"],
   ["homes", "Homes & targets"],
   ["setup", "Connections"],
 ] as const;

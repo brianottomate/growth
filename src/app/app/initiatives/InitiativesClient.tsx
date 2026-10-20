@@ -165,10 +165,21 @@ function InitiativeEditor({
     </form>
   );
 }
-export function InitiativesClient() {
+/**
+ * The workspace's initiatives, or one brand's when `brand` is given: those it
+ * leads or has a campaign, series or post in. A new initiative started from a
+ * brand page leads with that brand.
+ */
+export function InitiativesClient({
+  brand,
+}: {
+  brand?: { id: string; name: string };
+} = {}) {
   const [creating, setCreating] = useState(false);
   const { data, error, isLoading } = useQuery(
-    orpc.initiative.list.queryOptions({ input: {} }),
+    orpc.initiative.list.queryOptions({
+      input: brand ? { brandId: brand.id } : {},
+    }),
   );
   return (
     <div className="space-y-6">
@@ -176,7 +187,9 @@ export function InitiativesClient() {
         <div>
           <h1 className="text-2xl font-semibold">Initiatives</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Coordinate content and paid campaigns across brands around one push.
+            {brand
+              ? `Pushes ${brand.name} leads or takes part in, across content and paid campaigns.`
+              : "Coordinate content and paid campaigns across brands around one push."}
           </p>
         </div>
         <Button onClick={() => setCreating(true)}>New initiative</Button>
@@ -185,8 +198,9 @@ export function InitiativesClient() {
       {isLoading && <p>Loading initiatives…</p>}
       {data?.initiatives.length === 0 && (
         <p className="text-muted-foreground">
-          Create an initiative, then link existing series, content posts, and
-          campaigns.
+          {brand
+            ? `No initiative includes ${brand.name} yet. Create one, or link this brand's campaigns and series to an existing initiative.`
+            : "Create an initiative, then link existing series, content posts, and campaigns."}
         </p>
       )}
       <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @6xl:grid-cols-3">
@@ -202,7 +216,10 @@ export function InitiativesClient() {
               Give the push a shared brief. Link work after creating it.
             </DialogDescription>
           </DialogHeader>
-          <InitiativeEditor close={() => setCreating(false)} />
+          <InitiativeEditor
+            initial={brand ? { ...empty, leadBrandId: brand.id } : undefined}
+            close={() => setCreating(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>
