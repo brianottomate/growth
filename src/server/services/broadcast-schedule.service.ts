@@ -191,11 +191,12 @@ async function queueSend(
       .from(messageSendTable)
       .where(eq(messageSendTable.id, send.id))
       .for("update");
+    if (!current || !post) return false;
+    const schedule = current.snapshot.schedule;
     if (
-      !current ||
-      !post ||
+      !schedule ||
       !broadcastQueueReceiptCanAttach(
-        { status: current.status, schedule: current.snapshot.schedule },
+        { status: current.status, schedule },
         { dueAt, runtimeId },
         post.status,
       )
@@ -207,7 +208,7 @@ async function queueSend(
         snapshot: {
           ...current.snapshot,
           schedule: {
-            ...current.snapshot.schedule,
+            ...schedule,
             state: "scheduled",
             queueMessageId: receipt.messageId,
           },
