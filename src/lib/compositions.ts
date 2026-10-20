@@ -176,6 +176,20 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
       "Copy first, then a framed source image: below it on tall canvases, to its right on wide ones. Good for product UI.",
   },
   {
+    id: "stack-photo-below",
+    version: 1,
+    label: "Stack · photo below",
+    description:
+      "A light card: logo, headline, supporting line and a black pill, the photo bleeding off the foot. Kyle's Performance feed card. Wide canvases put the photo on the right.",
+  },
+  {
+    id: "stack-photo-above",
+    version: 1,
+    label: "Stack · photo above",
+    description:
+      "A light card led by the photo, the logo in a white tab on it, then a small lead-in, headline, supporting line and a black pill. Kyle's Performance feed card. Wide canvases put the photo on the left.",
+  },
+  {
     id: "split-frame-top",
     version: 1,
     label: "Split frame · image above",
@@ -476,6 +490,19 @@ export const COMPOSITION_FIELDS: Record<
   "image-hero": [mark, ...message],
   "split-frame-bottom": [mark, ...message],
   "split-frame-top": [mark, ...message],
+  "stack-photo-below": [
+    mark,
+    { key: "title", label: "Headline" },
+    { key: "subtitle", label: "Supporting line", hint: "Optional" },
+    { key: "cta", label: "Button", hint: "Optional" },
+  ],
+  "stack-photo-above": [
+    mark,
+    { key: "eyebrow", label: "Lead-in", hint: "Performance" },
+    { key: "title", label: "Headline" },
+    { key: "subtitle", label: "Supporting line", hint: "Optional" },
+    { key: "cta", label: "Button", hint: "Optional" },
+  ],
   "editorial-overlay": [mark, ...message, accent("colours the CTA")],
   "product-proof": [mark, ...message, accent("colours the card edge")],
   "brand-statement": [mark, ...message, accent("warms the ground")],

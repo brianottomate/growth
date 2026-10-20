@@ -1272,6 +1272,175 @@ export function renderComposition(
         {imageFirst ? [frame, copy] : [copy, frame]}
       </div>
     );
+  } else if (
+    spec.templateId === "stack-photo-below" ||
+    spec.templateId === "stack-photo-above"
+  ) {
+    // Kyle's Performance feed cards (2026-10): a light card with the photo
+    // bleeding off one end. "below" reads logo, headline, line, pill, photo;
+    // "above" leads with the photo, the logo in a white tab on it, then a
+    // small lead-in before the headline.
+    const above = spec.templateId === "stack-photo-above";
+    const stacked = !(format.width > format.height);
+    const pad = stacked ? 64 : 58;
+    const title = clamp(spec.title, 90);
+    const subtitle = spec.subtitle?.trim();
+    const eyebrow = spec.eyebrow?.trim();
+    const button = spec.cta?.trim();
+    const titleSize = stacked ? (square ? 64 : 78) : 54;
+    const copy = (
+      <div
+        key="copy"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: above ? "center" : "flex-start",
+          width: stacked ? "100%" : "50%",
+          padding: stacked
+            ? above
+              ? `${pad}px ${pad}px ${pad}px`
+              : `${pad}px ${pad}px 0`
+            : pad,
+          color: "#111111",
+        }}
+      >
+        {above ? (
+          eyebrow ? (
+            <div
+              style={{
+                display: "flex",
+                marginBottom: 22,
+                fontSize: 24,
+                color: "#6b6b66",
+              }}
+            >
+              {clamp(eyebrow, 40)}
+            </div>
+          ) : null
+        ) : (
+          <div style={{ display: "flex", marginBottom: 84 }}>
+            <BrandMark
+              brandName={context.brand.name}
+              logo={context.logo}
+              tone={spec.mark}
+            />
+          </div>
+        )}
+        <div
+          style={{
+            display: "flex",
+            maxWidth: "84%",
+            fontSize: titleSize,
+            fontWeight: 500,
+            lineHeight: 1.08,
+            letterSpacing: "-0.025em",
+            textWrap: "balance",
+          }}
+        >
+          {title}
+        </div>
+        {subtitle ? (
+          <div
+            style={{
+              display: "flex",
+              marginTop: 26,
+              maxWidth: "66%",
+              fontSize: 27,
+              lineHeight: 1.35,
+              color: "#3a3a36",
+            }}
+          >
+            {clamp(subtitle, 160)}
+          </div>
+        ) : null}
+        {button ? (
+          <div
+            style={{
+              display: "flex",
+              alignSelf: "flex-start",
+              marginTop: 32,
+              padding: "18px 30px",
+              borderRadius: 999,
+              background: "#111111",
+              color: "#ffffff",
+              fontSize: 23,
+              fontWeight: 600,
+            }}
+          >
+            {button}
+          </div>
+        ) : null}
+      </div>
+    );
+    const photo = (
+      <div
+        key="photo"
+        style={{
+          display: "flex",
+          position: "relative",
+          flex: 1,
+          ...(stacked
+            ? above
+              ? { width: "100%", height: "47%" }
+              : { margin: `${pad - 16}px ${pad}px 0`, height: "46%" }
+            : above
+              ? { width: "50%", height: "100%" }
+              : {
+                  width: "50%",
+                  height: "100%",
+                  margin: `${pad}px ${pad}px ${pad}px 0`,
+                }),
+        }}
+      >
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        {above ? (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              top: 28,
+              left: 28,
+              padding: "14px 22px",
+              borderRadius: 14,
+              background: "#ffffff",
+            }}
+          >
+            <BrandMark
+              brandName={context.brand.name}
+              logo={context.logo}
+              tone={spec.mark}
+              markSize={28}
+              textSize={20}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+    content = (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: stacked ? "column" : "row",
+          width: "100%",
+          height: "100%",
+          background: "#f6f5f2",
+        }}
+      >
+        {above ? [photo, copy] : [copy, photo]}
+      </div>
+    );
   } else if (spec.templateId === "hero-foot") {
     // Kyle's Performance ads (2026-10): the logo top left, the headline low
     // left just above a white pill, over a bottom scrim. Stories keep the

@@ -94,6 +94,8 @@ export const cardsSchema = z.strictObject({
     "image-hero",
     "split-frame-bottom",
     "split-frame-top",
+    "stack-photo-below",
+    "stack-photo-above",
     "editorial-overlay",
     "product-proof",
     "brand-statement",
