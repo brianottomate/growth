@@ -369,6 +369,11 @@ export async function intakePrefill(handle: { token: string }) {
     contact: account?.contactName ?? null,
     email: account?.contactEmail ?? null,
     site: brand.website,
+    sitePreview: {
+      title: brand.websiteMeta?.title ?? null,
+      description: brand.websiteMeta?.description ?? null,
+      image: brand.websiteMeta?.ogImage ?? null,
+    },
     // URLs, because that is what the form collects and pre-ticks.
     properties: properties
       .map((row) => row.url)
