@@ -412,6 +412,11 @@ export async function recordBroadcastQueueFailure(input: {
       )
     )
       return;
+    const [post] = await tx
+      .select({ status: platformPostTable.status })
+      .from(platformPostTable)
+      .where(eq(platformPostTable.id, current.platformPostId))
+      .for("update");
     await tx
       .update(messageSendTable)
       .set({
@@ -422,6 +427,11 @@ export async function recordBroadcastQueueFailure(input: {
         updatedAt: new Date(),
       })
       .where(eq(messageSendTable.id, current.id));
+    if (post?.status === "scheduled")
+      await tx
+        .update(platformPostTable)
+        .set({ status: "approved" })
+        .where(eq(platformPostTable.id, current.platformPostId));
   });
 }
 

@@ -71,7 +71,8 @@ flag, signing keys, base URL and runtime ID. Local env currently lacks the
 lifecycle enable/base/runtime configuration; local sends remain unavailable.
 Broadcast jobs register the shared signed QStash failure callback. Only an
 exhausted callback for the exact active runtime, date and queue message can mark
-an unstarted approved send failed; stale or superseded receipts are ignored.
+an unstarted approved send failed and return its content post to approved;
+stale or superseded receipts are ignored.
 Before activation verify the deployed queue endpoint, intended runtime,
 Customer.io cutover, approved cohort and consent, final creative and seed-inbox
 results. These checks were not performed by the local implementation. The cutover
