@@ -143,14 +143,17 @@ export function performanceCampaignName(input: {
   customer: string;
   isClient?: boolean;
   period?: string;
+  /** What the campaign buys; sales unless it collects leads on a form. */
+  goal?: string;
 }): string {
   return [
     performanceNamePrefix({
       brandName: input.customer,
       isClient: input.isClient ?? true,
     }),
-    "SALES",
-    "PURCHASE",
+    ...(input.goal === "lead_generation"
+      ? ["LEADS", "LEADFORM"]
+      : ["SALES", "PURCHASE"]),
     input.period ?? performancePeriod(),
   ].join("_");
 }
@@ -178,6 +181,7 @@ export function compileMetaCampaignName(input: {
   customer: string;
   isClient: boolean;
   period?: string;
+  goal?: string;
 }): string {
   if (input.name.startsWith("META_")) return input.name;
   const label = /^Sales · [A-Za-z]+ \d{4}(?: · (.+))?$/.exec(input.name);

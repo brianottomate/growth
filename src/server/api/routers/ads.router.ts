@@ -53,6 +53,8 @@ import {
   linkAudienceAction,
   createGoogleAdsAccountAction,
   createReportingConversionAction,
+  createLeadFormAction,
+  listLeadFormsAction,
   setPlatformDraftAction,
   setDeliveryGroupAction,
   deleteDeliveryGroupAction,
@@ -327,6 +329,9 @@ export const adsRouter = {
   linkAudience: actionProcedure(linkAudienceAction),
   createReportingConversion: actionProcedure(createReportingConversionAction),
   createGoogleAdsAccount: actionProcedure(createGoogleAdsAccountAction),
+  /** The instant forms on the Page the brand's Meta ads run as. */
+  leadForms: actionProcedure(listLeadFormsAction),
+  createLeadForm: actionProcedure(createLeadFormAction),
 
   importAdCreative: actionProcedure(importCreativeAction),
 

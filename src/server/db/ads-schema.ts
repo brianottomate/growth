@@ -353,6 +353,12 @@ export type PlatformCampaignSettings = {
      * Defaults to CBO.
      */
     budgetMode?: "cbo" | "abo";
+    /**
+     * Lead generation: the Meta instant form on the brand's Page that the
+     * ad set points at. The form is the ad's destination; Meta owns it and
+     * Growth lists the Page's forms by this id.
+     */
+    leadFormId?: string;
   };
   linkedin?: {
     /**

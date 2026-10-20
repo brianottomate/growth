@@ -84,6 +84,47 @@ Measured on Meta's raw leads 2026-09-09 → 09-23: **782 leads, 92 qualified
 conversion, ~50 qualified events/week). HubSpot's view showed ~1 because it only
 maps the Conditional form's buckets.
 
+## Lead forms from Growth (ads side)
+
+A Meta instant form is a Page asset: Meta owns it, it cannot be edited after
+creation (archive and recreate instead), and a lead ad set points at it by
+id. Growth reads and creates forms on the Page a brand's Meta ads run as
+(`brand.metaPageId`, else the Page bound to the pinned connection) through
+Graph with the `META_LEADS_ACCESS_TOKEN` system user, which mints a Page
+token for Wander's Page and for client Pages shared into the Wander business.
+Zernio's own `/v1/ads/lead-forms` endpoints bind to the connection's Page, so
+they would put a client's form on Wander's Page; that is why Graph is used.
+
+| Piece | Where |
+| --- | --- |
+| Form spec and house templates | `src/lib/meta-lead-forms.ts` |
+| Graph: list, create (`POST /{page}/leadgen_forms`), Page token | `src/server/clients/meta-leadgen.client.ts` |
+| Brand-scoped list and create | `src/server/services/meta-lead-forms.service.ts` |
+| Actions | `adsRead.listLeadForms`, `adsWrite.createLeadForm`; `setPlatformDraft meta.leadFormId` |
+| App | `orpc.ads.leadForms`, `orpc.ads.createLeadForm`; Meta setup → goal "Lead generation" → Lead form picker |
+| Push | `pushToMeta` in `ads-write.service.ts`; creative in `meta.client.ts` |
+
+Templates: `operator_qualification` (WanderOS: portfolio buckets `0 / 1-9 /
+10-199 / 200-750 / 750-2000 / 2000+`, PMS, booking site, name, email, phone;
+higher intent; thank-you button to wander.com/os) and `guest_inquiry` (a
+client's travellers: name, email, phone, travel dates, group size; thank-you
+button to the brand's site). The buckets split at 10 on purpose: the
+hand-built forms say `1-10`, which overlaps the 10-unit threshold.
+
+Push with the `lead_generation` goal: the draft must carry `meta.leadFormId`.
+The creative Growth builds on Meta carries the form on its call to action
+(`link_data.call_to_action.value.lead_gen_form_id` for one image set,
+`asset_feed_spec.call_to_actions` for placement-customized sets, no link
+urls; verified on act_885632589057558 2026-10-19), the ad's link is the Page
+short link, no pixel promoted object is sent, and every attached ad carries
+`leadGenFormId` so Zernio derives the ad set's lead optimisation and
+promoted Page. Zernio's lead ads are LEAD_GENERATION; optimising on the
+qualified CRM event (QUALITY_LEAD) is still done in Ads Manager.
+
+Leads from a form on a client's Page do not reach the webhook above, which
+is subscribed to Wander's Page only. Subscribe the Page (or use Zernio's
+`lead.received` webhook) before running lead ads for a client.
+
 ## Meeting-link forms
 
 Meeting-link forms send the lead to book a RevenueHero call with a specific

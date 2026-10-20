@@ -23,6 +23,7 @@ export const AD_PUSH_GOALS = [
   "awareness",
   "video_views",
   "conversions",
+  "lead_generation",
 ] as const;
 export type AdPushGoal = (typeof AD_PUSH_GOALS)[number];
 

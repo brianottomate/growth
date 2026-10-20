@@ -46,6 +46,7 @@ import type {
 } from "@/server/db/ads-schema";
 import { CompactAdMock } from "@/components/ad-mock";
 import { PushToPlatform } from "./PushToPlatform";
+import { MetaLeadFormPicker } from "./MetaLeadFormPicker";
 import { META_DEFAULT_CALL_TO_ACTION } from "@/lib/zernio-ads";
 import { money } from "./format";
 
@@ -152,6 +153,7 @@ export function MetaPlatformCard({
     goal === "conversions" &&
     !meta?.customConversionId &&
     !(meta?.pixelId && meta?.customEventType);
+  const missingLeadForm = goal === "lead_generation" && !meta?.leadFormId;
   const blockers = [
     scheduleError,
     !configuration &&
@@ -163,6 +165,7 @@ export function MetaPlatformCard({
     !placementPlan.length && "Choose delivery placements in Edit setup.",
     missingTracking &&
       "Set a pixel and conversion event, or a custom conversion, in Edit setup.",
+    missingLeadForm && "Pick or create a lead form in Edit setup.",
     !pc.budget && "Set a budget in Edit setup.",
     !creativeAds.length && "Add and approve a creative in Ad Studio.",
     missingCreative && "Add the missing artwork for the selected placements.",
@@ -245,6 +248,7 @@ export function MetaPlatformCard({
           {editingSetup ? (
             <MetaSettings
               pc={{ ...pc, settings: { ...pc.settings, meta } }}
+              brandSlug={brandSlug}
               campaignStartAt={campaignStartAt}
               campaignEndAt={campaignEndAt}
               choices={choices}
@@ -383,6 +387,7 @@ export function MetaPlatformCard({
 
 function MetaSettings({
   pc,
+  brandSlug,
   campaignStartAt,
   campaignEndAt,
   choices,
@@ -391,6 +396,7 @@ function MetaSettings({
   onClose,
 }: {
   pc: PlatformCampaign;
+  brandSlug: string;
   campaignStartAt?: Date | null;
   campaignEndAt?: Date | null;
   choices: {
@@ -422,6 +428,7 @@ function MetaSettings({
     meta?.conversionScope ?? "pixel",
   );
   const [mode, setMode] = useState<"cbo" | "abo">(meta?.budgetMode ?? "cbo");
+  const [leadFormId, setLeadFormId] = useState(meta?.leadFormId ?? "");
   const dateValue = (d: Date | null) =>
     d
       ? new Date(
@@ -482,6 +489,13 @@ function MetaSettings({
           </SelectContent>
         </Select>
       </label>
+      {draftGoal === "lead_generation" && (
+        <MetaLeadFormPicker
+          brandSlug={brandSlug}
+          value={leadFormId}
+          onChange={setLeadFormId}
+        />
+      )}
       <div className="space-y-1 text-sm">
         <p>Ad account · Facebook Page</p>
         <p className="text-muted-foreground">
@@ -672,6 +686,7 @@ function MetaSettings({
                 customConversionId: conversion.trim(),
                 conversionScope: scope,
                 budgetMode: mode,
+                leadFormId: draftGoal === "lead_generation" ? leadFormId : "",
               },
               startAt: null,
               endAt: scheduledEnd && end ? new Date(end).toISOString() : null,

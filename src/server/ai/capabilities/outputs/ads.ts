@@ -547,9 +547,17 @@ const importSourceSchema = z.strictObject({
 
 const metaSchema = z.strictObject({
   goal: z
-    .enum(["traffic", "engagement", "awareness", "video_views", "conversions"])
+    .enum([
+      "traffic",
+      "engagement",
+      "awareness",
+      "video_views",
+      "conversions",
+      "lead_generation",
+    ])
     .optional(),
   budgetMode: z.enum(["cbo", "abo"]).optional(),
+  leadFormId: z.string().optional(),
   conversionScope: z.enum(["host", "pixel"]).optional(),
   customConversionId: z.string().optional(),
   customEventType: z.string().optional(),
@@ -978,6 +986,39 @@ export const linkAudienceActionOutputSchema = z.strictObject({
   audienceId: z.string().nullable(),
   id: z.string(),
   name: z.string(),
+});
+
+const leadFormSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  status: z.string(),
+  createdAt: z.string().nullable(),
+  questions: z.array(
+    z.strictObject({
+      key: z.string(),
+      label: z.string(),
+      type: z.string(),
+      options: z.array(z.string()),
+    }),
+  ),
+});
+
+const leadFormBrandSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string().nullable(),
+});
+
+export const listLeadFormsActionOutputSchema = z.strictObject({
+  brand: leadFormBrandSchema,
+  pageId: z.string(),
+  forms: z.array(leadFormSchema),
+});
+
+export const createLeadFormActionOutputSchema = z.strictObject({
+  brand: leadFormBrandSchema,
+  pageId: z.string(),
+  form: leadFormSchema,
 });
 
 export const createReportingConversionActionOutputSchema = z.strictObject({

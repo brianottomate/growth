@@ -48,6 +48,8 @@ import {
   deletePlatformCampaignActionOutputSchema,
   createGoogleAdsAccountActionOutputSchema,
   createReportingConversionActionOutputSchema,
+  createLeadFormActionOutputSchema,
+  listLeadFormsActionOutputSchema,
   addAdShellActionOutputSchema,
   createAdsFromAssetsActionOutputSchema,
   setAdHomeActionOutputSchema,
@@ -125,6 +127,11 @@ import {
 } from "@/server/services/ads-write.service";
 import { ensureBrandGoogleAdsAccount } from "@/server/services/google-ads-accounts.service";
 import { duplicateCampaign } from "@/server/services/ads-duplicate.service";
+import {
+  createBrandLeadForm,
+  listBrandLeadForms,
+} from "@/server/services/meta-lead-forms.service";
+import { META_LEAD_FORM_TEMPLATES } from "@/lib/meta-lead-forms";
 import {
   adIdeaHomePhotos,
   addAudience,
@@ -953,6 +960,96 @@ export const createReportingConversionAction = growthAction({
     ensureBrandReportingConversion(input, { organizationId: ctx.orgId }),
 });
 
+export const listLeadFormsAction = growthAction({
+  outputSchema: listLeadFormsActionOutputSchema,
+  description:
+    "List the active Meta instant (lead) forms on the Facebook Page a brand's ads run as, with their questions. A Meta platform draft with the lead_generation goal points at one of these by id (setPlatformDraft meta.leadFormId). Read before choosing; never guess a form id.",
+  inputSchema: z.object({
+    brandSlug: destinationSchema.brandSlug,
+  }),
+  execute: async (input, ctx) =>
+    listBrandLeadForms({ ...input, organizationId: ctx.orgId }),
+});
+
+const leadFormQuestionSchema = z.union([
+  z.object({
+    type: z.enum([
+      "EMAIL",
+      "PHONE",
+      "FULL_NAME",
+      "FIRST_NAME",
+      "LAST_NAME",
+      "STREET_ADDRESS",
+      "CITY",
+    ]),
+  }),
+  z.object({
+    type: z.literal("CUSTOM"),
+    key: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9_]+$/)
+      .max(64)
+      .describe(
+        "Answer key, lowercase snake_case; what the lead payload carries.",
+      ),
+    label: z.string().trim().min(1).max(200),
+    options: z
+      .array(
+        z.object({
+          key: z.string().trim().min(1).max(64),
+          value: z.string().trim().min(1).max(100),
+        }),
+      )
+      .min(2)
+      .max(20)
+      .optional()
+      .describe("Multiple choice when given; free text otherwise."),
+  }),
+]);
+
+export const createLeadFormAction = growthAction({
+  outputSchema: createLeadFormActionOutputSchema,
+  description:
+    "Create a Meta instant (lead) form on the Facebook Page a brand's ads run as, from a house template (operator_qualification for WanderOS property-manager leads, guest_inquiry for a client's travellers) or an explicit spec. Meta never edits a form, so a change is a new form, and the create is not idempotent: call it once, then point the Meta platform draft at the returned form id with setPlatformDraft meta.leadFormId and the lead_generation goal. Creates a Page asset; spends nothing.",
+  inputSchema: z.object({
+    brandSlug: destinationSchema.brandSlug,
+    template: z.enum(META_LEAD_FORM_TEMPLATES).optional(),
+    locations: z
+      .array(z.string().trim().min(1).max(60))
+      .max(12)
+      .optional()
+      .describe(
+        "owner_acquisition only: the places offered for 'Where is the property?', e.g. ['Bend, Oregon', 'Redmond, Oregon']. Omit for the brand's market towns.",
+      ),
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe("Overrides the template's name; required with a spec."),
+    spec: z
+      .object({
+        privacyPolicyUrl: z.string().url(),
+        followUpUrl: z
+          .string()
+          .url()
+          .describe("Where the thank-you button sends people."),
+        higherIntent: z
+          .boolean()
+          .default(false)
+          .describe("Adds a review step before submit."),
+        locale: z.string().trim().max(10).default("en_US"),
+        questions: z.array(leadFormQuestionSchema).min(1).max(15),
+      })
+      .optional()
+      .describe("Explicit form content; fields given override the template."),
+  }),
+  execute: async (input, ctx) =>
+    createBrandLeadForm({ ...input, organizationId: ctx.orgId }),
+});
+
 export const createGoogleAdsAccountAction = growthAction({
   outputSchema: createGoogleAdsAccountActionOutputSchema,
   description:
@@ -1217,6 +1314,14 @@ export const setPlatformDraftAction = growthAction({
           .describe("cbo (default) is how Performance campaigns run."),
         placements: metaPlacementPlanSchema.optional(),
         importReviewed: z.boolean().optional(),
+        leadFormId: z
+          .string()
+          .trim()
+          .max(64)
+          .optional()
+          .describe(
+            "lead_generation goal: the Meta instant form the ad set points at, from adsRead.listLeadForms or adsWrite.createLeadForm. Empty string drops it.",
+          ),
       })
       .optional(),
     linkedin: z

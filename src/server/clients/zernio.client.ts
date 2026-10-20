@@ -1323,7 +1323,7 @@ export type CreateZernioStandaloneAdInput = {
    * https://docs.zernio.com/ad-campaigns/create-standalone-ad
    */
   attributionSpec?: Array<
-    | { eventType: "CLICK_THROUGH"; windowDays: 7 | 28 }
+    | { eventType: "CLICK_THROUGH"; windowDays: 1 | 7 | 28 }
     | { eventType: "VIEW_THROUGH" | "ENGAGED_VIDEO_VIEW"; windowDays: 1 }
   >;
   /** Meta only: one asset per placement on a single-image ad. */

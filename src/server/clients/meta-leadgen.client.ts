@@ -2,6 +2,10 @@ import "server-only";
 
 import { env } from "@/env";
 import { parseMetaLead, type MetaLead } from "@/lib/meta-leadgen";
+import type {
+  MetaLeadFormQuestion,
+  MetaLeadFormSpec,
+} from "@/lib/meta-lead-forms";
 
 const GRAPH = "https://graph.facebook.com/v23.0";
 
@@ -18,7 +22,12 @@ export interface MetaLeadForm {
   id: string;
   name: string;
   status: string;
+  created_time?: string;
+  questions?: MetaLeadFormQuestion[];
 }
+
+const FORM_FIELDS =
+  "id,name,status,created_time,questions{key,label,type,options}";
 
 const LEAD_FIELDS =
   "id,created_time,form_id,ad_id,ad_name,adset_name,campaign_id,campaign_name,is_organic,field_data";
@@ -44,6 +53,19 @@ async function graph<T>(
   return json;
 }
 
+async function graphPost<T>(
+  path: string,
+  body: Record<string, unknown>,
+  accessToken: string,
+): Promise<T> {
+  const form = new URLSearchParams({ access_token: accessToken });
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    form.set(key, typeof value === "string" ? value : JSON.stringify(value));
+  }
+  return graph<T>(path, {}, { method: "POST", body: form });
+}
+
 function systemToken(): string {
   if (!env.META_LEADS_ACCESS_TOKEN) {
     throw new Error("META_LEADS_ACCESS_TOKEN is not configured");
@@ -51,14 +73,22 @@ function systemToken(): string {
   return env.META_LEADS_ACCESS_TOKEN;
 }
 
-/** Form listing and lead reads need a Page token; the system user mints one. */
-export async function fetchPageAccessToken(): Promise<string> {
-  const page = await graph<{ access_token?: string }>(WANDER_PAGE_ID, {
+/**
+ * Form listing, form creation and lead reads need a Page token; the system
+ * user mints one for any Page it has a role on (Wander's own, or a client
+ * Page shared into the Wander business).
+ */
+export async function fetchPageAccessToken(
+  pageId: string = WANDER_PAGE_ID,
+): Promise<string> {
+  const page = await graph<{ access_token?: string }>(pageId, {
     fields: "access_token",
     access_token: systemToken(),
   });
   if (!page.access_token) {
-    throw new Error("[meta-leadgen] system user has no token for the Page");
+    throw new Error(
+      `[meta-leadgen] the system user has no token for Page ${pageId}; assign it the Page in Business Settings`,
+    );
   }
   return page.access_token;
 }
@@ -88,11 +118,12 @@ export async function fetchFormName(
 
 export async function listActiveLeadForms(
   pageToken: string,
+  pageId: string = WANDER_PAGE_ID,
 ): Promise<MetaLeadForm[]> {
   const forms: MetaLeadForm[] = [];
-  let next: string | undefined = `${WANDER_PAGE_ID}/leadgen_forms`;
+  let next: string | undefined = `${pageId}/leadgen_forms`;
   let params: Record<string, string> = {
-    fields: "id,name,status",
+    fields: FORM_FIELDS,
     limit: "100",
     access_token: pageToken,
   };
@@ -104,6 +135,34 @@ export async function listActiveLeadForms(
     params = {};
   }
   return forms.filter((form) => form.status === "ACTIVE");
+}
+
+/**
+ * Create an instant form on a Page. Meta never edits a form afterwards, so a
+ * changed spec is a new form; the id comes back for the ad set to point at.
+ * https://developers.facebook.com/docs/marketing-api/guides/lead-ads/create
+ */
+export async function createLeadForm(
+  pageId: string,
+  pageToken: string,
+  spec: MetaLeadFormSpec,
+): Promise<MetaLeadForm> {
+  const { id } = await graphPost<{ id: string }>(
+    `${pageId}/leadgen_forms`,
+    {
+      name: spec.name,
+      locale: spec.locale,
+      privacy_policy: { url: spec.privacyPolicyUrl },
+      follow_up_action_url: spec.followUpUrl,
+      is_optimized_for_quality: spec.higherIntent,
+      questions: spec.questions,
+    },
+    pageToken,
+  );
+  return graph<MetaLeadForm>(id, {
+    fields: FORM_FIELDS,
+    access_token: pageToken,
+  });
 }
 
 export async function listFormLeadsSince(

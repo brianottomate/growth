@@ -46,6 +46,7 @@ import { searchTerms, type SearchTerm } from "@/lib/search-terms";
 import { META_URL_TAGS, tagGoogleAdUrl } from "@/lib/ad-utm";
 import {
   createMetaPlacementCreative,
+  META_LEAD_AD_LINK,
   ensureMetaAdsPaused,
   metaCreativeTemplate,
   type MetaCreativeTemplate,
@@ -219,6 +220,8 @@ async function resolveOwnedBrandConnections(
       name: true,
       zernioProfileId: true,
       metaPageId: true,
+      website: true,
+      markets: true,
       performanceSettings: true,
       organizationId: true,
     },
@@ -323,6 +326,37 @@ function brandConnections(
   return own.length
     ? own
     : matchingConnections(accounts, brand.zernioProfileId!, platform);
+}
+
+/**
+ * The Facebook Page a brand's Meta ads run as: the Page pinned on the brand,
+ * else the one bound to its configured connection. Page assets such as lead
+ * forms live there.
+ */
+export async function resolveBrandMetaPage(input: {
+  organizationId: string;
+  brandSlug: string;
+}) {
+  const { brand, ownZernioProfileId } = await resolveOwnedBrandConnections(
+    input.organizationId,
+    input.brandSlug,
+  );
+  if (brand.metaPageId) return { brand, pageId: brand.metaPageId };
+  const pinned = configuredMetaDestination(brand.performanceSettings);
+  const connection = brandConnections(
+    await listZernioAccounts(),
+    brand,
+    ownZernioProfileId,
+    "meta",
+  ).find(
+    (candidate) => zernioAccountId(candidate) === pinned.connectionAccountId,
+  );
+  const pageId = metaPageIdFromConnection(connection?.platformUserId);
+  if (!pageId)
+    throw new Error(
+      `Could not resolve the Facebook Page ${brand.name}'s ads run as. Set the Page in brand settings.`,
+    );
+  return { brand, pageId };
 }
 
 /** Credentials are chosen once in brand settings, never during a push. */
@@ -707,11 +741,10 @@ export function assertMetaAdPayload(
       "promotedObject.customConversionId must be sent without pixelId — Meta rejects the pair",
     );
   }
-  if (
-    !payload.adSetId &&
-    goal === "lead_generation" &&
-    !payload.leadGenFormId
-  ) {
+  // The form is the destination; the ad set derives its lead optimisation
+  // and promoted Page from it, and Meta rejects a formless ad attached to a
+  // lead ad set.
+  if (goal === "lead_generation" && !payload.leadGenFormId) {
     throw new Error("Meta lead generation requires leadGenFormId");
   }
   if (
@@ -813,6 +846,14 @@ export const META_ATTRIBUTION_SPEC: NonNullable<
   { eventType: "VIEW_THROUGH", windowDays: 1 },
 ];
 
+/**
+ * Lead ad sets take only a 1-day click window: Meta refuses any view-through
+ * on LEAD_GENERATION (subcode 1885501, Oasis 2026-10-19).
+ */
+export const META_LEAD_ATTRIBUTION_SPEC: NonNullable<
+  CreateZernioStandaloneAdInput["attributionSpec"]
+> = [{ eventType: "CLICK_THROUGH", windowDays: 1 }];
+
 /** A create gets the house window; an attach joins an ad set that has one. */
 export function withMetaAttribution(
   payload: CreateZernioStandaloneAdInput,
@@ -820,7 +861,11 @@ export function withMetaAttribution(
   if (payload.adSetId) return { ...payload, attributionSpec: undefined };
   return {
     ...payload,
-    attributionSpec: payload.attributionSpec ?? META_ATTRIBUTION_SPEC,
+    attributionSpec:
+      payload.attributionSpec ??
+      (payload.goal === "lead_generation"
+        ? META_LEAD_ATTRIBUTION_SPEC
+        : META_ATTRIBUTION_SPEC),
   };
 }
 
@@ -3327,19 +3372,27 @@ async function pushToMeta(args: PushArgs) {
       `${skippedText} text ad(s) were not sent to Meta — they compile to Google`,
     );
   }
-  const linkUrl =
-    usable.find(({ content }) => content.linkUrl)?.content.linkUrl ??
-    campaign.landingUrl;
+  const meta = applyMetaTrackingDefaults(
+    settings.meta ?? {},
+    await metaTrackingDefaults(brand.id, destination.adAccount.id),
+  );
+  // A lead ad's destination is its instant form on the Page: no landing URL,
+  // no pixel event, and every ad carries the form id.
+  const leadGenFormId =
+    input.goal === "lead_generation" ? meta.leadFormId : undefined;
+  if (input.goal === "lead_generation" && !leadGenFormId)
+    throw new Error(
+      "Pick or create a lead form in Meta setup before pushing a lead generation campaign.",
+    );
+  const linkUrl = leadGenFormId
+    ? META_LEAD_AD_LINK
+    : (usable.find(({ content }) => content.linkUrl)?.content.linkUrl ??
+      campaign.landingUrl);
   if (!linkUrl) {
     throw new Error(
       "Set a landing URL on the campaign, or a link URL on at least one ad",
     );
   }
-
-  const meta = applyMetaTrackingDefaults(
-    settings.meta ?? {},
-    await metaTrackingDefaults(brand.id, destination.adAccount.id),
-  );
   const planned = metaPlacementPlanSchema.safeParse(
     meta.placements ?? META_DEFAULT_PLACEMENTS,
   );
@@ -3362,15 +3415,17 @@ async function pushToMeta(args: PushArgs) {
     }
   }
   const useCbo = (meta.budgetMode ?? "cbo") === "cbo";
-  const promotedObject = metaPromotedObjectFor({
-    brand,
-    meta,
-    reporting:
-      brand.performanceSettings?.metaReportingConversions?.[
-        destination.adAccount.id
-      ],
-    host: normalizeDomain(brand.website),
-  });
+  const promotedObject = leadGenFormId
+    ? undefined
+    : metaPromotedObjectFor({
+        brand,
+        meta,
+        reporting:
+          brand.performanceSettings?.metaReportingConversions?.[
+            destination.adAccount.id
+          ],
+        host: normalizeDomain(brand.website),
+      });
 
   // Book now is the default; an operator's selected CTA reaches the platform.
   const isClient = brand.relationship === "client";
@@ -3383,6 +3438,7 @@ async function pushToMeta(args: PushArgs) {
     name: campaign.name,
     customer: brand.name,
     isClient,
+    goal: input.goal,
     period: (draft.startAt ?? campaign.startAt ?? campaign.createdAt)
       .toISOString()
       .slice(0, 7)
@@ -3414,7 +3470,9 @@ async function pushToMeta(args: PushArgs) {
         item.headline ??
         (index === 0 ? content.headline : (content.headline ?? campaign.name)),
       description: item.description ?? content.description,
-      linkUrl: item.landingUrl ?? content.linkUrl ?? linkUrl,
+      linkUrl: leadGenFormId
+        ? META_LEAD_AD_LINK
+        : (item.landingUrl ?? content.linkUrl ?? linkUrl),
       callToAction: metaCallToAction(content),
     }));
 
@@ -3512,6 +3570,7 @@ async function pushToMeta(args: PushArgs) {
           link: card.linkUrl,
         })),
         sets: await placementSetsFor(ad, content),
+        leadGenFormId,
       });
       return creativeId;
     })();
@@ -3541,7 +3600,9 @@ async function pushToMeta(args: PushArgs) {
     headline: content.headline,
     body: content.body,
     description: content.description,
-    linkUrl: content.linkUrl ?? linkUrl,
+    ...(leadGenFormId
+      ? { leadGenFormId }
+      : { linkUrl: content.linkUrl ?? linkUrl }),
     callToAction: metaCallToAction(content),
     ...(await mediaFor(ad, content)),
   });

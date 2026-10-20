@@ -683,6 +683,9 @@ const META_CREATIVE_FEATURES = [
 ] as const;
 
 /** Who the ad runs as and what every creative carries. */
+/** The only link Meta accepts on a lead ad's creative: the Page short link. */
+export const META_LEAD_AD_LINK = "https://fb.me/";
+
 export type MetaCreativeTemplate = {
   pageId: string;
   instagramUserId: string;
@@ -727,8 +730,14 @@ export async function createMetaPlacementCreative(input: {
   cards: { title: string; description?: string; link: string }[];
   /** In priority order, one image per card each. */
   sets: MetaCreativeSet[];
+  /**
+   * Lead ad: the button opens this instant form instead of a link. Meta
+   * takes the form on the call to action and the Page short link as the
+   * link; the asset feed carries it on `call_to_actions` and needs no urls.
+   */
+  leadGenFormId?: string;
 }) {
-  const { cards, template, sets } = input;
+  const { cards, template, sets, leadGenFormId } = input;
   if (!sets.length) throw new Error("A creative needs at least one image set");
   if (sets.some((set) => set.imageUrls.length !== cards.length))
     throw new Error("Every set needs one image per card");
@@ -757,7 +766,7 @@ export async function createMetaPlacementCreative(input: {
   };
   const callToAction = (link: string) => ({
     type: input.callToActionType,
-    value: { link },
+    value: leadGenFormId ? { lead_gen_form_id: leadGenFormId } : { link },
   });
 
   if (sets.length === 1) {
@@ -811,7 +820,7 @@ export async function createMetaPlacementCreative(input: {
   const descriptions = unique(
     cards.flatMap((card) => (card.description ? [card.description] : [])),
   );
-  const links = unique(cards.map((card) => card.link));
+  const links = leadGenFormId ? [] : unique(cards.map((card) => card.link));
   const label = (name: string) => ({ name });
   const imageLabel = (set: number, card: number) =>
     label(`image_${hashes.indexOf(hashAt(set, card))}`);
@@ -824,7 +833,9 @@ export async function createMetaPlacementCreative(input: {
           ),
         }
       : {}),
-    link_url_label: label(`link_${links.indexOf(card.link)}`),
+    ...(leadGenFormId
+      ? {}
+      : { link_url_label: label(`link_${links.indexOf(card.link)}`) }),
   });
   const spec = (positions: MetaPositions) => ({
     publisher_platforms: positions.publisherPlatforms,
@@ -858,10 +869,21 @@ export async function createMetaPlacementCreative(input: {
               })),
             }
           : {}),
-        link_urls: links.map((website_url, i) => ({
-          website_url,
-          adlabels: [label(`link_${i}`)],
-        })),
+        ...(leadGenFormId
+          ? {
+              call_to_actions: [
+                {
+                  type: input.callToActionType,
+                  value: { lead_gen_form_id: leadGenFormId },
+                },
+              ],
+            }
+          : {
+              link_urls: links.map((website_url, i) => ({
+                website_url,
+                adlabels: [label(`link_${i}`)],
+              })),
+            }),
         bodies: [{ text: input.message, adlabels: [label("body_0")] }],
         call_to_action_types: [input.callToActionType],
         ad_formats: [carousel ? "CAROUSEL" : "SINGLE_IMAGE"],

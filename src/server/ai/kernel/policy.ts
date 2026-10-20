@@ -424,6 +424,7 @@ export const growthActionPolicies = {
     scope: read("provider-read"),
     top: read("provider-read"),
     listDestinations: read("provider-read"),
+    listLeadForms: read("provider-read"),
     openCampaign: read(),
     listCampaigns: read(),
     ideaHomePhotos: read(),
@@ -519,6 +520,14 @@ export const growthActionPolicies = {
     createReportingConversion: write({
       consequence: "provider-write",
       idempotent: true,
+    }),
+    // Creates an instant form on the brand's Facebook Page. Meta cannot edit
+    // or hard-delete a form (archive only) and a retry makes one more; it
+    // spends nothing and changes no campaign.
+    createLeadForm: write({
+      consequence: "provider-write",
+      idempotent: false,
+      reversible: false,
     }),
     // Makes a Google Ads account under the manager and a conversion on it.
     // Currency and time zone are permanent, but nothing is spent.
