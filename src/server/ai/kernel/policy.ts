@@ -720,6 +720,11 @@ export const growthActionPolicies = {
     previewSlots: read("model-read", ALL),
   },
   planningWrite: { generateSlots: write() },
+  influencerRead: { partnerships: read() },
+  influencerWrite: {
+    savePartnership: write(),
+    removePartnership: write({ reversible: false }),
+  },
   amplificationRead: { list: read(), targets: read() },
   amplificationWrite: {
     saveContact: write(),

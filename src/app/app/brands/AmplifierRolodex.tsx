@@ -22,6 +22,7 @@ import { orpc } from "@/orpc/client";
 import type { AmplifierHandle } from "@/server/db/amplification-schema";
 
 const TYPE_OPTIONS = [
+  { value: "none", label: "Unspecified" },
   { value: "friend", label: "Friend of the company" },
   { value: "creator", label: "Creator" },
   { value: "investor", label: "Investor" },
@@ -60,6 +61,8 @@ type Amplifier = {
   slackUserId: string | null;
   handoffPreference: "manual" | "slack";
   linkedBrandId: string | null;
+  email?: string | null;
+  phone?: string | null;
 };
 
 export function AmplifierRolodex() {
@@ -200,6 +203,8 @@ export function AmplifierRolodex() {
                       setEditing({
                         id: a.id,
                         name: a.name,
+                        email: a.email,
+                        phone: a.phone,
                         type: a.type,
                         handles: a.handles,
                         notes: a.notes,
@@ -244,26 +249,31 @@ export function AmplifierRolodex() {
 
 // ---- create / edit dialog -------------------------------------------
 
-function AmplifierDialog({
+export function AmplifierDialog({
   open,
   onOpenChange,
   initial,
   onSaved,
+  allowBrandLink = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial?: Amplifier;
+  allowBrandLink?: boolean;
   onSaved: () => Promise<void> | void;
 }) {
   const isEdit = !!initial;
-  const { data: contacts } = useQuery(
-    orpc.amplifier.list.queryOptions({ input: {} }),
-  );
+  const { data: contacts } = useQuery({
+    ...orpc.amplifier.list.queryOptions({ input: {} }),
+    enabled: open && !!initial && allowBrandLink,
+  });
   const [handoff, setHandoff] = useState<"manual" | "slack">("manual");
   const [brandId, setBrandId] = useState("none");
 
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
-  const [type, setType] = useState("creator");
+  const [type, setType] = useState("none");
   const [handles, setHandles] = useState<AmplifierHandle[]>([]);
   const [notes, setNotes] = useState("");
   const [slackUserId, setSlackUserId] = useState("");
@@ -274,14 +284,16 @@ function AmplifierDialog({
   // Re-seed the form whenever the dialog opens (or switches target).
   useEffect(() => {
     if (!open) return;
+    setEmail(initial?.email ?? "");
+    setPhone(initial?.phone ?? "");
     setName(initial?.name ?? "");
-    setType(initial?.type ?? "friend");
+    setType(initial?.type ?? "none");
     setHandles(initial?.handles ?? []);
     setNotes(initial?.notes ?? "");
     setSlackUserId(initial?.slackUserId ?? "");
     setHandoff(initial?.handoffPreference ?? "manual");
     setBrandId(initial?.linkedBrandId ?? "none");
-    setPlatform("x");
+    setPlatform(initial ? "x" : "");
     setHandle("");
   }, [open, initial]);
 
@@ -318,13 +330,21 @@ function AmplifierDialog({
   function save() {
     const trimmed = name.trim();
     if (!trimmed) return;
+    const initialHandle = handle.trim().replace(/^@/, "");
+    if (!isEdit && initialHandle && !platform) return;
     if (isEdit && initial) {
       update.mutate({
         id: initial.id,
         name: trimmed,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
         handoffPreference: handoff,
-        linkedBrandId: brandId === "none" ? null : brandId,
-        type,
+        linkedBrandId: allowBrandLink
+          ? brandId === "none"
+            ? null
+            : brandId
+          : (initial?.linkedBrandId ?? null),
+        type: type === "none" ? null : type,
         handles,
         notes,
         slackUserId: slackUserId.trim().toUpperCase() || null,
@@ -332,12 +352,10 @@ function AmplifierDialog({
     } else {
       create.mutate({
         name: trimmed,
-        handoffPreference: handoff,
-        linkedBrandId: brandId === "none" ? null : brandId,
-        type,
-        handles,
-        notes: notes || undefined,
-        slackUserId: slackUserId.trim().toUpperCase() || undefined,
+        linkedBrandId: null,
+        ...(initialHandle
+          ? { handles: [{ platform, handle: initialHandle }] }
+          : {}),
       });
     }
   }
@@ -350,8 +368,9 @@ function AmplifierDialog({
             {isEdit ? "Edit amplifier" : "Add amplifier"}
           </DialogTitle>
           <DialogDescription>
-            A lightweight contact in the org rolodex — reusable across every
-            brand and launch.
+            {isEdit
+              ? "Update contact details, social handles, and handoff preferences."
+              : "Start with a name and optionally add one social account. Add more details later. No brand workspace is created."}
           </DialogDescription>
         </DialogHeader>
 
@@ -359,119 +378,195 @@ function AmplifierDialog({
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Name (e.g. David Ternyak)"
+            aria-label="Amplifier name"
+            placeholder="Name"
+            maxLength={150}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                if (!busy) save();
+              }
+            }}
             autoFocus
           />
-          <SimpleSelect
-            className="w-40"
-            value={type}
-            onValueChange={setType}
-            options={TYPE_OPTIONS}
-            aria-label="Amplifier type"
-          />
-
-          {/* handle list */}
-          {handles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {handles.map((h) => (
-                <span
-                  key={`${h.platform}:${h.handle}`}
-                  className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs"
-                >
-                  <ChannelLogo platform={h.platform} className="size-3.5" />@
-                  {h.handle}
-                  <button
-                    type="button"
-                    aria-label="Remove handle"
-                    onClick={() =>
-                      setHandles(
-                        handles.filter(
-                          (x) =>
-                            !(
-                              x.platform === h.platform && x.handle === h.handle
-                            ),
-                        ),
-                      )
+          {!isEdit && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Social account (optional)
+              </p>
+              <div className="flex gap-2">
+                <SimpleSelect
+                  aria-label="Platform"
+                  placeholder="Platform"
+                  value={platform}
+                  onValueChange={setPlatform}
+                  options={PLATFORM_OPTIONS}
+                  className="w-32 shrink-0"
+                />
+                <Input
+                  aria-label="Social handle"
+                  placeholder="@handle"
+                  value={handle}
+                  maxLength={150}
+                  onChange={(event) =>
+                    setHandle(event.target.value.replace(/^@/, ""))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      if (!busy) save();
                     }
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              ))}
+                  }}
+                />
+              </div>
+              {handle.trim().replace(/^@/, "") && !platform && (
+                <p className="text-sm text-muted-foreground">
+                  Choose the platform for this handle.
+                </p>
+              )}
             </div>
           )}
-
-          {/* add-handle row */}
-          <div className="flex gap-2">
-            <SimpleSelect
-              className="w-32"
-              value={platform}
-              onValueChange={setPlatform}
-              options={PLATFORM_OPTIONS}
-              aria-label="Platform"
-            />
-            <div className="relative flex-1">
-              <span className="absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">
-                @
-              </span>
-              <Input
-                value={handle}
-                onChange={(e) => setHandle(e.target.value.replace(/^@/, ""))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addHandle();
-                  }
-                }}
-                placeholder="handle"
-                leading="handle"
+          {isEdit && (
+            <>
+              <SimpleSelect
+                className="w-40"
+                value={type}
+                onValueChange={setType}
+                options={TYPE_OPTIONS}
+                aria-label="Amplifier type"
               />
-            </div>
-            <Button type="button" variant="outline" onClick={addHandle}>
-              Add
-            </Button>
-          </div>
 
-          <SimpleSelect
-            aria-label="Handoff preference"
-            value={handoff}
-            onValueChange={(value) => setHandoff(value as "manual" | "slack")}
-            options={[
-              { value: "manual", label: "Manual handoff" },
-              { value: "slack", label: "Slack handoff" },
-            ]}
-          />
-          <SimpleSelect
-            aria-label="Personal brand"
-            value={brandId}
-            onValueChange={setBrandId}
-            options={[
-              { value: "none", label: "Lightweight contact" },
-              ...(contacts?.brands ?? []).map((b) => ({
-                value: b.id,
-                label: b.name,
-              })),
-            ]}
-          />
-          <p className="text-xs text-muted-foreground">
-            A personal brand adds a content workspace. Connecting a publishing
-            account is optional.
-          </p>
-          <Input
-            value={slackUserId}
-            onChange={(event) =>
-              setSlackUserId(event.target.value.toUpperCase())
-            }
-            placeholder="Slack member ID (for example U012ABCDEF)"
-          />
+              {/* handle list */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input
+                  aria-label="Contact email"
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  maxLength={254}
+                />
+                <Input
+                  aria-label="Contact phone"
+                  type="tel"
+                  placeholder="Phone"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  maxLength={80}
+                />
+              </div>
+              {handles.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {handles.map((h) => (
+                    <span
+                      key={`${h.platform}:${h.handle}`}
+                      className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs"
+                    >
+                      <ChannelLogo platform={h.platform} className="size-3.5" />
+                      @{h.handle}
+                      <button
+                        type="button"
+                        aria-label="Remove handle"
+                        onClick={() =>
+                          setHandles(
+                            handles.filter(
+                              (x) =>
+                                !(
+                                  x.platform === h.platform &&
+                                  x.handle === h.handle
+                                ),
+                            ),
+                          )
+                        }
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
 
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notes (optional)"
-            rows={2}
-          />
+              {/* add-handle row */}
+              <div className="flex gap-2">
+                <SimpleSelect
+                  className="w-32"
+                  value={platform}
+                  onValueChange={setPlatform}
+                  options={PLATFORM_OPTIONS}
+                  aria-label="Platform"
+                />
+                <div className="relative flex-1">
+                  <span className="absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">
+                    @
+                  </span>
+                  <Input
+                    value={handle}
+                    onChange={(e) =>
+                      setHandle(e.target.value.replace(/^@/, ""))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addHandle();
+                      }
+                    }}
+                    placeholder="handle"
+                    leading="handle"
+                  />
+                </div>
+                <Button type="button" variant="outline" onClick={addHandle}>
+                  Add
+                </Button>
+              </div>
+
+              <SimpleSelect
+                aria-label="Handoff preference"
+                value={handoff}
+                onValueChange={(value) =>
+                  setHandoff(value as "manual" | "slack")
+                }
+                options={[
+                  { value: "manual", label: "Manual handoff" },
+                  { value: "slack", label: "Slack handoff" },
+                ]}
+              />
+              {allowBrandLink && (
+                <>
+                  <SimpleSelect
+                    aria-label="Personal brand"
+                    value={brandId}
+                    onValueChange={setBrandId}
+                    options={[
+                      { value: "none", label: "Lightweight contact" },
+                      ...(contacts?.brands ?? []).map((b) => ({
+                        value: b.id,
+                        label: b.name,
+                      })),
+                    ]}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    A personal brand adds a content workspace. Connecting a
+                    publishing account is optional.
+                  </p>
+                </>
+              )}
+              <Input
+                value={slackUserId}
+                onChange={(event) =>
+                  setSlackUserId(event.target.value.toUpperCase())
+                }
+                placeholder="Slack member ID (for example U012ABCDEF)"
+              />
+
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notes (optional)"
+                rows={2}
+              />
+            </>
+          )}
         </div>
 
         <DialogFooter>
@@ -482,7 +577,14 @@ function AmplifierDialog({
           >
             Cancel
           </Button>
-          <Button onClick={save} disabled={!name.trim() || busy}>
+          <Button
+            onClick={save}
+            disabled={
+              !name.trim() ||
+              busy ||
+              (!isEdit && !!handle.trim().replace(/^@/, "") && !platform)
+            }
+          >
             {busy && <Loader2 className="size-4 animate-spin" />}
             {isEdit ? "Save" : "Add amplifier"}
           </Button>

@@ -31,6 +31,8 @@ import { campaignRouter } from "@/server/api/routers/campaign.router";
 import { newsletterRouter } from "@/server/api/routers/newsletter.router";
 import { orgRouter } from "@/server/api/routers/org.router";
 import { outreachRouter } from "@/server/api/routers/outreach.router";
+import { influencerPartnershipsRouter } from "@/server/api/routers/influencerPartnerships.router";
+import { homeGroupSharesRouter } from "@/server/api/routers/homeGroupShares.router";
 import { performanceRouter } from "@/server/api/routers/performance.router";
 import { productStorefrontRouter } from "@/server/api/routers/productStorefront.router";
 import { instantlyRouter } from "@/server/api/routers/instantly.router";
@@ -91,6 +93,8 @@ export const appRouter = {
   org: orgRouter,
   outreach: outreachRouter,
   performance: performanceRouter,
+  homeGroupShares: homeGroupSharesRouter,
+  influencerPartnerships: influencerPartnershipsRouter,
   productStorefront: productStorefrontRouter,
   instantly: instantlyRouter,
   leads: leadsRouter,

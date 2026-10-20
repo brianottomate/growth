@@ -52,3 +52,5 @@ export * from "./reference-board-schema";
 export * from "./article-revision-schema";
 
 export * from "./content-workbook-schema";
+
+export * from "./influencer-partnership-schema";

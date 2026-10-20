@@ -3,7 +3,11 @@ import { z } from "zod";
 import { and, eq, isNull } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 
-import { protectedProcedure, actionProcedure } from "@/server/api/orpc";
+import {
+  protectedProcedure,
+  actionProcedure,
+  workspaceProcedure,
+} from "@/server/api/orpc";
 import {
   amplificationTargetTable,
   amplifierTable,
@@ -26,14 +30,6 @@ type Ctx = {
   db: Database;
   session: { user: { id: string } };
 };
-
-async function orgIdFor(ctx: Ctx): Promise<string | null> {
-  const m = await ctx.db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, ctx.session.user.id),
-    with: { organization: true },
-  });
-  return m?.organization?.id ?? null;
-}
 
 async function assertOrgMembership(ctx: Ctx, organizationId: string) {
   const membership = await ctx.db.query.memberTable.findFirst({
@@ -95,18 +91,16 @@ export const amplifierRouter = {
   targets: actionProcedure(readAmplificationTargets),
 
   /** Soft-delete a rolodex amplifier (keeps past moment history intact). */
-  remove: protectedProcedure
+  remove: workspaceProcedure
     .input(z.object({ id: z.string() }))
     .handler(async ({ context: ctx, input }) => {
-      const org = await orgIdFor(ctx);
-      if (!org) throw new ORPCError("FORBIDDEN");
       await ctx.db
         .update(amplifierTable)
         .set({ deletedAt: new Date() })
         .where(
           and(
             eq(amplifierTable.id, input.id),
-            eq(amplifierTable.organizationId, org),
+            eq(amplifierTable.organizationId, ctx.workspace.orgId),
           ),
         );
       return { ok: true };

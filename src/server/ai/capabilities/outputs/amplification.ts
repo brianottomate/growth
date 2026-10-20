@@ -19,6 +19,8 @@ export const listAmplifiersOutputSchema = z.strictObject({
       id: z.string(),
       linkedBrandId: z.string().nullable(),
       name: z.string(),
+      email: z.string().nullable(),
+      phone: z.string().nullable(),
       notes: z.string().nullable(),
       slackUserId: z.string().nullable(),
       handoffPreference: z.enum(["manual", "slack"]),

@@ -73,6 +73,18 @@ These record progress with provenance without performing the underlying tasks.
 See [recorded launch checklist](performance-launch-checklist.md) for item IDs,
 workflow completion points, and revision handling.
 
+Amplifier contacts are available in chat and MCP through
+`amplificationRead__list` and `amplificationWrite__saveContact`. Creation needs
+only a name and creates no brand workspace. Later calls pass the contact ID
+and only the details to update; omitted fields are preserved.
+
+Influencer partnerships use `influencerRead__partnerships` and
+`influencerWrite__savePartnership` / `influencerWrite__removePartnership`.
+Creation needs an existing amplifier and client; home, stay dates and deliverables
+are optional. Returned booking URLs carry the stable partnership ID in `utm_id`.
+Saving generates a link but sends no email or reservation. Collections remain
+independent, reusable view-only galleries.
+
 Notable portable workflows:
 
 - inspect the workspace, brands, brand maps, audiences, content, ads, and signals;

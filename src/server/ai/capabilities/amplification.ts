@@ -87,6 +87,8 @@ export const listAmplifiers = growthAction({
       amplifiers: amplifiers.map((amplifier) => ({
         id: amplifier.id,
         name: amplifier.name,
+        email: amplifier.email,
+        phone: amplifier.phone,
         type: amplifier.type,
         handles: amplifier.handles ?? [],
         linkedBrandId: amplifier.linkedBrandId,
@@ -188,7 +190,7 @@ async function ownedTarget(id: string, ctx: CapabilityContext) {
 export const saveAmplifier = growthAction({
   outputSchema: savedAmplifierOutputSchema,
   description:
-    "Create or edit ONE private amplifier contact. Optionally link an existing personal brand in this workspace; a Zernio connection is not required. Linking preserves assignments. Manual handoff is the default; Slack preference does not send a message.",
+    "Create or edit ONE private workspace amplifier contact, including influencers. To create, only name is required: save it immediately without asking for email, handles, type, or a brand. Do not create or link a brand unless explicitly requested. To update, supply id and only the fields to change; omitted fields are preserved and nullable fields can be cleared with null. Email, phone, social handles, type, notes, Slack member and handoff preference can be added later. An explicit personal-brand link must reference an existing personal brand in this workspace; publishing access is independent. Manual handoff is the default; saving never sends a message.",
   inputSchema: z.object({
     id: z.string().optional(),
     name: z.string().trim().min(1).max(150).optional(),
@@ -202,6 +204,15 @@ export const saveAmplifier = growthAction({
       )
       .max(20)
       .optional(),
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email()
+      .max(254)
+      .nullable()
+      .optional(),
+    phone: z.string().trim().max(80).nullable().optional(),
     notes: z.string().max(2000).nullable().optional(),
     slackUserId: z
       .string()

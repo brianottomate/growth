@@ -11,6 +11,11 @@ import {
 } from "react";
 import { track as vercelTrack } from "@vercel/analytics/react";
 import posthog from "posthog-js";
+import { usePathname } from "next/navigation";
+import {
+  homeGroupAnalyticsBlocked,
+  isHomeGroupSharePath,
+} from "@/lib/home-group-share-privacy";
 
 import type {
   AnalyticsMetadata,
@@ -72,7 +77,26 @@ export const useAnalytics = () => {
  * Analytics is cookieless. The consent banner was asking permission for
  * cookies nothing writes, so it is gone along with the gate it drove.
  */
+const untrackedAnalytics: AnalyticsContextType = {
+  trackEvent: () => undefined,
+  identifyUser: () => undefined,
+  reset: () => undefined,
+};
+
 export function AnalyticsProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  // The public view does not even mount the session hook or tracking effects.
+  if (isHomeGroupSharePath(pathname) || homeGroupAnalyticsBlocked()) {
+    return (
+      <AnalyticsContext.Provider value={untrackedAnalytics}>
+        {children}
+      </AnalyticsContext.Provider>
+    );
+  }
+  return <TrackedAnalyticsProvider>{children}</TrackedAnalyticsProvider>;
+}
+
+function TrackedAnalyticsProvider({ children }: { children: ReactNode }) {
   const session = authClient.useSession();
   const lastIdentifiedUserId = useRef<string | null>(null);
 
@@ -80,7 +104,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   // because consent used to switch it on. Session recording stays off: that
   // was a consent-gated escalation, not the default.
   useEffect(() => {
-    if (!env.NEXT_PUBLIC_POSTHOG_KEY) return;
+    if (!env.NEXT_PUBLIC_POSTHOG_KEY || homeGroupAnalyticsBlocked()) return;
     posthog.set_config({
       capture_pageview: "history_change",
       capture_pageleave: true,
@@ -98,7 +122,8 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
           eventName: T,
           properties?: ClientEventPropertiesDefinition[T],
         ) => {
-          if (!env.NEXT_PUBLIC_POSTHOG_KEY) return;
+          if (!env.NEXT_PUBLIC_POSTHOG_KEY || homeGroupAnalyticsBlocked())
+            return;
           try {
             posthog.capture(eventName, properties);
           } catch (error) {
@@ -106,7 +131,8 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
           }
         },
         identify: (userId, traits) => {
-          if (!env.NEXT_PUBLIC_POSTHOG_KEY) return;
+          if (!env.NEXT_PUBLIC_POSTHOG_KEY || homeGroupAnalyticsBlocked())
+            return;
           try {
             posthog.identify(userId, traits);
           } catch (error) {
@@ -114,7 +140,8 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
           }
         },
         reset: () => {
-          if (!env.NEXT_PUBLIC_POSTHOG_KEY) return;
+          if (!env.NEXT_PUBLIC_POSTHOG_KEY || homeGroupAnalyticsBlocked())
+            return;
           try {
             posthog.reset();
           } catch (error) {
@@ -147,6 +174,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       properties?: ClientEventPropertiesDefinition[T],
       meta?: AnalyticsMetadata,
     ): void => {
+      if (homeGroupAnalyticsBlocked()) return;
       console.log("🔵 [Analytics] Client event:", { eventName, properties });
       providers.forEach((provider) =>
         provider.trackEvent(eventName, properties, meta),
@@ -157,7 +185,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
 
   // Identify user function
   const identifyUser = useCallback(() => {
-    if (!session.data?.user) return;
+    if (!session.data?.user || homeGroupAnalyticsBlocked()) return;
 
     const userId = session.data.user.id;
 
@@ -197,6 +225,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
 
   // Reset analytics
   const reset = useCallback(() => {
+    if (homeGroupAnalyticsBlocked()) return;
     console.log("🔵 [Analytics] Resetting all providers");
     providers.forEach((provider) => {
       if (provider.reset) {

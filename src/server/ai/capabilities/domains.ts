@@ -353,6 +353,11 @@ import {
   promoteToClientAction,
 } from "./performance";
 import { readWebPage, webSearch } from "./research";
+import {
+  listPartnerships,
+  savePartnership,
+  removePartnership,
+} from "./influencer-partnerships";
 import { growthDomainTool } from "./types";
 
 export const creativeRead = growthDomainTool({
@@ -918,6 +923,17 @@ export const planningWrite = growthDomainTool({
   },
 });
 
+export const influencerRead = growthDomainTool({
+  description:
+    "Read influencer partnerships and their tagged booking destinations.",
+  actions: { partnerships: listPartnerships },
+});
+export const influencerWrite = growthDomainTool({
+  description:
+    "Create, edit and delete influencer partnerships without sending messages or making bookings.",
+  actions: { savePartnership, removePartnership },
+});
+
 export const amplificationRead = growthDomainTool({
   description:
     "Read the amplifier rolodex with per-contact ask history — who can boost a post and how reliably they deliver.",
@@ -929,7 +945,7 @@ export const amplificationRead = growthDomainTool({
 
 export const amplificationWrite = growthDomainTool({
   description:
-    "Plan amplification for a specific platform post, then explicitly notify one human through Slack when approved.",
+    "Create and update private workspace amplifier contacts, including influencers, or plan amplification for a specific platform post. Contact creation needs only a name and creates no brand. Explicitly notify one human through Slack only when approved.",
   actions: {
     request: AMPLIFICATION_TOOLS.requestAmplification,
     saveContact: AMPLIFICATION_TOOLS.saveAmplifier,
@@ -1046,6 +1062,8 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   planningWrite,
   amplificationRead,
   amplificationWrite,
+  influencerRead,
+  influencerWrite,
   leadsRead,
   leadsWrite,
   listeningRead,

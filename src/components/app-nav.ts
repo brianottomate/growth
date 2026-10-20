@@ -64,6 +64,11 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       },
       { label: "Prospects", href: "/app/performance/prospects", icon: Target },
       {
+        label: "Influencers",
+        href: "/app/performance/influencer-collections",
+        icon: Layers,
+      },
+      {
         label: "Clients",
         href: "/app/performance/clients",
         icon: Building2,

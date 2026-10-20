@@ -344,6 +344,20 @@
       "when": 1792508063510,
       "tag": "0047_meta_leadgen_lead_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1792511626414,
+      "tag": "0048_shareable_home_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792511852518,
+      "tag": "0049_influencer_partnerships",
+      "breakpoints": true
     }
   ]
 }

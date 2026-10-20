@@ -42,9 +42,9 @@ async function ownedGroup(id: string, orgId: string) {
   const group = await db.query.homeGroupTable.findFirst({
     where: eq(homeGroupTable.id, id),
   });
-  if (!group) throw new Error("Home group not found.");
+  if (!group?.brandId) throw new Error("Brand home group not found.");
   await groupBrand(group.brandId, orgId);
-  return group;
+  return { ...group, brandId: group.brandId };
 }
 export async function homeGroupContext(brandId: string, orgId: string) {
   const brand = await groupBrand(brandId, orgId);
@@ -117,6 +117,7 @@ export async function saveHomeGroup(
       .set({
         name: input.name.trim(),
         description: input.description ?? null,
+        revision: sql`${homeGroupTable.revision} + 1`,
         updatedAt: new Date(),
       })
       .where(eq(homeGroupTable.id, group.id));
@@ -199,7 +200,10 @@ export async function changeGroupHomes(
     }
     await tx
       .update(homeGroupTable)
-      .set({ updatedAt: new Date() })
+      .set({
+        revision: sql`${homeGroupTable.revision} + 1`,
+        updatedAt: new Date(),
+      })
       .where(eq(homeGroupTable.id, group.id));
   });
   return { groupId: group.id };
@@ -224,7 +228,11 @@ export async function makePrimaryGroup(
 ) {
   await tx
     .update(homeGroupTable)
-    .set({ isPrimary: false, updatedAt: new Date() })
+    .set({
+      isPrimary: false,
+      revision: sql`${homeGroupTable.revision} + 1`,
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(homeGroupTable.brandId, brandId),
@@ -234,7 +242,11 @@ export async function makePrimaryGroup(
     );
   await tx
     .update(homeGroupTable)
-    .set({ isPrimary: true, updatedAt: new Date() })
+    .set({
+      isPrimary: true,
+      revision: sql`${homeGroupTable.revision} + 1`,
+      updatedAt: new Date(),
+    })
     .where(
       and(eq(homeGroupTable.brandId, brandId), eq(homeGroupTable.id, groupId)),
     );
@@ -334,6 +346,18 @@ export async function setInPrimaryGroup(
         .values({ brandId, name: "Featured homes", isPrimary: true })
         .returning();
     }
+    await tx
+      .select({ id: homeGroupTable.id })
+      .from(homeGroupTable)
+      .where(eq(homeGroupTable.id, primary!.id))
+      .for("update");
+    await tx
+      .update(homeGroupTable)
+      .set({
+        revision: sql`${homeGroupTable.revision} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(homeGroupTable.id, primary!.id));
     if (!featured) {
       await tx
         .delete(homeGroupMemberTable)

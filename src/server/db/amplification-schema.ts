@@ -40,6 +40,8 @@ export const amplifierTable = pgTable(
       .notNull(),
 
     name: t.text().notNull(),
+    email: t.text(),
+    phone: t.text(),
     type: t.text(), // investor | press | partner | creator | team (soft)
     handles: t.jsonb().$type<AmplifierHandle[]>().default([]),
     notes: t.text(),

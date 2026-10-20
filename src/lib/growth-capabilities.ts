@@ -330,6 +330,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   strategyWrite: ["setChannelCadence", "setSeriesCadence", "setBrandMix"],
   planningRead: ["previewSlots"],
   planningWrite: ["generateSlots"],
+  influencerRead: ["partnerships"],
+  influencerWrite: ["savePartnership", "removePartnership"],
   amplificationRead: ["list", "targets"],
   amplificationWrite: [
     "request",
@@ -412,6 +414,8 @@ export const GROWTH_CAPABILITY_LABELS = {
   strategyWrite: "Updating strategy",
   planningRead: "Reading plan",
   planningWrite: "Updating plan",
+  influencerRead: "Reading influencer partnerships",
+  influencerWrite: "Updating influencer partnerships",
   amplificationRead: "Reading amplifiers",
   amplificationWrite: "Coordinating amplification",
   leadsRead: "Reading leads",
