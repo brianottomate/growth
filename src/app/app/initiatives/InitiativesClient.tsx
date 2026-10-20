@@ -1,7 +1,13 @@
 "use client";
 import { CampaignListRow } from "@/components/campaigns/campaign-summary";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Megaphone, ImageIcon } from "lucide-react";
+import { Megaphone, ImageIcon, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { WorkPreview, previewDate } from "./WorkPreview";
 import { InitiativeCard } from "./InitiativeCard";
 import { StatusBoard, workLane } from "./StatusBoard";
@@ -365,8 +371,8 @@ export function InitiativeDetail({ id }: { id: string }) {
         ← Initiatives
       </Link>
       <section className="space-y-4">
-        <div className="flex flex-col justify-between gap-4 @3xl:flex-row @3xl:items-start">
-          <div className="min-w-0">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
             <p className="mb-2 text-xs text-muted-foreground">Overview</p>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-semibold">{i.name}</h1>
@@ -487,16 +493,30 @@ export function InitiativeDetail({ id }: { id: string }) {
                   detail={`${brandName(campaign.brandId)} · ${campaign.status} · ${preview?.adCount ?? 0} ads · ${preview?.audienceCount ?? 0} audience ${preview?.audienceCount === 1 ? "plan" : "plans"}`}
                   description={preview?.description}
                   actions={
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={unlink.isPending}
-                      onClick={() =>
-                        unlink.mutate({ id, campaignId: campaign.id })
-                      }
-                    >
-                      Unlink
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Actions for ${campaign.name}`}
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={href}>Open campaign</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={unlink.isPending}
+                          onSelect={() =>
+                            unlink.mutate({ id, campaignId: campaign.id })
+                          }
+                        >
+                          Unlink from initiative
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   }
                 />
               </div>

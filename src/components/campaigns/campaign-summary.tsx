@@ -153,7 +153,9 @@ export function CampaignListRow({
 }) {
   return (
     <div className="@container/campaign min-w-0">
-      <div className="grid grid-cols-1 gap-3 px-4 py-4 @4xl/campaign:grid-cols-[minmax(0,1fr)_auto] @4xl/campaign:items-start @4xl/campaign:gap-6">
+      {/* Actions stay top right at every width; the name and description wrap
+        beside them rather than pushing them below. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 px-4 py-4 @4xl/campaign:gap-6">
         <div className="min-w-0 space-y-3">
           <CampaignSummary
             compact
@@ -166,14 +168,14 @@ export function CampaignListRow({
           {thumbnails}
         </div>
         {(platforms || spend || actions) && (
-          <div className="flex min-w-0 flex-col gap-2 border-t pt-3 @4xl/campaign:items-end @4xl/campaign:border-0 @4xl/campaign:pt-0">
+          <div className="flex min-w-0 flex-col items-end gap-2">
             {actions && (
-              <div className="flex flex-wrap items-center gap-1 @4xl/campaign:justify-end">
+              <div className="flex flex-wrap items-center justify-end gap-1">
                 {actions}
               </div>
             )}
             {(platforms || spend) && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground @4xl/campaign:justify-end">
+              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-xs text-muted-foreground">
                 {platforms}
                 {spend && <span className="whitespace-nowrap">{spend}</span>}
               </div>
