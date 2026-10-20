@@ -155,21 +155,4 @@ describe("Growth MCP protocol compatibility", () => {
     await assertToolCatalog(client);
     await client.close();
   }, 20_000);
-
-  test("starting spend over MCP never runs without the person's yes", async () => {
-    // This client declares no elicitation, so it cannot ask; the server must
-    // refuse before reading anything (the test database is unreachable).
-    const client = new Client(
-      { name: "growth-confirmation-test", version: "1.0.0" },
-      { versionNegotiation: { mode: { pin: "2026-07-28" } } },
-    );
-    await client.connect(createTransport());
-    const result = await client.callTool({
-      name: "adsWrite__setDelivery",
-      arguments: { platformCampaignId: "pc_test", status: "active" },
-    });
-    expect(result.isError).toBe(true);
-    expect(JSON.stringify(result.content)).toContain("cannot ask");
-    await client.close();
-  }, 20_000);
 });

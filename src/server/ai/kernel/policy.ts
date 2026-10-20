@@ -29,9 +29,10 @@ export interface GrowthActionPolicy {
 
 const ALL = ["overview-chat", "mcp", "invoke-growth", "test"] as const;
 const PRODUCT = ["overview-chat", "test"] as const;
-// Actions that need a person's yes: the in-app chat shows its approval card,
-// and MCP asks through the client with an elicitation before running them
-// (to-mcp-server). invoke-growth has no way to ask, so it does not get them.
+// Actions that need a person's yes in the in-app chat, which shows its
+// approval card. MCP runs them without asking: the person connected the
+// client, and its own tool approval is theirs to set. invoke-growth has no
+// way to ask, so it does not get them.
 const CONFIRMED = ["overview-chat", "mcp", "test"] as const;
 const read = (
   consequence: GrowthToolConsequence = "local-read",

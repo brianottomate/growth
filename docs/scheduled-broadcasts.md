@@ -45,8 +45,8 @@ draggable. Queued time changes go through a separate delivery reschedule review.
 The Schedule delivery action lives in the normal workspace toolbar and is
 available for approved emails, with audience selection and exact-send review in
 a focused dialog. The individual email send card shows delivery timing and pause/recovery.
-Schedule approval and recovery use existing MCP elicitation policy; hosts that
-cannot elicit are refused by the normal runtime. No alternate credential route.
+Schedule approval and recovery run over MCP without a confirmation round trip,
+as every MCP action does. No alternate credential route.
 
 ## Winter Park Escapes read-only verification
 

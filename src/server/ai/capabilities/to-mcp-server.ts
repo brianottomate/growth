@@ -2,14 +2,7 @@ import "server-only";
 import { mcpOutputSchema } from "@/server/mcp/result-contract";
 import { widgetForTool } from "@/server/mcp/connector-widgets";
 
-import {
-  CLIENT_CAPABILITIES_META_KEY,
-  inputRequired,
-  inputResponse,
-  type AuthInfo,
-  type McpServer,
-  type ServerContext,
-} from "@modelcontextprotocol/server";
+import { type AuthInfo, type McpServer } from "@modelcontextprotocol/server";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, stepCountIs, type ToolExecutionOptions } from "ai";
 import { z } from "zod";
@@ -241,46 +234,6 @@ function registerInvokeGrowth(
   );
 }
 
-// An action whose policy needs a person's yes asks for it through the
-// client before it runs: the multi-round-trip elicitation of protocol
-// revision 2026-07-28, which needs no server-side session. The client shows
-// the question and calls again with the answer; a client set to always allow
-// the tool may answer for its person, which is theirs to decide.
-const CONFIRM_KEY = "confirm";
-
-function clientCanAsk(extra: ServerContext) {
-  const envelope = extra.mcpReq.envelope as Record<string, unknown> | undefined;
-  const capabilities = envelope?.[CLIENT_CAPABILITIES_META_KEY] as
-    | { elicitation?: unknown }
-    | undefined;
-  return Boolean(capabilities?.elicitation);
-}
-
-function confirmationQuestion(
-  name: string,
-  description: unknown,
-  input: unknown,
-) {
-  const what =
-    typeof description === "string"
-      ? (description.split(/(?<=\.)\s/)[0] ?? "")
-      : "";
-  const details = JSON.stringify(input);
-  return `Wander Growth wants to run ${name.replace("__", ".")}. ${what}\n\nDetails: ${details.length > 700 ? `${details.slice(0, 699)}…` : details}`;
-}
-
-function refusal(message: string) {
-  const failure = {
-    ok: false as const,
-    error: { code: "confirmation", message },
-  };
-  return {
-    isError: true,
-    content: [{ type: "text" as const, text: JSON.stringify(failure) }],
-    structuredContent: failure,
-  };
-}
-
 /** Project native AI SDK tools onto the authenticated OAuth MCP surface. */
 export function registerMcpTools(
   server: McpServer,
@@ -329,41 +282,6 @@ export function registerMcpTools(
         let runId: string | undefined;
         try {
           const validatedInput = nativeDefinition.validationSchema.parse(input);
-          if (policyForGrowthTool(name, validatedInput).approval === "user") {
-            const answer = inputResponse(
-              extra.mcpReq.inputResponses,
-              CONFIRM_KEY,
-            );
-            if (answer.kind !== "elicit") {
-              if (!clientCanAsk(extra))
-                return refusal(
-                  "This action needs the person's confirmation, and this client cannot ask for it. Run it from Growth instead.",
-                );
-              return inputRequired({
-                inputRequests: {
-                  [CONFIRM_KEY]: inputRequired.elicit({
-                    message: confirmationQuestion(
-                      name,
-                      definition.description,
-                      validatedInput,
-                    ),
-                    requestedSchema: {
-                      type: "object",
-                      properties: {
-                        confirm: {
-                          type: "boolean",
-                          title: "Run it",
-                        },
-                      },
-                      required: ["confirm"],
-                    },
-                  }),
-                },
-              });
-            }
-            if (answer.action !== "accept" || answer.content?.confirm !== true)
-              return refusal("The person declined. Nothing ran.");
-          }
           const identity = identityFromMcpContext(extra);
           const manifest = mcpContextManifest();
           runId = await startAssistantRun({

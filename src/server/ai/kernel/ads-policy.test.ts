@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { growthActionPolicies } from "@/server/ai/kernel/policy";
 
-// Actions that start spend or destroy what ran need a person's yes on every
-// surface that can run them: the approval card in chat, an elicitation over
-// MCP. invoke-growth has no way to ask, so it never gets them.
+// Actions that start spend or destroy what ran need a person's yes in the
+// in-app chat (its approval card). MCP runs them without asking, and
+// invoke-growth has no way to ask, so it never gets them.
 const adsWrite = growthActionPolicies.adsWrite;
 const NEEDS_A_YES = [
   "setDelivery",
