@@ -1,171 +1,105 @@
-# Warehouse email audiences
+# Live email audiences
 
-Growth selects email recipients in BigQuery rather than importing Customer.io's
-million-profile population into Neon or mixing guests with sales leads.
-The authenticated builder is `/app/newsletters/audiences`, linked from Newsletters.
-The same builder is embedded in each Performance brand’s Email tab, fixed to
-that brand. Its header link jumps to the audience section, and “All email
-audiences” returns to the cross-brand page.
+Growth keeps reusable, brand-scoped email audiences separate from sales leads
+and advertising personas. Scheduled Performance broadcasts reference the saved
+audience directly and resolve its current membership when delivery starts. The
+current model has no compile action, recipient snapshot table, snapshot expiry
+or persisted dispatch cursor.
 
-## Operator workflow
+## Audience sources
 
-1. Choose a brand and rules. Wander can select recent email clickers or all
-   Customer.io subscriber candidates. Property managers can select bookers,
-   website signups, or both from their linked WanderOS website.
-2. Preview a count, ten recipients with selection reasons, the SQL, and source
-   freshness. Preview does not save or send. Known machine/prefetched clicks are
-   excluded; opens do not establish human engagement. An unknown machine flag
-   does not prove that a click was human.
-3. Save a named audience. Edits require the current revision, preventing a stale
-   tab or assistant from overwriting another operator's changes. Confirming
-   marketing permission is an explicit operator assertion, not a consent inference
-   from a booking. Candidates can be inspected without that confirmation.
-4. Saved audiences are available directly to the email send picker. Database
-   lists read their current members; warehouse audiences read their saved rules.
-   There is no MCP compile step or expiring recipient snapshot.
-5. Download a streamed candidate CSV or let an internal worker read bounded pages.
-   Neither path loads the whole population into application memory.
+An audience uses one of two source families:
 
-“Discuss in chat” hands over the brand and form rules. The canonical assistant/MCP
-catalog exposes `emailRead.audiences`, `emailRead.previewAudience`,
-`emailWrite.saveAudience`, and `emailWrite.addAudienceMembers`. SQL and brand scope are owned by code; chat adjusts
-validated parameters rather than running arbitrary SQL. Customer.io API read tools
-are not added.
+- **Database list:** contacts live in Growth's `email.list` and
+  `email.list_member` tables. CSV import normalizes and deduplicates addresses,
+  rejects invalid values and clears bot-like first names. Operators can append
+  consent-confirmed contacts later with `emailWrite.addAudienceMembers`; those
+  rows become part of subsequent reads of the same audience.
+- **Warehouse rules:** typed rules select Customer.io candidates or one linked
+  WanderOS website's bookers/signups. Growth builds the SQL and brand scope;
+  assistants cannot supply arbitrary SQL. Known machine and prefetched clicks
+  do not qualify as human engagement.
 
-## Uploaded lists and send waves
+Every definition records the operator's marketing-permission assertion.
+Bookings or list possession do not infer consent. A selected `sampleSize`
+limits current membership deterministically; counts are informational and can
+change after review.
 
-"Upload list" takes a CSV with an `Email` or `Email Address` column (a
-Mailchimp export works as is). The browser sends only email, first name and
-id; the server lowercases, deduplicates, drops invalid addresses and clears
-bot-generated first names (`GYCETzIUgVASAdh`) so `{{first_name|there}}` falls
-back. The list is stored in Growth's own database, in the `email` Postgres
-schema (`email.list`, `email.list_member`), not in the warehouse. Like `leads`,
-that schema references only `brand`, so it can move to a separate email service
-as it is. Members never change; a new export is a new list. A request is capped
-by Vercel at 4.5 MB, so a list much beyond about 50,000 rows needs a chunked
-upload first.
+## Operator and MCP workflow
 
-Any audience can set a random sample. Uploaded lists order members by
-`sha256(email)`, stored on the row at upload; warehouse audiences use
-`FARM_FINGERPRINT(email)`. Either way a sample of 100 always sits inside a
-sample of 1,000. An uploaded list needs no compiling: its current members and
-the audience definition decide who is in it.
+1. Choose a brand and audience rules, then preview current count, blockers,
+   source freshness and SQL. The authenticated UI can show a ten-row sample;
+   MCP preview deliberately omits recipient PII from retained tool results.
+2. Save the audience with `emailWrite.saveAudience`. For a database list, add
+   reviewed contacts with `emailWrite.addAudienceMembers` as needed.
+3. Approve an existing email's creative and call
+   `emailWrite.prepareBroadcast` with its `platformPostId` and `audienceId`.
+   Preparation freezes creative, sender, links and the live audience reference;
+   it does not freeze recipient membership.
+4. `emailRead.previewBroadcasts` shows the exact prepared emails, sender,
+   current counts and local send times. Current count is excluded from the
+   reviewed hash because membership is intentionally live.
+5. After the controlled seed and cutover checks, scheduling requires the exact
+   reviewed hash and literal `customerIoStopped: true`.
 
-One email reaches an address at most once across all its sends: prepare the
-same issue against the 100 sample, then the 1,000, then everyone, and each wave
-skips the people an earlier wave reached (`already_sent`). A published issue
-can take further waves.
+The current catalog exposes `emailRead.audiences`,
+`emailRead.previewAudience`, `emailWrite.saveAudience`,
+`emailWrite.addAudienceMembers` and `emailWrite.prepareBroadcast`. There is no
+`emailWrite.compileAudience` or `emailRead.audienceSnapshot` action.
 
-Sends use Postmark's Bulk API (enabled account-wide 2026-10-14; broadcast
-streams only). Each page of up to 10,000 guests is one bulk request: the email
-once as a Postmark template, where every `{{field|fallback}}` occurrence
-becomes its own key that Growth resolves per guest, plus each guest's address
-and metadata. Postmark paces the release. A malformed address rejects the
-whole request (422); suppressed addresses are accepted and counted on its side.
-The ledger writes each address before the request and marks it `sent` with
-`bulk:<id>` once Postmark accepts, so a resumed send never mails anyone twice;
-delivery and bounces come back through Postmark's webhooks. Postmark templates
-refuse `<link>` stylesheets, so the web font moves into an `@import`.
+## Delivery semantics
 
-Who handles unsubscribes is each brand's Postmark broadcast stream setting,
-read from Postmark at send time (cached five minutes). On `Postmark` (every
-stream today) Postmark fills `{{{ pm:unsubscribe }}}`, adds the
-`List-Unsubscribe` headers and suppresses unsubscribers. On `Custom` (allowed
-for the account since 2026-10-14; one API call per stream to switch) Growth
-does it: each guest gets a signed link to `/u/<token>`, a page with an
-Unsubscribe button, plus `List-Unsubscribe` and
-`List-Unsubscribe-Post: List-Unsubscribe=One-Click` pointing at
-`/api/email/unsubscribe/<token>`. Both record `email.opt_out` (brand, email),
-which every blast page and sequence step skips whatever the stream setting.
-Postmark keeps suppressing hard bounces and spam complaints either way.
+At dispatch, Growth rereads the saved audience and verifies that it still
+belongs to the email's brand and still has confirmed marketing permission.
+Database-list rows are read in internal database pages; warehouse membership is
+queried from its saved rules. Those reads build one eligible recipient set.
+They are not provider send waves.
 
-Uploaded lists carry no WanderOS opt-outs. The brand's Postmark broadcast stream
-holds their unsubscribes, bounces and complaints, and the dispatcher records
-those as skipped.
+Growth then applies the source and stream protections that are available:
 
-## Selection and sending are separate
+- warehouse audiences reread the linked WanderOS website's current email
+  opt-outs;
+- Growth-managed Postmark streams query brand opt-outs and create signed
+  one-click unsubscribe links;
+- Postmark-managed broadcast streams own unsubscribe substitution and provider
+  suppressions, including hard bounces and spam complaints.
 
-Customer.io people/attributes are historical exports. The query chooses each
-profile's latest version, normalizes and deduplicates email addresses, and excludes
-exported deleted, suppressed, and unsubscribed profiles. Any blocked profile for
-the same email excludes that email. Wander's warehouse workspace is `142511` and
-is available only to the Wander brand.
+Recipient ledger rows support webhook identity, booking attribution and send
+receipts. They do not implement cross-wave `already_sent` exclusion or a
+partial-send resume cursor. Preparing another send can include the same address
+again if that address belongs to its live audience.
 
-WanderOS bookings and signups are scoped to the linked website. Bookings must
-match both the website ID and organization, be confirmed, not cancelled, and use
-the generated-website channel. This avoids mixing brands that share an organization.
-`SaasGuestEmailOptOut` is not available in the audited datastream, so these lists
-are explicitly candidates with a live-opt-out blocker.
+After all recipients and the complete request are materialized, the dispatcher
+makes one authoritative database claim immediately before one Postmark Bulk
+request for the entire broadcast. Internal list pagination never becomes
+multiple provider submissions. The serialized request must remain below
+Postmark's 50 MB limit; Growth fails before the HTTP request rather than
+splitting it automatically.
 
-A saved audience **is not permission to send**. The dispatcher must:
+If pause wins before the final claim, no provider request is submitted. Once
+the claim changes the send to `sending`, pause cannot report success. Postmark
+owns pacing and processing after acceptance. Failed or uncertain provider
+handoffs require operator investigation and explicit reapproval; recovery never
+replays them automatically.
 
-- Verify the brand's readiness, marketing permission and active flow/campaign.
-- Recheck current source opt-outs and the correct brand/stream's Postmark
-  suppressions before every send batch, plus frequency caps and idempotency.
-- Call `filterEmailAudienceBatch` with a current eligibility checker. Only explicit
-  `true` passes; missing decisions or checker failures cannot allow delivery.
-- Track per-recipient outcomes and resume its cursor/ledger without double sends.
+## Storage and access
 
-That helper is a required integration boundary, not a live suppression connector.
-This PR does not implement sending, opt-out syncing, campaign scheduling or a
-provider dispatcher. It does not upload contact lists to Postmark. CSV exports
-are labeled candidates and are not meant to be uploaded as an approved send list.
+- `email.audience` stores the brand-scoped definition and consent assertion.
+- `email.list` and `email.list_member` store imported database-list membership.
+- `message_send.snapshot.audience.audienceId` stores the prepared live
+  reference; it does not contain recipient rows.
+- `message_send_recipient` stores per-send attribution and provider outcomes.
+- The email platform post metadata stores the accepted single-Bulk handoff
+  receipt.
 
-## Storage, cost and access
+Migration `0044_remove_email_audience_snapshots` rewrites old Postmark
+references to the owning audience and drops `email_audience_snapshot`.
+Migration `0046_simplify_email_delivery` removes the unused send cursor and
+converts receipts to the single-request shape. Current list counts are derived
+from member rows.
 
-Neon stores only audience definitions/revisions and compilation receipts in
-`email_audience` and `email_audience_snapshot`. Recipient rows stay in
-`wander-9fc9c.growth_email_audiences`, in `us-central1`, alongside the source datasets.
-The dataset is created on first compilation and tables expire after 30 days;
-Neon retains receipt metadata. Source exports can lag current consent state.
-The preview watermark is the oldest of the participating CIO tables' maximum
-`_load_date` values, not proof that every upstream change has arrived. WanderOS
-has no reliable watermark exposed here.
-
-Each query has a 100 GB billing ceiling. External CIO tables report a zero
-`LOWER_BOUND` on dry runs, so the UI displays an unavailable estimate rather than
-pretending the query is free. The live 90-day-click preview consumed a query that
-needed more than the initial 50 GB ceiling; keep an eye on warehouse scan cost as
-rules expand. Counts and ten-row sampling run in the warehouse.
-
-The warehouse service account needs query/read access to the source datasets and
-dataset/table creation and read/write access for the private snapshot dataset.
-No public image bucket is used for recipient files. Recipient samples are returned
-only by the authenticated UI preview endpoint, bypassing durable action receipts.
-Assistant/MCP previews return an empty sample so chat history and tool receipts
-do not retain guest addresses. HTTP CSV export requires a
-signed-in user, resolves current workspace membership, checks brand ownership,
-and rejects unready or expired snapshots. Cancellation stops fetching more pages.
-CSV fields are escaped and spreadsheet formulas are neutralized; delivery workers
-use original table rows, not spreadsheet-safe strings. A long CSV download is
-still bounded by the HTTP route's 300-second timeout. Workers should persist the
-page token and retry against the durable table; snapshots are the canonical
-artifact, not a successfully completed HTTP download.
-
-## Schema rollout and local development
-
-The two new tables are exported in `src/server/db/schema.ts` for the normal
-production schema push. The additive SQL is in
-`scripts/migrations/email-audiences.sql` for explicit application to a target DB.
-Existing lead/profile tables are unchanged.
-
-For isolated local integration testing, `EMAIL_AUDIENCE_DEV_SCHEMA` may name a
-schema matching `email_audience_dev_[a-z0-9_]+`. Create that schema and run the SQL
-with its `search_path` first. Only the two audience tables use it; existing brand
-membership remains in public. The override is ignored outside development, so
-preview/production use the normal public tables. The validated local namespace
-for this worktree is `email_audience_dev_oct02`. No public audience migration was
-applied during development.
-
-## Validation recorded
-
-- Real CIO preview: 16,798 candidates with non-machine/non-prefetched clicks in
-  the last 90 days, with export watermark 2026-10-02. This is not a sendable count.
-- Compiled that revision into a private 30-day snapshot. Read two 500-row pages;
-  no duplicate addresses between those pages.
-- Stale revision writes and cross-workspace snapshot access were rejected.
-- Property-manager query and opt-out blocker exercised against Winter Park Escapes.
-- Unit tests cover source/brand scope, invalid rules, fail-closed current eligibility,
-  deduplication, batch limits and CSV escaping.
-
-No guest was emailed by this workflow.
+All audience reads enforce workspace ownership through the selected brand.
+Saving or previewing an audience never approves creative, schedules delivery or
+sends email. See [Live database audiences for scheduled email](email-live-audiences.md)
+and [Scheduled brand broadcasts](scheduled-broadcasts.md) for the execution and
+release contracts.

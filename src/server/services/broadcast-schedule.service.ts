@@ -9,7 +9,9 @@ import { brandSendBlockers } from "@/lib/email-delivery";
 import { canOperateEmailDelivery } from "@/lib/email-delivery-role";
 import {
   broadcastCanPause,
+  broadcastCanRecover,
   broadcastJobCanRun,
+  broadcastQueueReceiptCanAttach,
   shouldPauseSupersededBroadcast,
   shouldPersistBroadcastJobFailure,
   type BroadcastScheduleApprovalInput,
@@ -177,8 +179,8 @@ async function queueSend(
   const send = await db.query.messageSendTable.findFirst({
     where: eq(messageSendTable.id, messageSendId),
   });
-  if (!send) return receipt;
-  await withTransaction(async (tx) => {
+  if (!send) return { receipt, authoritative: false };
+  const authoritative = await withTransaction(async (tx) => {
     const [post] = await tx
       .select()
       .from(platformPostTable)
@@ -190,13 +192,15 @@ async function queueSend(
       .where(eq(messageSendTable.id, send.id))
       .for("update");
     if (
-      current?.status !== "approved" ||
-      !current.snapshot.schedule ||
-      !broadcastJobCanRun(current.snapshot.schedule, { dueAt, runtimeId }) ||
+      !current ||
       !post ||
-      !["approved", "scheduled"].includes(post.status)
+      !broadcastQueueReceiptCanAttach(
+        { status: current.status, schedule: current.snapshot.schedule },
+        { dueAt, runtimeId },
+        post.status,
+      )
     )
-      return;
+      return false;
     await tx
       .update(messageSendTable)
       .set({
@@ -215,8 +219,9 @@ async function queueSend(
       .update(platformPostTable)
       .set({ status: "scheduled" })
       .where(eq(platformPostTable.id, post.id));
+    return true;
   });
-  return receipt;
+  return { receipt, authoritative };
 }
 
 export async function scheduleBroadcasts(
@@ -315,8 +320,15 @@ export async function scheduleBroadcasts(
   const results = [];
   for (const item of preview.sends) {
     try {
-      await queueSend(item.messageSendId, item.scheduledAt, runtimeId);
-      results.push({ messageSendId: item.messageSendId, queued: true });
+      const queued = await queueSend(
+        item.messageSendId,
+        item.scheduledAt,
+        runtimeId,
+      );
+      results.push({
+        messageSendId: item.messageSendId,
+        queued: queued.authoritative,
+      });
     } catch {
       results.push({ messageSendId: item.messageSendId, queued: false });
     }
@@ -386,15 +398,20 @@ export async function recoverBroadcast(messageSendId: string, actor: Actor) {
   const { send } = await ownedSend(messageSendId, actor);
   const schedule = send.snapshot.schedule;
   if (
-    send.status !== "approved" ||
     !schedule ||
-    !["approved", "scheduled"].includes(schedule.state) ||
-    schedule.runtimeId !== env.LIFECYCLE_RUNTIME_ID
+    !broadcastCanRecover(
+      { status: send.status, schedule },
+      env.LIFECYCLE_RUNTIME_ID,
+    )
   )
     throw new Error(
       "Only an unstarted active schedule can be recovered. Investigate attempted sends separately.",
     );
-  await queueSend(send.id, schedule.dueAt, schedule.runtimeId);
+  const queued = await queueSend(send.id, schedule.dueAt, schedule.runtimeId);
+  if (!queued.authoritative)
+    throw new Error(
+      "The schedule changed before its recovery receipt could be saved.",
+    );
   return { queued: true };
 }
 
@@ -464,8 +481,8 @@ export async function executeBroadcastJob(input: {
   if (!canOperateEmailDelivery(membership?.role))
     return { status: "access_revoked" };
   if (Date.parse(input.dueAt) > Date.now()) {
-    await queueSend(send.id, input.dueAt, input.runtimeId);
-    return { status: "queued" };
+    const queued = await queueSend(send.id, input.dueAt, input.runtimeId);
+    return { status: queued.authoritative ? "queued" : "inactive" };
   }
   try {
     await dispatchBrandSend({

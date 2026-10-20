@@ -83,6 +83,49 @@ export function broadcastCanEnterProviderHandoff(
   return Boolean(job && broadcastJobCanRun(send.schedule, job));
 }
 
+/** Recovery republishes only a valid, acknowledged schedule for this runtime. */
+export function broadcastCanRecover(
+  send: {
+    status: string;
+    schedule?: {
+      state: string;
+      dueAt: string;
+      runtimeId: string;
+      customerIoStopped?: true;
+    };
+  },
+  runtimeId: string | undefined,
+) {
+  if (!runtimeId || send.status !== "approved" || !send.schedule) return false;
+  if (!Number.isFinite(Date.parse(send.schedule.dueAt))) return false;
+  return broadcastJobCanRun(send.schedule, {
+    dueAt: send.schedule.dueAt,
+    runtimeId,
+  });
+}
+
+/** A queue receipt is authoritative only while the exact approved job is active. */
+export function broadcastQueueReceiptCanAttach(
+  send: {
+    status: string;
+    schedule?: {
+      state: string;
+      dueAt: string;
+      runtimeId: string;
+      customerIoStopped?: true;
+    };
+  },
+  job: { dueAt: string; runtimeId: string },
+  postStatus: string | undefined,
+) {
+  return Boolean(
+    send.status === "approved" &&
+    broadcastJobCanRun(send.schedule, job) &&
+    postStatus &&
+    ["approved", "scheduled"].includes(postStatus),
+  );
+}
+
 /** A newly approved send for one email revokes older unstarted queue authority. */
 export function shouldPauseSupersededBroadcast(
   selectedSendId: string,

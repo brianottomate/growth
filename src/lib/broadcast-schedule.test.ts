@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
   broadcastCanEnterProviderHandoff,
   broadcastCanPause,
+  broadcastCanRecover,
   broadcastJobCanRun,
+  broadcastQueueReceiptCanAttach,
   broadcastScheduleApprovalInput,
   shouldPauseSupersededBroadcast,
   shouldPersistBroadcastJobFailure,
@@ -92,6 +94,70 @@ describe("broadcast delivery authorization", () => {
     const sending = { status: "sending", schedule };
     expect(broadcastCanPause(sending)).toBe(false);
     expect(broadcastCanEnterProviderHandoff(sending, job)).toBe(false);
+  });
+
+  test("recovery requires an active acknowledged schedule for this runtime", () => {
+    expect(
+      broadcastCanRecover({ status: "approved", schedule }, "preview"),
+    ).toBe(true);
+    expect(
+      broadcastCanRecover(
+        {
+          status: "approved",
+          schedule: { ...schedule, customerIoStopped: undefined },
+        },
+        "preview",
+      ),
+    ).toBe(false);
+    expect(
+      broadcastCanRecover(
+        {
+          status: "approved",
+          schedule: { ...schedule, dueAt: "not-a-date" },
+        },
+        "preview",
+      ),
+    ).toBe(false);
+    expect(
+      broadcastCanRecover(
+        {
+          status: "approved",
+          schedule: { ...schedule, state: "paused" },
+        },
+        "preview",
+      ),
+    ).toBe(false);
+    expect(
+      broadcastCanRecover({ status: "approved", schedule }, "production"),
+    ).toBe(false);
+    expect(
+      broadcastCanRecover({ status: "sending", schedule }, "preview"),
+    ).toBe(false);
+
+    expect(
+      broadcastQueueReceiptCanAttach(
+        { status: "approved", schedule },
+        job,
+        "approved",
+      ),
+    ).toBe(true);
+    expect(
+      broadcastQueueReceiptCanAttach(
+        {
+          status: "approved",
+          schedule: { ...schedule, customerIoStopped: undefined },
+        },
+        job,
+        "approved",
+      ),
+    ).toBe(false);
+    expect(
+      broadcastQueueReceiptCanAttach(
+        { status: "approved", schedule },
+        job,
+        "published",
+      ),
+    ).toBe(false);
   });
   test("Winter Park's Friday time stays local across the fall clock change", () => {
     const before = resolveZonedDateTime({
