@@ -452,13 +452,9 @@ export const growthActionPolicies = {
     setAdPlatforms: write({ idempotent: true }),
     // Local copy of an approved ad as a draft; the original is untouched.
     returnToStudio: write(),
-    // Approval is the person's sign-off that gates the push, so chat asks
-    // for it with the approval card rather than deciding on its own.
-    setAdStatus: write({
-      idempotent: true,
-      approval: "user",
-      surfaces: CONFIRMED,
-    }),
+    // Approving is a local review state; the push is the step that reaches a
+    // platform, so agents approve without a confirmation round trip.
+    setAdStatus: write({ idempotent: true }),
     setAdCopy: write({ idempotent: true }),
     saveIdea: write(),
     // Shells, bindings and cards: local ad rows, no provider call.

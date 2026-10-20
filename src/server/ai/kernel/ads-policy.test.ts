@@ -11,7 +11,6 @@ const NEEDS_A_YES = [
   "deletePlatformCampaign",
   "deleteCampaignLeavingPlatform",
   "deleteAdDraft",
-  "setAdStatus",
 ] as const satisfies readonly (keyof typeof adsWrite)[];
 
 describe("ads action policy", () => {
