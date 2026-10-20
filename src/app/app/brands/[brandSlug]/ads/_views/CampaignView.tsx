@@ -1,3 +1,4 @@
+import { emailListCounts } from "@/server/services/email-list.service";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
@@ -96,7 +97,7 @@ export async function CampaignView({
   const [emailLists, seedPersonas, bookingSite] = await Promise.all([
     db.query.emailListTable.findMany({
       where: eq(emailListTable.brandId, brand.id),
-      columns: { id: true, name: true, memberCount: true },
+      columns: { id: true, name: true },
     }),
     db.query.personaTable.findMany({
       where: and(
@@ -110,12 +111,16 @@ export async function CampaignView({
       columns: { wanderOsWebsiteId: true },
     }),
   ]);
+  const counts = await emailListCounts(emailLists.map((list) => list.id));
   const seedContext = {
     brandId: brand.id,
     hasBookingSite: Boolean(bookingSite?.wanderOsWebsiteId),
     hasHomes: orderedHomes.length > 0,
     personas: seedPersonas,
-    emailLists,
+    emailLists: emailLists.map((list) => ({
+      ...list,
+      memberCount: counts.get(list.id) ?? 0,
+    })),
   };
   const adHomeIds = [
     ...new Set(ads.flatMap((ad) => (ad.homeId ? [ad.homeId] : []))),

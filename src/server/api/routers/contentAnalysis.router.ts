@@ -251,7 +251,7 @@ ${source}`;
         source = await loadReadableSource(post.externalUrl);
       }
       if (!source) {
-        const metadata = post.metadata as Record<string, unknown> | null;
+        const metadata = post.metadata;
         source = normalizeContentSource(
           JSON.stringify(metadata?.inspiration ?? metadata ?? post.text ?? ""),
         );

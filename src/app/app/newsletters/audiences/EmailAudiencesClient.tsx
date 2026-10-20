@@ -55,8 +55,6 @@ export function EmailAudiencesClient({
   ]);
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [savedDefinition, setSavedDefinition] = useState<string>();
-  const [revision, setRevision] = useState<number | undefined>();
-  const [snapshotId, setSnapshotId] = useState<string | undefined>();
   const [listId, setListId] = useState<string | null>(null);
   const [sample, setSample] = useState("");
   const [upload, setUpload] = useState<{
@@ -67,6 +65,10 @@ export function EmailAudiencesClient({
       sourceId: string | null;
     }>;
   }>();
+  const [appendTo, setAppendTo] = useState("");
+  const appendMembers = useMutation(
+    orpc.newsletter.addAudienceMembers.mutationOptions(),
+  );
   const fileInput = useRef<HTMLInputElement>(null);
   const definition: EmailAudienceDefinition = {
     source: listId
@@ -95,17 +97,6 @@ export function EmailAudiencesClient({
   );
   const save = useMutation(orpc.newsletter.saveAudience.mutationOptions());
   const importList = useMutation(orpc.newsletter.importList.mutationOptions());
-  const compile = useMutation(
-    orpc.newsletter.compileAudience.mutationOptions(),
-  );
-  const snapshot = useQuery(
-    orpc.newsletter.audienceSnapshot.queryOptions({
-      input: { snapshotId: snapshotId ?? "" },
-      enabled: Boolean(snapshotId),
-      refetchInterval: (query) =>
-        query.state.data?.status === "compiling" ? 3000 : false,
-    }),
-  );
   const previewMatches =
     Boolean(preview.data) &&
     preview.variables?.brandId === brandId &&
@@ -118,12 +109,11 @@ export function EmailAudiencesClient({
     );
   const resetPreview = () => {
     preview.reset();
-    setSnapshotId(undefined);
   };
   const startNew = () => {
+    setAppendTo("");
     setOpen(true);
     setSelectedId(undefined);
-    setRevision(undefined);
     setName("New audience");
     setConsent(false);
     setListId(null);
@@ -149,7 +139,9 @@ export function EmailAudiencesClient({
     }
     const firstName = column(/^first[ _]?name$/i);
     const sourceId = column(/^(leid|id|contact id)$/i);
+    const target = selectedId && listId && consent ? selectedId : "";
     startNew();
+    setAppendTo(target);
     setName(file.name.replace(/\.csv$/i, ""));
     setUpload({
       fileName: file.name,
@@ -192,7 +184,7 @@ export function EmailAudiencesClient({
           Brand
           <select
             aria-label="Brand"
-            disabled={save.isPending || compile.isPending}
+            disabled={save.isPending}
             value={brandId}
             className="mt-2 w-full rounded-md border bg-background p-2"
             onChange={(e) => {
@@ -203,7 +195,6 @@ export function EmailAudiencesClient({
                   : "Guests and signups",
               );
               setSelectedId(undefined);
-              setRevision(undefined);
               setConsent(false);
               resetPreview();
             }}
@@ -231,13 +222,12 @@ export function EmailAudiencesClient({
         ))}
       {audiences.data?.map((a) => (
         <button
-          disabled={save.isPending || compile.isPending}
+          disabled={save.isPending}
           key={a.id}
           className="block w-full rounded-md border p-3 text-left text-sm hover:bg-muted"
           onClick={() => {
             if (embedded) setOpen(true);
             setSelectedId(a.id);
-            setRevision(a.revision);
             setSavedDefinition(emailAudienceDefinitionKey(a.definition));
             setName(a.name);
             setDays(
@@ -253,25 +243,12 @@ export function EmailAudiencesClient({
             );
             setUpload(undefined);
             resetPreview();
-            setSnapshotId(a.latestSnapshotId ?? undefined);
           }}
         >
           {a.name}
           <span className="mt-1 block text-xs text-muted-foreground">
-            Revision {a.revision}
-            {a.latestSnapshot && (
-              <>
-                {" "}
-                · {a.latestSnapshot.recipientCount?.toLocaleString() ??
-                  "—"}{" "}
-                candidates ·{" "}
-                {a.latestSnapshot.revision !== a.revision
-                  ? "Earlier revision"
-                  : Date.parse(a.latestSnapshot.expiresAt) <= Date.now()
-                    ? "Expired"
-                    : a.latestSnapshot.status}
-              </>
-            )}
+            {a.recipientCount !== null &&
+              `${a.recipientCount.toLocaleString()} current members`}
           </span>
         </button>
       ))}
@@ -280,7 +257,7 @@ export function EmailAudiencesClient({
           <Button
             variant="outline"
             size="sm"
-            disabled={save.isPending || compile.isPending}
+            disabled={save.isPending}
             onClick={startNew}
           >
             New audience
@@ -294,20 +271,24 @@ export function EmailAudiencesClient({
     <section
       className={embedded ? "space-y-5" : "space-y-5 rounded-xl border p-5"}
     >
-      <label className="block text-sm">
-        Audience name
-        <Input
-          value={name}
-          className="mt-2"
-          onChange={(e) => setName(e.target.value)}
-        />
-      </label>
+      {!(upload && appendTo) && (
+        <>
+          <label className="block text-sm">
+            Audience name
+            <Input
+              value={name}
+              className="mt-2"
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+        </>
+      )}
       <p className="text-sm text-muted-foreground">
         Source:{" "}
         {upload
           ? `${upload.fileName} · ${upload.rows.length.toLocaleString()} rows, not uploaded yet`
           : listId
-            ? "An uploaded list"
+            ? "Database list"
             : brand?.slug === "wander"
               ? "Wander’s Customer.io warehouse export"
               : "This brand’s WanderOS guests and signups"}
@@ -360,6 +341,11 @@ export function EmailAudiencesClient({
           ))}
         </fieldset>
       )}
+      {listId && selectedId && !upload && (
+        <Button variant="outline" onClick={() => fileInput.current?.click()}>
+          Add contacts
+        </Button>
+      )}
       {!upload && (
         <label className="block text-sm">
           Random sample
@@ -375,9 +361,8 @@ export function EmailAudiencesClient({
             }}
           />
           <span className="mt-2 block text-xs text-muted-foreground">
-            The same people every time, and a smaller sample sits inside a
-            larger one. Sending one email to 100, then 1,000, then everyone
-            reaches each person once.
+            Optional subset for a test edition. Each email edition has one
+            delivery run; use another edition for a separate broadcast.
           </span>
         </label>
       )}
@@ -393,7 +378,58 @@ export function EmailAudiencesClient({
         I have confirmed marketing permission for this audience. A booking alone
         does not establish it.
       </label>
-      {upload ? (
+      {upload && (
+        <label className="block text-sm">
+          Add contacts to
+          <select
+            className="mt-2 w-full rounded-md border bg-background p-2"
+            value={appendTo}
+            onChange={(e) => setAppendTo(e.target.value)}
+          >
+            <option value="">Create a new audience</option>
+            {audiences.data
+              ?.filter(
+                (a) => a.definition.listId && a.definition.consentConfirmed,
+              )
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+          </select>
+          <span className="mt-2 block text-xs text-muted-foreground">
+            New contacts join editions that have not started delivery. Completed
+            editions are not resent.
+          </span>
+        </label>
+      )}
+      {upload && appendTo ? (
+        <Button
+          loading={appendMembers.isPending}
+          disabled={!consent}
+          onClick={() =>
+            appendMembers.mutate(
+              {
+                audienceId: appendTo,
+                consentConfirmed: true,
+                rows: upload.rows,
+              },
+              {
+                onSuccess: (result) => {
+                  setUpload(undefined);
+                  void audiences.refetch();
+                  setSelectedId(appendTo);
+                  setOpen(false);
+                  toast.success(`${result.imported} new contacts added`);
+                },
+                onError: report,
+              },
+            )
+          }
+        >
+          Add contacts to audience
+        </Button>
+      ) : upload ? (
         <Button
           loading={importList.isPending}
           disabled={!name.trim() || !brandId}
@@ -411,7 +447,6 @@ export function EmailAudiencesClient({
                   const a = result.audience;
                   setUpload(undefined);
                   setSelectedId(a.id);
-                  setRevision(a.revision);
                   setListId(a.definition.listId);
                   setSavedDefinition(emailAudienceDefinitionKey(a.definition));
                   void audiences.refetch();
@@ -457,7 +492,6 @@ export function EmailAudiencesClient({
                 {
                   onSuccess: (a) => {
                     setSelectedId(a.id);
-                    setRevision(a.revision);
                     setSavedDefinition(
                       emailAudienceDefinitionKey(a.definition),
                     );
@@ -471,36 +505,14 @@ export function EmailAudiencesClient({
           >
             {save.isPending ? "Saving audience…" : "Save audience"}
           </Button>
-          <Button
-            variant="outline"
-            loading={compile.isPending}
-            disabled={
-              !selectedId ||
-              !previewMatches ||
-              preview.isPending ||
-              save.isPending ||
-              savedDefinition !== emailAudienceDefinitionKey(definition) ||
-              (preview.variables
-                ? emailAudienceDefinitionKey(preview.variables.definition)
-                : undefined) !== emailAudienceDefinitionKey(definition)
-            }
-            onClick={() =>
-              compile.mutate(
-                { audienceId: selectedId! },
-                {
-                  onSuccess: (s) => {
-                    setSnapshotId(s.id);
-                    void audiences.refetch();
-                  },
-                  onError: report,
-                },
-              )
-            }
-          >
-            {compile.isPending
-              ? "Compiling recipients…"
-              : "Compile saved revision"}
-          </Button>
+          {selectedId &&
+            savedDefinition === emailAudienceDefinitionKey(definition) && (
+              <Button variant="outline" asChild>
+                <a href={`/api/newsletters/audiences/${selectedId}`}>
+                  Download audience CSV
+                </a>
+              </Button>
+            )}
         </div>
       )}
       {preview.error && (
@@ -565,39 +577,6 @@ export function EmailAudiencesClient({
           </details>
         </div>
       )}
-      {snapshot.data && (
-        <div className="space-y-2 rounded-lg border p-4">
-          <h2 className="font-medium">
-            Revision {snapshot.data.revision} snapshot: {snapshot.data.status}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {snapshot.data.recipientCount?.toLocaleString() ?? "Calculating"}{" "}
-            candidates · expires{" "}
-            {new Date(snapshot.data.expiresAt).toLocaleDateString()}
-          </p>
-          {snapshot.data.error && (
-            <p className="text-sm text-destructive">{snapshot.data.error}</p>
-          )}
-          {snapshot.data.status === "ready" &&
-            Date.parse(snapshot.data.expiresAt) > Date.now() && (
-              <a
-                href={`/api/newsletters/audiences/${snapshot.data.id}`}
-                className="text-sm underline"
-              >
-                Download candidate CSV
-              </a>
-            )}
-          <p className="text-xs text-muted-foreground">
-            This snapshot does not send email. Current opt-outs, suppression and
-            frequency checks are still required.
-          </p>
-        </div>
-      )}
-      {snapshot.error && (
-        <p role="alert" className="text-sm text-destructive">
-          {snapshot.error.message}
-        </p>
-      )}
     </section>
   );
   const audienceActions = (
@@ -605,7 +584,7 @@ export function EmailAudiencesClient({
       <Button
         variant={audiences.data?.length ? "outline" : "default"}
         size="sm"
-        disabled={save.isPending || compile.isPending}
+        disabled={save.isPending}
         onClick={startNew}
       >
         New audience
@@ -622,7 +601,7 @@ export function EmailAudiencesClient({
             newThread: true,
             brandId: brand.id,
             brandName: brand.name,
-            visibleText: `Help me choose email recipients for ${brand.name}. Compare counts and inclusion reasons before saving or compiling anything.`,
+            visibleText: `Help me choose email recipients for ${brand.name}. Compare counts and inclusion reasons before saving.`,
           })
         }
       >
@@ -647,7 +626,7 @@ export function EmailAudiencesClient({
             compact
             icon={Users}
             title="Choose who receives your emails"
-            description="Choose recipient rules, preview who qualifies, then save the audience. Compile recipients when you are ready to use it in an email."
+            description="Choose recipient rules, preview who qualifies, then save the audience. Emails read its current members when they send."
             actions={audienceActions}
           />
         )}
@@ -655,11 +634,15 @@ export function EmailAudiencesClient({
           <DialogContent size="xl" scrollable>
             <DialogHeader>
               <DialogTitle>
-                {selectedId ? "Edit audience" : "New audience"}
+                {upload && appendTo
+                  ? "Add contacts"
+                  : selectedId
+                    ? "Edit audience"
+                    : "New audience"}
               </DialogTitle>
               <DialogDescription>
-                Preview recipients, save the rules, then compile a fixed
-                candidate list.
+                Preview recipients and save the selection. Database-list
+                membership resolves when each edition starts delivery.
               </DialogDescription>
             </DialogHeader>
             {editor}
@@ -695,7 +678,7 @@ export function EmailAudiencesClient({
                 newThread: true,
                 brandId: brand.id,
                 brandName: brand.name,
-                visibleText: `Help me choose email recipients for ${brand.name}. ${selectedId ? `Current audience: ${name} (${selectedId}), revision ${revision}. ` : ""}Current form rules: ${emailAudienceDefinitionKey(definition)}. Compare counts and inclusion reasons before saving or compiling anything.`,
+                visibleText: `Help me choose email recipients for ${brand.name}. ${selectedId ? `Current audience: ${name} (${selectedId}). ` : ""}Current form rules: ${emailAudienceDefinitionKey(definition)}. Compare counts and inclusion reasons before saving.`,
               })
             }
           >
@@ -703,8 +686,9 @@ export function EmailAudiencesClient({
           </Button>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          Choose recipients in the warehouse, inspect the count and sample, then
-          compile a fixed candidate list. Guest profiles stay in BigQuery.
+          Choose a saved database audience and inspect its current members. New
+          contacts join future editions automatically. Warehouse sources remain
+          available as fixed selections.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-6 @3xl:grid-cols-[280px_1fr]">

@@ -57,6 +57,7 @@ export async function publishLifecycleDelivery(
 export async function publishEmailJob(input: {
   path: string;
   failurePath?: string;
+  retries?: number;
   key: string;
   body: Record<string, string>;
   dueAt: Date;
@@ -78,7 +79,7 @@ export async function publishEmailJob(input: {
     body: input.body,
     notBefore: Math.ceil(wakeAt / 1000),
     deduplicationId: `${input.key}-${Math.floor(wakeAt / 60_000)}`,
-    retries: 5,
+    retries: input.retries ?? 5,
     retryDelay: "60000 * (1 + retried)",
     timeout: "60s",
     ...(input.failurePath

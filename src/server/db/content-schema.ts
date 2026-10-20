@@ -19,6 +19,7 @@ import {
   deliveryProviderEnum,
 } from "./channel-schema";
 import { createId } from "./utils";
+import type { EmailDeliveryReceipt } from "@/lib/email-delivery";
 
 // NOTE: the master content table is named `content_post` (export
 // `contentPostTable`) to avoid colliding with the Jetpack template's demo
@@ -55,6 +56,11 @@ export type PlatformPostSource =
   (typeof platformPostSourceEnum.enumValues)[number];
 
 // ---- JSONB SHAPES --------------------------------------------------
+
+/** Provider-specific email handoff data on the email platform post itself. */
+export type PlatformPostMetadata = Record<string, unknown> & {
+  emailDelivery?: EmailDeliveryReceipt;
+};
 
 export type MediaItem = {
   url: string;
@@ -569,7 +575,7 @@ export const platformPostTable = pgTable(
     // backfill existing seed rows, then flipped to default(false).
     isSeed: t.boolean().default(false).notNull(),
 
-    metadata: t.jsonb(),
+    metadata: t.jsonb().$type<PlatformPostMetadata>(),
 
     createdAt: t
       .timestamp()

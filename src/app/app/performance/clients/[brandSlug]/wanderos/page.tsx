@@ -2,6 +2,7 @@ import { HomeGroupsWorkspace } from "@/app/app/brands/[brandSlug]/homes/HomeGrou
 import { DestinationsCard } from "../DestinationsCard";
 import { SeedListsCard } from "../SeedListsCard";
 import { listSeedDeliveries } from "@/server/services/seeds/delivery";
+import { emailListCounts } from "@/server/services/email-list.service";
 import { db } from "@/server/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { emailListTable, personaTable } from "@/server/db/schema";
@@ -57,9 +58,10 @@ export default async function PerformanceWanderOsPage({
     }),
     db.query.emailListTable.findMany({
       where: eq(emailListTable.brandId, brand.id),
-      columns: { id: true, name: true, memberCount: true },
+      columns: { id: true, name: true },
     }),
   ]);
+  const counts = await emailListCounts(emailLists.map((list) => list.id));
   const slug = brand.slug ?? brand.id;
   const connected = Boolean(brand.wanderOsEnabled && brand.wanderOsWebsiteId);
   const hasImportedHomes = rows.some((home) => home.source === "wanderos");
@@ -159,7 +161,10 @@ export default async function PerformanceWanderOsPage({
               hasBookingSite: Boolean(brand.wanderOsWebsiteId),
               hasHomes: rows.length > 0,
               personas,
-              emailLists,
+              emailLists: emailLists.map((list) => ({
+                ...list,
+                memberCount: counts.get(list.id) ?? 0,
+              })),
             }}
           />
           <AllHomesCard

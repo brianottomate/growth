@@ -547,9 +547,7 @@ date owns tentative editorial planning; an approved post may have a date without
 being queued. Only a queue receipt advances the post to Scheduled; pausing returns
 it to Approved while preserving its calendar date. The sequence QStash transport/signature boundary is shared while the
 broadcast audience/send ledger remains authoritative. Old snapshots need no
-backfill: absence of schedule means existing on-demand delivery. Audience
-retention is set at compilation, including actual warehouse expiration, so an
-eight-week plan does not silently outlive a thirty-day audience table.
+backfill: absence of schedule means existing on-demand delivery. Audience compilation was subsequently removed below; delivery reads live membership.
 ## Email creative review and client links (2026-10-19)
 
 Email content remains the existing platform post plus canonical email document;
@@ -566,3 +564,29 @@ re-check ownership, deletion, expiry and signature and expose creative only.
 These links are deliberately live, not publication snapshots; the UI states that
 edits appear there and future editions are excluded. A frozen publication model
 would be a separate product decision. Private PDF export does not mint a link.
+
+## Live email audiences (2026-10-19)
+
+Database-list membership belongs to `email.list_member`; delivery keeps a list
+reference and reads current rows through existing pagination. Counts are derived
+from those rows. Audience changes do not require membership materialization,
+resolution timestamps or a lifetime delivery restriction on the platform post. Keep job claims and per-send recipient uniqueness for actual
+repeated side effects; remove cross-send wave lookups and the generic eligibility
+wrapper. A typed `metadata.emailDelivery` receipt on the email platform post records
+accepted Postmark bulk IDs and counts, matching the typed pushed-creative pattern
+used by platform ads. It adds no scheduling/status owner or new database column;
+existing send/recipient records retain their execution and attribution roles.
+Broadcasts now make one Bulk submission, rejecting payloads above 50 MB rather
+than splitting. Removed broadcast queue retries, stale-claim recovery and send
+cursor use. Database paging remains for reads/attribution only; Postmark owns
+provider processing. The final cleanup drops the legacy cursor, audience revision
+and cached list count. Membership rows own counts. A single `bulkRequest` receipt
+replaces the array; link checks are optional preview feedback and the blanket
+Customer.io cutover acknowledgement is removed.
+See `docs/email-live-audiences.md`.
+
+The redundant `email_audience_snapshot` table and compile/status UI/MCP actions
+are removed. Sends and CSV exports reference `email_audience` directly; database
+membership and existing warehouse queries resolve at read time. A forward
+migration rewrites prior send/receipt references before dropping the table.
+Verified on an isolated production-derived database; no production writes.

@@ -131,6 +131,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
   const previewDraft = (
     next: Draft = draft,
     as: "template" | "full" | "sparse" = viewAs,
+    checkLinks = false,
   ) => {
     const request = ++previewSequence.current;
     preview.mutate(
@@ -139,6 +140,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
         draft: { ...next, bodyMarkdown: previewBody(next.bodyMarkdown) },
         viewAs: as,
         blockIds: true,
+        checkLinks,
       },
       {
         onSuccess: ({ html, warnings }) => {
@@ -371,14 +373,14 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => renderPreview()}
+                    onClick={() => previewDraft(draft, viewAs, true)}
                     disabled={preview.isPending}
                     className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
                   >
                     <RefreshCw
                       className={`size-4 ${preview.isPending ? "animate-spin" : ""}`}
                     />
-                    Refresh preview
+                    Check links
                   </button>
                   <button
                     type="button"

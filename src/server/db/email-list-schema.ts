@@ -7,7 +7,7 @@ import { createId } from "./utils";
  * Operator-uploaded email lists (a client's newsletter export, say). Like
  * `leads`, they live in their own Postgres schema so they can move to a
  * separate email service with no untangling: the only reference out is the
- * brand. Members are immutable once uploaded; a new export is a new list.
+ * brand. New members may be appended to the same list; the sender reads membership live.
  */
 export const emailSchema = pgSchema("email");
 
@@ -22,7 +22,6 @@ export const emailListTable = emailSchema.table("list", (t) => ({
     .references(() => brandTable.id, { onDelete: "cascade" }),
   name: t.text().notNull(),
   fileName: t.text(),
-  memberCount: t.integer().notNull(),
   invalidCount: t.integer().notNull().default(0),
   duplicateCount: t.integer().notNull().default(0),
   /** Bot-generated first names cleared at upload ("GYCETzIUgVASAdh"). */
@@ -45,8 +44,8 @@ export const emailListMemberTable = emailSchema.table(
     /** The source system's id for this person, e.g. Mailchimp's LEID. */
     sourceId: t.text(),
     /**
-     * sha256(email) in hex. Samples and send waves take members in this
-     * order, so a sample of 100 always sits inside a sample of 1,000.
+     * sha256(email) in hex. Optional test subsets use this stable order;
+     * the sender reads current members without freezing a recipient set.
      */
     sampleRank: t.text().notNull(),
   }),
@@ -58,8 +57,8 @@ export const emailListMemberTable = emailSchema.table(
 
 /**
  * Who stopped a brand's marketing email, recorded by Growth's own
- * unsubscribe link and one-click header (the brand's Postmark broadcast
- * stream leaves unsubscribes to us). Every Growth send skips these.
+ * unsubscribe link and one-click header on Custom streams.
+ * Postmark-managed streams enforce their own suppressions.
  */
 export const emailOptOutTable = emailSchema.table(
   "opt_out",

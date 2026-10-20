@@ -100,10 +100,9 @@ import {
 } from "./launch-checklist";
 import {
   listEmailAudiencesAction,
+  addEmailAudienceMembersAction,
   previewEmailAudienceAction,
   saveEmailAudienceAction,
-  compileEmailAudienceAction,
-  emailAudienceSnapshotAction,
 } from "./email-audiences";
 import {
   listMediaSuggestionsAction,
@@ -659,7 +658,6 @@ export const emailRead = growthDomainTool({
     listTemplates: EMAIL_TOOLS.listEmailTemplates,
     audiences: listEmailAudiencesAction,
     previewAudience: previewEmailAudienceAction,
-    audienceSnapshot: emailAudienceSnapshotAction,
   },
 });
 
@@ -679,8 +677,8 @@ export const emailWrite = growthDomainTool({
     enrollSequence,
     recoverSequence,
     cancelSequenceEnrollment,
+    addAudienceMembers: addEmailAudienceMembersAction,
     saveAudience: saveEmailAudienceAction,
-    compileAudience: compileEmailAudienceAction,
     createSlot: EMAIL_TOOLS.createEmailSlot,
     sharePreview: shareEmailPreviewAction,
     createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,

@@ -329,6 +329,12 @@ export async function sendPostmarkBulk(
   serverToken: string,
   request: PostmarkBulkRequest,
 ) {
+  const body = JSON.stringify(request);
+  if (Buffer.byteLength(body, "utf8") > 50_000_000) {
+    throw new Error(
+      "The broadcast exceeds Postmark's 50 MB payload limit. Reduce the audience or email size before sending.",
+    );
+  }
   const response = await fetch(new URL("/email/bulk", API_BASE), {
     method: "POST",
     headers: {
@@ -336,7 +342,7 @@ export async function sendPostmarkBulk(
       "Content-Type": "application/json",
       "X-Postmark-Server-Token": serverToken,
     },
-    body: JSON.stringify(request),
+    body,
   });
   if (!response.ok) {
     const body = await response.text();

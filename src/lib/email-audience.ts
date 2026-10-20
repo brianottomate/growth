@@ -11,7 +11,7 @@ export const emailAudienceDefinitionSchema = z.object({
     .min(1)
     .default(["bookers", "signups"]),
   consentConfirmed: z.boolean().default(false),
-  /** A stable random subset of this size, for test sends and send waves. */
+  /** An optional sample limit; the sender reads current members in stable sample order. */
   sampleSize: z.number().int().min(1).max(1_000_000).nullable().default(null),
 });
 export type EmailAudienceDefinition = z.infer<
@@ -57,28 +57,8 @@ export function emailAudienceBlockers(definition: EmailAudienceDefinition) {
     ...(definition.source === "wanderos"
       ? ["Live WanderOS opt-outs must be available before sending."]
       : []),
-    "Recheck current opt-outs, Postmark suppressions and frequency caps before every send batch.",
+    "Postmark-managed streams enforce suppressions; custom streams require their own current opt-out handling.",
   ];
-}
-
-/** Never treat a compiled snapshot as permission to send. A live gate is required. */
-export async function filterEmailAudienceBatch(
-  recipients: EmailAudienceRecipient[],
-  checkCurrentEligibility: (emails: string[]) => Promise<Map<string, boolean>>,
-) {
-  if (recipients.length > 10_000)
-    throw new Error("Audience batches are limited to 10,000 recipients.");
-  const unique = new Map<string, EmailAudienceRecipient>();
-  for (const input of recipients) {
-    const recipient = emailAudienceRecipientSchema.parse(input);
-    const email = recipient.email.trim().toLowerCase();
-    if (!unique.has(email)) unique.set(email, { ...recipient, email });
-  }
-  const eligibility = await checkCurrentEligibility([...unique.keys()]);
-  // Unknown eligibility fails closed, including incomplete responses.
-  return [...unique.values()].filter(
-    (recipient) => eligibility.get(recipient.email) === true,
-  );
 }
 
 export function emailAudienceCsvRow(recipient: EmailAudienceRecipient) {

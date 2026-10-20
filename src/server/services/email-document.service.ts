@@ -1,3 +1,4 @@
+import { emailLinkWarnings } from "@/server/email/link-check";
 import { nextEmailReviewStatus } from "./email-creative-review";
 import { brandStorySection } from "@/server/ai/prompts/brand-story";
 import { emailCopyGuidance } from "@/lib/brand-email-style";
@@ -816,6 +817,7 @@ export async function renderEmailPreview(input: {
    */
   viewAs?: "template" | "full" | "sparse";
   blockIds?: boolean;
+  checkLinks?: boolean;
 }) {
   const { document, spot } = await ensureEmailDocument(input);
   const draft = emailDocumentDraftSchema.parse(input.draft ?? document);
@@ -852,6 +854,8 @@ export async function renderEmailPreview(input: {
       ? "Template syntax is left in the email and would show as text."
       : null,
   ].filter((warning): warning is string => Boolean(warning));
+  if (input.checkLinks)
+    warnings.push(...(await emailLinkWarnings(rendered.html)));
   return { html: rendered.html, warnings };
 }
 

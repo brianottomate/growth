@@ -62,13 +62,24 @@ export function messageSendSummary(
   };
 }
 
+/** Last Postmark handoff for an email platform post; provider processing stays in Postmark. */
+export type EmailDeliveryReceipt = {
+  provider: "postmark";
+  messageSendId: string;
+  audienceReference: string;
+  bulkRequest: {
+    id: string;
+    submittedAt: string;
+    recipientCount: number;
+  };
+};
+
 export type BroadcastSchedule = {
   dueAt: string;
   timeZone: string;
   runtimeId: string;
   state: "approved" | "scheduled" | "paused";
   queueMessageId?: string;
-  customerIoStopped: true;
 };
 
 export type MessageSendSnapshot = {
@@ -97,8 +108,8 @@ export type MessageSendSnapshot = {
     | {
         kind: MessageAudienceKind;
         provider: "postmark";
-        /** A compiled email_audience_snapshot; its table holds the guests. */
-        snapshotId: string;
+        /** The saved audience; current members or source rules are read when sending. */
+        audienceId: string;
         serverId: number;
         messageStream: string;
         label: string;

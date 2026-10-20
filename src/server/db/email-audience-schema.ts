@@ -28,45 +28,8 @@ export const emailAudienceTable = audienceTable(
       .references(() => brandTable.id, { onDelete: "cascade" }),
     name: t.text().notNull(),
     definition: jsonb().$type<EmailAudienceDefinition>().notNull(),
-    revision: t.integer().notNull().default(1),
     createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
   }),
   (t) => [index("email_audience_brand_idx").on(t.brandId)],
-);
-
-/** References and audit metadata only; recipients stay in BigQuery or, for an
- * uploaded list, in email.list_member. */
-export const emailAudienceSnapshotTable = audienceTable(
-  "email_audience_snapshot",
-  (t) => ({
-    id: t
-      .text()
-      .primaryKey()
-      .$defaultFn(() => createId("easnap")),
-    audienceId: t
-      .text()
-      .notNull()
-      .references(() => emailAudienceTable.id, { onDelete: "cascade" }),
-    revision: t.integer().notNull(),
-    definition: jsonb().$type<EmailAudienceDefinition>().notNull(),
-    querySql: t.text().notNull(),
-    queryHash: t.text().notNull(),
-    /** The warehouse compile job and table. An uploaded list has neither:
-     * its members never change, so the definition alone fixes who is in it. */
-    jobId: t.text(),
-    tableId: t.text(),
-    status: t
-      .text()
-      .$type<"compiling" | "ready" | "failed">()
-      .notNull()
-      .default("compiling"),
-    recipientCount: t.integer(),
-    error: t.text(),
-    expiresAt: t.timestamp({ withTimezone: true }).notNull(),
-    createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
-  }),
-  (t) => [
-    index("email_audience_snapshot_audience_idx").on(t.audienceId, t.createdAt),
-  ],
 );

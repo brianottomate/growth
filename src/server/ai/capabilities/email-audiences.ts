@@ -9,8 +9,7 @@ import {
   listEmailAudiences,
   saveEmailAudience,
   previewEmailAudience,
-  compileEmailAudience,
-  getEmailAudienceSnapshot,
+  addEmailAudienceMembers,
 } from "@/server/services/email-audience.service";
 
 const audience = z.object({
@@ -18,34 +17,9 @@ const audience = z.object({
   brandId: z.string(),
   name: z.string(),
   definition: emailAudienceDefinitionSchema,
-  revision: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  latestSnapshotId: z.string().nullable(),
-  latestSnapshot: z
-    .object({
-      status: z.enum(["compiling", "ready", "failed"]),
-      recipientCount: z.number().nullable(),
-      expiresAt: z.string(),
-      revision: z.number(),
-    })
-    .nullable(),
-});
-const snapshot = z.object({
-  id: z.string(),
-  audienceId: z.string(),
-  revision: z.number(),
-  definition: emailAudienceDefinitionSchema,
-  querySql: z.string(),
-  queryHash: z.string(),
-  jobId: z.string().nullable(),
-  tableId: z.string().nullable(),
-  status: z.enum(["compiling", "ready", "failed"]),
   recipientCount: z.number().nullable(),
-  error: z.string().nullable(),
-  expiresAt: z.string(),
-  createdAt: z.string(),
-  blockers: z.array(z.string()),
 });
 const actor = (ctx: { orgId: string; userId: string }) => ({
   organizationId: ctx.orgId,
@@ -53,7 +27,7 @@ const actor = (ctx: { orgId: string; userId: string }) => ({
 });
 export const listEmailAudiencesAction = growthAction({
   description:
-    "Read saved warehouse email audiences for a brand. These are guest recipient rules, separate from sales leads and advertising personas.",
+    "Read saved database-list and warehouse email audiences for a brand. These are guest recipient rules, separate from sales leads and advertising personas.",
   inputSchema: z.object({ brandId: z.string() }),
   outputSchema: z.array(audience),
   execute: (input, ctx) => listEmailAudiences(input, actor(ctx)),
@@ -93,20 +67,28 @@ export const saveEmailAudienceAction = growthAction({
   outputSchema: audience,
   execute: (input, ctx) => saveEmailAudience(input, actor(ctx)),
 });
-export const compileEmailAudienceAction = growthAction({
+export const addEmailAudienceMembersAction = growthAction({
   description:
-    "Compile a saved audience revision into a private, immutable BigQuery recipient table retained for retentionDays (default 30, maximum 90 for a reviewed broadcast schedule). Returns an asynchronous job receipt; poll audienceSnapshot for readiness. No guest records are copied into Neon and no email is sent. Live opt-outs and suppressions must still be checked before each delivery batch.",
+    "Add consent-confirmed contacts to an existing brand database audience. Scheduled sends read current membership through normal paging; there is no frozen recipient set. Never sends an email or replaces the audience.",
   inputSchema: z.object({
-    audienceId: z.string(),
-    retentionDays: z.number().int().min(1).max(90).optional(),
+    audienceId: z.string().min(1),
+    consentConfirmed: z.literal(true),
+    rows: z
+      .array(
+        z.object({
+          email: z.string().max(320),
+          firstName: z.string().max(200).nullable(),
+          sourceId: z.string().max(200).nullable(),
+        }),
+      )
+      .min(1)
+      .max(200_000),
   }),
-  outputSchema: snapshot,
-  execute: (input, ctx) => compileEmailAudience(input, actor(ctx)),
-});
-export const emailAudienceSnapshotAction = growthAction({
-  description:
-    "Read compilation status and recipient count for an owned audience snapshot. A ready snapshot is candidate membership, not send authorization.",
-  inputSchema: z.object({ snapshotId: z.string() }),
-  outputSchema: snapshot,
-  execute: (input, ctx) => getEmailAudienceSnapshot(input, actor(ctx)),
+  outputSchema: z.object({
+    imported: z.number(),
+    invalid: z.number(),
+    duplicates: z.number(),
+    namesCleared: z.number(),
+  }),
+  execute: (input, ctx) => addEmailAudienceMembers(input, actor(ctx)),
 });

@@ -177,7 +177,6 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "get",
     "audiences",
     "previewAudience",
-    "audienceSnapshot",
     "listSequences",
     "getSequence",
     "sequenceEmails",
@@ -185,6 +184,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "previewSequence",
   ],
   emailWrite: [
+    "addAudienceMembers",
     "prepareBroadcast",
     "scheduleBroadcasts",
     "pauseBroadcast",
@@ -199,7 +199,6 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "recoverSequence",
     "cancelSequenceEnrollment",
     "saveAudience",
-    "compileAudience",
     "createSlot",
     "createDigestFromRow",
     "draftFromTemplate",

@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 
-import { and, asc, eq, gt, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, or, sql } from "drizzle-orm";
 
 import {
   emailAudienceRecipientSchema,
@@ -28,23 +28,12 @@ function looksGenerated(name: string) {
 const sampleRank = (email: string) =>
   createHash("sha256").update(email).digest("hex");
 
-/**
- * Store an operator's list for a brand. Rows are cleaned here, once:
- * lowercased, deduplicated, invalid addresses dropped, and bot-generated
- * first names cleared so `{{first_name|there}}` falls back.
- */
-export async function createEmailList(input: {
-  brandId: string;
-  name: string;
-  fileName: string | null;
-  createdBy: string;
-  rows: EmailListUploadRow[];
-}) {
+function normalizeEmailListRows(rows: EmailListUploadRow[]) {
   const members = new Map<string, typeof emailListMemberTable.$inferInsert>();
   let invalidCount = 0;
   let duplicateCount = 0;
   let namesCleared = 0;
-  for (const row of input.rows) {
+  for (const row of rows) {
     const email = row.email.trim().toLowerCase();
     if (!emailAudienceRecipientSchema.shape.email.safeParse(email).success) {
       invalidCount += 1;
@@ -68,6 +57,24 @@ export async function createEmailList(input: {
   }
   if (!members.size) throw new Error("The list has no valid email addresses.");
 
+  return { members, invalidCount, duplicateCount, namesCleared };
+}
+
+/**
+ * Store an operator's list for a brand. Rows are cleaned here, once:
+ * lowercased, deduplicated, invalid addresses dropped, and bot-generated
+ * first names cleared so `{{first_name|there}}` falls back.
+ */
+export async function createEmailList(input: {
+  brandId: string;
+  name: string;
+  fileName: string | null;
+  createdBy: string;
+  rows: EmailListUploadRow[];
+}) {
+  const { members, invalidCount, duplicateCount, namesCleared } =
+    normalizeEmailListRows(input.rows);
+
   return withTransaction(async (tx) => {
     const [list] = await tx
       .insert(emailListTable)
@@ -75,7 +82,6 @@ export async function createEmailList(input: {
         brandId: input.brandId,
         name: input.name,
         fileName: input.fileName,
-        memberCount: members.size,
         invalidCount,
         duplicateCount,
         namesCleared,
@@ -87,7 +93,7 @@ export async function createEmailList(input: {
       await tx
         .insert(emailListMemberTable)
         .values(rows.slice(i, i + INSERT_CHUNK));
-    return list!;
+    return { ...list!, imported: members.size };
   });
 }
 
@@ -111,14 +117,6 @@ const toRecipient = (
   reason: `Uploaded list: ${list.name}`,
 });
 
-/** How many members an audience of this list (and sample size) reaches. */
-export function emailListAudienceCount(
-  list: { memberCount: number },
-  sampleSize: number | null,
-) {
-  return sampleSize ? Math.min(sampleSize, list.memberCount) : list.memberCount;
-}
-
 /** Ten members by email, for the preview. */
 export async function previewEmailListMembers(list: {
   id: string;
@@ -135,8 +133,8 @@ export async function previewEmailListMembers(list: {
 
 /**
  * One page of the audience in sample order. The token is
- * `<served>:<rank>:<email>` of the last member served, so a send resumes
- * exactly where it stopped and never serves past the sample size.
+ * `<served>:<rank>:<email>` of the last member served, so the next page continues
+ * where the previous page stopped and never serves past the sample size.
  */
 export async function readEmailListPage(input: {
   list: { id: string; name: string };
@@ -182,4 +180,56 @@ export async function readEmailListPage(input: {
     nextPageToken:
       done || !last ? null : `${total}:${last.sampleRank}:${last.email}`,
   };
+}
+
+/** Append membership to the same list identity; future editions see the new rows. */
+export async function appendEmailListMembers(input: {
+  listId: string;
+  brandId: string;
+  rows: EmailListUploadRow[];
+}) {
+  const { members, invalidCount, duplicateCount, namesCleared } =
+    normalizeEmailListRows(input.rows);
+  return withTransaction(async (tx) => {
+    const [list] = await tx
+      .select()
+      .from(emailListTable)
+      .where(
+        and(
+          eq(emailListTable.id, input.listId),
+          eq(emailListTable.brandId, input.brandId),
+        ),
+      );
+    if (!list) throw new Error("Email list not found on this brand.");
+    const rows = [...members.values()].map((m) => ({ ...m, listId: list.id }));
+    let imported = 0;
+    for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+      const added = await tx
+        .insert(emailListMemberTable)
+        .values(rows.slice(i, i + INSERT_CHUNK))
+        .onConflictDoNothing()
+        .returning({ email: emailListMemberTable.email });
+      imported += added.length;
+    }
+    return {
+      imported,
+      invalid: invalidCount,
+      duplicates: duplicateCount + members.size - imported,
+      namesCleared,
+    };
+  });
+}
+
+/** Counts come from membership rows, not a frozen compilation receipt. */
+export async function emailListCounts(ids: string[]) {
+  if (!ids.length) return new Map<string, number>();
+  const rows = await db
+    .select({
+      id: emailListMemberTable.listId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(emailListMemberTable)
+    .where(inArray(emailListMemberTable.listId, ids))
+    .groupBy(emailListMemberTable.listId);
+  return new Map(rows.map((r) => [r.id, r.count]));
 }

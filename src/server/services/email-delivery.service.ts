@@ -183,9 +183,11 @@ export async function approveMessageSend(input: {
     send.platformPostId,
     input.organizationId,
   );
-  // A Postmark email goes out in waves; later waves follow a published one.
+  // Delivery approval uses the existing email post approval.
   const sendable =
-    send.provider === "postmark" ? ["approved", "published"] : ["approved"];
+    send.provider === "postmark"
+      ? ["approved", "scheduled", "published"]
+      : ["approved"];
   if (!sendable.includes(spot.status))
     throw new Error("Approve the email creative before approving delivery.");
   const [approved] = await db
