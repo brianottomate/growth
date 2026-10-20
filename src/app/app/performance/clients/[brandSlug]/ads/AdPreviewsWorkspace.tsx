@@ -10,7 +10,10 @@ import { Images, Search } from "lucide-react";
 
 import { AdFormatFilter } from "@/components/ad-format-filter";
 import { AD_FORMATS, adFormat, type AdFormat } from "@/lib/ad-format";
-import { campaignDisplayName } from "@/lib/campaign-navigation";
+import {
+  campaignDisplayName,
+  type CampaignWorkspace,
+} from "@/lib/campaign-navigation";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/compound/combobox";
 import { WorkspaceCard } from "../../../WorkspaceCard";
@@ -52,6 +55,7 @@ export function AdPreviewsWorkspace({
   ideas: allIdeas,
   focusHomeId,
   homeContext,
+  workspace,
 }: {
   brandId: string;
   brandSlug: string;
@@ -64,6 +68,7 @@ export function AdPreviewsWorkspace({
   ideas: StudioIdea[];
   /** A single home a per-home link opened on: open and scroll to it. */
   focusHomeId?: string | null;
+  workspace: CampaignWorkspace;
 }) {
   const reviewPreview = useReviewPreview();
   const previewStatus = usePreviewReviewStatus();
@@ -137,7 +142,11 @@ export function AdPreviewsWorkspace({
       />
       {!reviewPreview && <FromCarousels brandId={brandId} />}
       {!reviewPreview && (
-        <SendToCampaign brandId={brandId} brandSlug={brandSlug} />
+        <SendToCampaign
+          brandId={brandId}
+          brandSlug={brandSlug}
+          workspace={workspace}
+        />
       )}
       <ShapeBrandButton
         brandId={brandId}
@@ -273,6 +282,7 @@ export function AdPreviewsWorkspace({
                 website={website}
                 connected={connected}
                 focusHomeId={focusHomeId}
+                workspace={workspace}
               />
             ) : (
               <EmptyState

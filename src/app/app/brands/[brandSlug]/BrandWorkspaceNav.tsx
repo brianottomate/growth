@@ -10,6 +10,7 @@ const tabs = [
   ["content", "Content"],
   ["newsletters", "Newsletters"],
   ["previews", "Organic previews"],
+  ["studio", "Ad studio"],
   ["ads", "Paid campaigns"],
   ["initiatives", "Initiatives"],
   ["homes", "Homes & targets"],

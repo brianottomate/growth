@@ -9,7 +9,11 @@ import { adFormat } from "@/lib/ad-format";
 
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import { campaignDisplayName } from "@/lib/campaign-navigation";
+import {
+  campaignDisplayName,
+  campaignPath,
+  type CampaignWorkspace,
+} from "@/lib/campaign-navigation";
 import {
   groupCollectionAds,
   adHomeContext,
@@ -63,6 +67,7 @@ export function StudioIdeas({
   focusHomeId,
   grouping,
   homeContext,
+  workspace,
 }: {
   ideas: StudioIdea[];
   brandId: string;
@@ -74,6 +79,7 @@ export function StudioIdeas({
   connected: boolean;
   grouping: AdGrouping;
   homeContext: AdHomeContext[];
+  workspace: CampaignWorkspace;
 }) {
   useEffect(() => {
     if (focusHomeId)
@@ -120,7 +126,7 @@ export function StudioIdeas({
             {group.ads.map((idea) => {
               const assignment = idea.campaignId ? (
                 <Link
-                  href={`/app/performance/clients/${brandSlug}/campaigns/${idea.campaignId}`}
+                  href={campaignPath(brandSlug, idea.campaignId, workspace)}
                   className="text-xs text-muted-foreground underline underline-offset-4"
                 >
                   Campaign:{" "}

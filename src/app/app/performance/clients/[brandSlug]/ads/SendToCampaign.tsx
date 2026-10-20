@@ -12,15 +12,21 @@ import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 import { adFormat } from "@/lib/ad-format";
 import { adTypeLabel, toggleAdSelection } from "@/lib/ad-collection-groups";
-import { campaignDisplayName } from "@/lib/campaign-navigation";
+import {
+  campaignDisplayName,
+  campaignPath,
+  type CampaignWorkspace,
+} from "@/lib/campaign-navigation";
 import { useWorkspaceMutation } from "../useWorkspaceMutation";
 
 export function SendToCampaign({
   brandId,
   brandSlug,
+  workspace,
 }: {
   brandId: string;
   brandSlug: string;
+  workspace: CampaignWorkspace;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -58,9 +64,7 @@ export function SendToCampaign({
         toast.success(
           `Sent ${result.attached} ${result.attached === 1 ? "ad" : "ads"} to ${result.campaignName}`,
         );
-        router.push(
-          `/app/performance/clients/${brandSlug}/campaigns/${result.campaignId}`,
-        );
+        router.push(campaignPath(brandSlug, result.campaignId, workspace));
       },
     }),
   );
