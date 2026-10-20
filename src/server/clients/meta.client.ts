@@ -733,7 +733,8 @@ export async function createMetaPlacementCreative(input: {
   /**
    * Lead ad: the button opens this instant form instead of a link. Meta
    * takes the form on the call to action and the Page short link as the
-   * link; the asset feed carries it on `call_to_actions` and needs no urls.
+   * link. Placement-customised creatives still need that link in
+   * `link_urls` (subcode 1885800), so both go on the asset feed.
    */
   leadGenFormId?: string;
 }) {
@@ -820,7 +821,7 @@ export async function createMetaPlacementCreative(input: {
   const descriptions = unique(
     cards.flatMap((card) => (card.description ? [card.description] : [])),
   );
-  const links = leadGenFormId ? [] : unique(cards.map((card) => card.link));
+  const links = unique(cards.map((card) => card.link));
   const label = (name: string) => ({ name });
   const imageLabel = (set: number, card: number) =>
     label(`image_${hashes.indexOf(hashAt(set, card))}`);
@@ -833,9 +834,7 @@ export async function createMetaPlacementCreative(input: {
           ),
         }
       : {}),
-    ...(leadGenFormId
-      ? {}
-      : { link_url_label: label(`link_${links.indexOf(card.link)}`) }),
+    link_url_label: label(`link_${links.indexOf(card.link)}`),
   });
   const spec = (positions: MetaPositions) => ({
     publisher_platforms: positions.publisherPlatforms,
@@ -869,6 +868,10 @@ export async function createMetaPlacementCreative(input: {
               })),
             }
           : {}),
+        link_urls: links.map((website_url, i) => ({
+          website_url,
+          adlabels: [label(`link_${i}`)],
+        })),
         ...(leadGenFormId
           ? {
               call_to_actions: [
@@ -878,12 +881,7 @@ export async function createMetaPlacementCreative(input: {
                 },
               ],
             }
-          : {
-              link_urls: links.map((website_url, i) => ({
-                website_url,
-                adlabels: [label(`link_${i}`)],
-              })),
-            }),
+          : {}),
         bodies: [{ text: input.message, adlabels: [label("body_0")] }],
         call_to_action_types: [input.callToActionType],
         ad_formats: [carousel ? "CAROUSEL" : "SINGLE_IMAGE"],
