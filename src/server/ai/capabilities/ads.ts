@@ -12,7 +12,7 @@ import {
   addAudienceActionNativeResultSchema,
   openCampaignActionNativeResultSchema,
   createAudienceActionNativeResultSchema,
-  duplicateMetaCampaignActionNativeResultSchema,
+  duplicateCampaignActionNativeResultSchema,
   boostMetaPostActionNativeResultSchema,
   createSpecializedMetaDraftActionNativeResultSchema,
   draftCampaignActionNativeResultSchema,
@@ -23,7 +23,7 @@ import {
   draftCampaignActionOutputSchema,
   createSpecializedMetaDraftActionOutputSchema,
   boostMetaPostActionOutputSchema,
-  duplicateMetaCampaignActionOutputSchema,
+  duplicateCampaignActionOutputSchema,
   createAudienceActionOutputSchema,
   addAudienceUsersActionOutputSchema,
   draftAdActionOutputSchema,
@@ -114,7 +114,6 @@ import {
   boostMetaPost,
   createMetaAdDraft,
   deletePlatformCampaign,
-  duplicateMetaCampaign,
   ensureBrandReportingConversion,
   listAdsWriteDestinations,
   createAdAudience,
@@ -125,6 +124,7 @@ import {
   syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
 import { ensureBrandGoogleAdsAccount } from "@/server/services/google-ads-accounts.service";
+import { duplicateCampaign } from "@/server/services/ads-duplicate.service";
 import {
   adIdeaHomePhotos,
   addAudience,
@@ -511,22 +511,49 @@ export const boostMetaPostAction = growthAction({
     }),
 });
 
-export const duplicateMetaCampaignAction = growthAction({
-  nativeOutputSchema: duplicateMetaCampaignActionNativeResultSchema,
-  outputSchema: duplicateMetaCampaignActionOutputSchema,
+export const duplicateCampaignAction = growthAction({
+  nativeOutputSchema: duplicateCampaignActionNativeResultSchema,
+  outputSchema: duplicateCampaignActionOutputSchema,
   description:
-    "Deep-copy one Meta campaign already visible inside the named brand's allowlisted account. Zernio creates the copied campaign PAUSED and syncs the copy back into the ad tree. Requires explicit operator approval.",
+    "Copy a LOCAL campaign inside Growth: its ads (same creative and media, unpushed so they are editable again), audiences with their lookalike links, and platform drafts with their delivery groups and budget. Nothing touches any ad platform; the copy is a draft that push takes to the platform paused. Use it to run the same creative in a second campaign or to change ads that a push has locked.",
   inputSchema: z.object({
-    brandSlug: destinationSchema.brandSlug,
-    platformCampaignId: z.string().trim().min(1),
-    renameSuffix: z.string().max(80).optional().default(" (copy)"),
+    campaignId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The camp_ id of the campaign to copy."),
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .optional()
+      .describe('Name for the copy. Omit for the source name plus " copy".'),
   }),
-  execute: async (input, ctx) =>
-    duplicateMetaCampaign({
+  execute: async (input, ctx) => {
+    const result = await duplicateCampaign({
       ...input,
       organizationId: ctx.orgId,
-      runId: ctx.runId,
-    }),
+    });
+    const path = campaignPath(
+      result.brandSlug ?? result.campaign.brandId,
+      result.campaign.id,
+      "performance",
+    );
+    return {
+      ...result,
+      path,
+      handoff: {
+        reviewUrl: new URL(path, env.NEXT_PUBLIC_BASE_URL).href,
+        brandId: result.campaign.brandId,
+        campaignId: result.campaign.id,
+        reviewPath: path,
+        state: "draft" as const,
+        nextAction:
+          "Review the copy in Growth, then push it from the campaign page. It is created paused on the platform.",
+      },
+    };
+  },
 });
 
 export const createAudienceAction = growthAction({

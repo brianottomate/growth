@@ -40,6 +40,7 @@ import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
 import { WorkInChatButton } from "./WorkInChatButton";
 import { DownloadCampaignAds } from "./DownloadCampaignAds";
+import { DuplicateCampaign } from "./DuplicateCampaign";
 
 /**
  * The campaign, read top to bottom as the work happens: the ads, the photos
@@ -331,6 +332,12 @@ export async function CampaignView({
               campaignId={campaign.id}
               campaignName={campaign.name}
               hasAds={ads.length > 0}
+            />
+            <DuplicateCampaign
+              campaignId={campaign.id}
+              campaignName={campaignDisplayName(campaign.name)}
+              brandSlug={brandSlug}
+              workspace={workspace}
             />
           </div>
         </div>

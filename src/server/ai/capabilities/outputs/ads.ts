@@ -721,68 +721,17 @@ export const boostMetaPostActionOutputSchema = z.strictObject({
   provider: providerSchema,
 });
 
-export const duplicateMetaCampaignActionOutputSchema = z.strictObject({
-  brand: z.strictObject({
-    id: z.string(),
-    metaPageId: z.string().nullable(),
-    name: z.string(),
-    organizationId: z.string().nullable(),
-    performanceSettings: z
-      .strictObject({
-        adCopiesUrl: z.string().nullable().optional(),
-        adsConnectionBrandId: z.string().optional(),
-        metaAdsDestination: z
-          .strictObject({
-            connectionAccountId: z.string(),
-            adAccountId: z.string(),
-          })
-          .optional(),
-        bookings: z.number().nullable().optional(),
-        carouselCreativeUrl: z.string().nullable().optional(),
-        catalogCreativeUrl: z.string().nullable().optional(),
-        creativeDriveUrl: z.string().nullable().optional(),
-        dedicatedNewsletter: z.string().nullable().optional(),
-        guestListDriveUrl: z.string().nullable().optional(),
-        heroCreativeUrl: z.string().nullable().optional(),
-        homeInventory: z
-          .strictObject({
-            addressesFetchedAt: z.string().optional(),
-            enrichmentError: z.string().optional(),
-            homes: z.array(homesSchema),
-            syncedAt: z.string(),
-          })
-          .optional(),
-        influencer: z.string().nullable().optional(),
-        invoiceEmail: z.string().nullable().optional(),
-        metaTrackingDefaults: z
-          .record(
-            z.string(),
-            z.strictObject({
-              customEventType: z.string(),
-              pixelId: z.string(),
-            }),
-          )
-          .optional(),
-        metaReportingConversions: metaReportingConversionsSchema,
-        reportEmails: z.string().nullable().optional(),
-        socialMediaPosts: z.string().nullable().optional(),
-        ugcPermission: z.string().nullable().optional(),
-        updatedAt: z.string().optional(),
-        updatedBy: z.string().nullable().optional(),
-        updatedFrom: z.enum(["agent", "intake", "operator"]).optional(),
-      })
-      .nullable(),
-    slug: z.string().nullable(),
-    zernioProfileId: z.string().nullable(),
+export const duplicateCampaignActionOutputSchema = z.strictObject({
+  handoff: campaignHandoffSchema.extend({ state: z.literal("draft") }),
+  brandSlug: z.string().nullable(),
+  campaign: campaignSchema,
+  sourceCampaignId: z.string(),
+  counts: z.strictObject({
+    ads: z.number(),
+    audiences: z.number(),
+    platforms: z.number(),
   }),
-  provider: z
-    .strictObject({
-      copiedCampaignId: z.string().optional(),
-      discovery: jsonValueSchema.optional(),
-      raw: jsonValueSchema.optional(),
-    })
-    .catchall(jsonValueSchema),
-  requestedStatus: z.literal("PAUSED"),
+  path: z.string(),
 });
 
 export const createAudienceActionOutputSchema = z.strictObject({
@@ -1542,14 +1491,9 @@ export const boostMetaPostActionNativeResultSchema =
   });
 
 /** Native service result; the existing wire contract validates its JSON projection. */
-export const duplicateMetaCampaignActionNativeResultSchema =
-  duplicateMetaCampaignActionOutputSchema.extend({
-    provider: duplicateMetaCampaignActionOutputSchema.shape.provider
-      .extend({
-        discovery: z.unknown().optional(),
-        raw: z.unknown().optional(),
-      })
-      .catchall(z.unknown()),
+export const duplicateCampaignActionNativeResultSchema =
+  duplicateCampaignActionOutputSchema.extend({
+    campaign: draftCampaignActionNativeResultSchema.shape.campaign,
   });
 
 /** Native service result; the existing wire contract validates its JSON projection. */

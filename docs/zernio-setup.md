@@ -73,8 +73,9 @@ kernel:
   spend-capable campaign and returns an explicit warning.
 - `adsWrite.boostMetaPost` preserves the existing post engagement. Zernio
   launches boosts active, which makes the approval card the final spend gate.
-- `adsWrite.duplicateMetaCampaign` deep-copies only a campaign found in the
-  selected brand's allowed Meta account and requests a paused copy.
+- `adsWrite.duplicateCampaign` copies a campaign inside Growth (ads, audiences
+  and platform drafts, nothing on the platform); the ordinary push then creates
+  the copy paused. Zernio's campaign duplicate endpoint is not used.
 
 Create and boost calls send Zernio's `Idempotency-Key` header. The key is stable
 for one assistant run and exact payload, which makes provider retries safe for

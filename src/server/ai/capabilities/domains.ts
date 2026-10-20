@@ -139,7 +139,7 @@ import {
   deletePlatformCampaignAction,
   draftAdAction,
   draftCampaignAction,
-  duplicateMetaCampaignAction,
+  duplicateCampaignAction,
   listAdsDestinations,
   importCreativeAction,
   linkAudienceAction,
@@ -794,7 +794,7 @@ export const adsWrite = growthDomainTool({
     createPersonaLookalike: createPersonaLookalikeAction,
     assignPersonaAudience: assignPersonaAudienceAction,
     boostMetaPost: boostMetaPostAction,
-    duplicateMetaCampaign: duplicateMetaCampaignAction,
+    duplicateCampaign: duplicateCampaignAction,
   },
 });
 

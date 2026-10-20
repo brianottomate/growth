@@ -93,7 +93,6 @@ import {
   listZernioCustomConversions,
   deleteZernioCampaign,
   createZernioStandaloneAd,
-  duplicateZernioMetaCampaign,
   getZernioAdsTree,
   listZernioAccounts,
   listZernioAdPages,
@@ -1235,66 +1234,6 @@ export async function boostMetaPost(
     adAccount: destination.adAccount,
     launchesActive: true as const,
     provider: result,
-  };
-}
-
-export async function duplicateMetaCampaign(input: {
-  organizationId: string;
-  runId: string;
-  brandSlug: string;
-  platformCampaignId: string;
-  renameSuffix?: string;
-  /** Stable cross-run dedupe key; see adWriteIdempotencyKey. */
-  businessKey?: string | null;
-}) {
-  const brand = await resolveOwnedBrand(input.organizationId, input.brandSlug);
-  const [tree, allowed] = await Promise.all([
-    getZernioAdsTree(),
-    allowedAccountsForBrand(brand.id, "meta"),
-  ]);
-  const campaign = tree.find((candidate) => {
-    const row = candidate as Record<string, unknown>;
-    const candidateId =
-      (typeof row.platformCampaignId === "string"
-        ? row.platformCampaignId
-        : null) ??
-      candidate.id ??
-      candidate._id;
-    const accountId = row.platformAdAccountId;
-    const platform = typeof row.platform === "string" ? row.platform : "";
-    return (
-      candidateId === input.platformCampaignId &&
-      zernioConnectionMatchesPlatform("meta", platform) &&
-      typeof accountId === "string" &&
-      allowed.some((allowedAccount) =>
-        sameAdAccountId("meta", allowedAccount.externalId, accountId),
-      )
-    );
-  });
-  if (!campaign) {
-    throw new Error(
-      `Meta campaign ${input.platformCampaignId} is outside ${brand.name}'s allowed accounts`,
-    );
-  }
-  const provider = await duplicateZernioMetaCampaign(
-    input.platformCampaignId,
-    { renameSuffix: input.renameSuffix },
-    {
-      idempotencyKey: idempotencyKey(
-        { organizationId: input.organizationId, runId: input.runId },
-        "duplicate-meta",
-        {
-          platformCampaignId: input.platformCampaignId,
-          renameSuffix: input.renameSuffix,
-        },
-        input.businessKey,
-      ),
-    },
-  );
-  return {
-    brand,
-    requestedStatus: "PAUSED" as const,
-    provider,
   };
 }
 

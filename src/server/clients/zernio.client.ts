@@ -1609,39 +1609,6 @@ export async function boostZernioMetaPost(
   });
 }
 
-export type DuplicateZernioMetaCampaignResponse = {
-  copiedCampaignId?: string;
-  discovery?: unknown;
-  raw?: unknown;
-  [key: string]: unknown;
-};
-
-/** Deep-copy a Meta campaign in PAUSED state. */
-export async function duplicateZernioMetaCampaign(
-  platformCampaignId: string,
-  input: {
-    renameSuffix?: string;
-    syncAfter?: boolean;
-  },
-  options: { idempotencyKey: string },
-): Promise<DuplicateZernioMetaCampaignResponse> {
-  return zernioFetch<DuplicateZernioMetaCampaignResponse>(
-    `/ads/campaigns/${encodeURIComponent(platformCampaignId)}/duplicate`,
-    {
-      method: "POST",
-      headers: { "Idempotency-Key": options.idempotencyKey },
-      body: JSON.stringify({
-        platform: "facebook",
-        deepCopy: true,
-        statusOption: "PAUSED",
-        renameStrategy: "DEEP_RENAME",
-        renameSuffix: input.renameSuffix ?? " (copy)",
-        syncAfter: input.syncAfter ?? true,
-      }),
-    },
-  );
-}
-
 // ---- AD AUDIENCES ----------------------------------------------------------
 //
 // POST /v1/ads/audiences is discriminated by `type`. We type the two shapes we

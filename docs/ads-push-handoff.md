@@ -293,3 +293,15 @@ renders (below) are the reference.
 - Zernio sometimes creates the first ad of an ad set ACTIVE although the push
   asked for paused. The push warns when a response says ACTIVE, but the
   response is not always right: check every ad is paused after a push.
+
+## Duplicating a campaign (2026-10-19)
+
+A campaign is copied inside Growth, never on the platform. `adsWrite.duplicateCampaign`
+(the "Duplicate campaign…" entry on the campaign page) inserts fresh rows for the
+campaign, its ads, its audiences with their lookalike links, and its platform drafts
+with their delivery groups. Media is shared by reference: ads point at the same
+library assets and rendered placements, so nothing is re-rendered or re-uploaded.
+The copy is a draft with no external ids, so the ordinary push creates it paused,
+and its ads carry no push record, which makes them editable again. Budget copies as
+is; pause the source before switching the copy on. This replaced the Zernio campaign
+duplicate endpoint, which cloned a live Meta campaign and left nothing in Growth.

@@ -606,12 +606,8 @@ export const growthActionPolicies = {
       reversible: false,
       surfaces: CONFIRMED,
     }),
-    // Zernio makes the copy PAUSED, so it spends nothing.
-    duplicateMetaCampaign: write({
-      consequence: "provider-write",
-      idempotent: false,
-      reversible: false,
-    }),
+    // Local rows only: a draft copy the push takes to the platform later.
+    duplicateCampaign: write(),
   },
   publishingRead: {
     connections: read(),

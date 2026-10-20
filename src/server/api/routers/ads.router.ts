@@ -37,6 +37,7 @@ import {
   topAds,
   setDeliveryAction,
   draftCampaignAction,
+  duplicateCampaignAction,
   draftAdAction,
   writeGoogleTextAdsAction,
   addAdShellAction,
@@ -124,6 +125,9 @@ export const adsRouter = {
   /** A local draft: the editable object chat and the canvas work on. No
    *  provider call — launching is the separate, approved step. */
   createDraft: actionProcedure(draftCampaignAction),
+  /** A local copy of a campaign: ads, audiences and platform drafts under
+   *  fresh ids, unpushed. The push is the separate step. */
+  duplicateCampaign: actionProcedure(duplicateCampaignAction),
 
   /** The copy pass: AI words onto the drafts already drawn. Captions and editable image words together. */
   draftCreativeCopy: workspaceProcedure

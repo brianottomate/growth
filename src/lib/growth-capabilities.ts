@@ -293,7 +293,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "createPersonaLookalike",
     "assignPersonaAudience",
     "boostMetaPost",
-    "duplicateMetaCampaign",
+    "duplicateCampaign",
   ],
   publishingRead: ["connections", "openTimelinePost", "proposeLivePost"],
   publishingWrite: [
