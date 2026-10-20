@@ -16,7 +16,10 @@ import {
   listZernioFacebookPages,
   listZernioPixels,
 } from "@/server/clients/zernio.client";
-import { selectMetaSetupAccount } from "@/lib/meta-setup-selection";
+import {
+  selectMetaSetupAccount,
+  selectSavedMetaAccount,
+} from "@/lib/meta-setup-selection";
 import { metaAdBillingStatus } from "@/lib/meta-ad-billing";
 import { sameAdAccountId } from "@/lib/zernio-ads";
 import { sitePixels } from "./performance-connections.service";
@@ -222,8 +225,14 @@ export async function loadMetaConnectAccounts(brandId: string) {
         String(a.platformStatus).toLowerCase(),
       ),
   );
-  if (connections.length !== 1) return null;
-  const connection = connections[0]!;
+  const savedConnectionId =
+    brand.performanceSettings?.metaAdsDestination?.connectionAccountId;
+  const connection = savedConnectionId
+    ? connections.find((a) => (a._id ?? a.id) === savedConnectionId)
+    : connections.length === 1
+      ? connections[0]
+      : undefined;
+  if (!connection) return null;
   const connectionAccountId = connection._id ?? connection.id;
   if (!connectionAccountId) throw new Error("Meta connection has no ID");
   const [accounts, registry] = await Promise.all([
@@ -260,34 +269,32 @@ export async function loadMetaConnectAccounts(brandId: string) {
 
 /** Only the private Connect page receives this limited projection of its grant. */
 export async function getMetaConnectChoice(brandId: string) {
+  const savedBrand = await db.query.brandTable.findFirst({
+    where: and(eq(brandTable.id, brandId), isNull(brandTable.deletedAt)),
+    columns: { performanceSettings: true },
+  });
+  if (!savedBrand?.performanceSettings?.metaAdsDestination)
+    return { selectedId: null, accounts: [] };
   const context = await loadMetaConnectAccounts(brandId);
   if (!context) return null;
-  const selected = context.selectedId
-    ? selectMetaSetupAccount(
-        context.accounts,
-        context.selectedId,
-        context.blockedIds,
-      )
-    : null;
+  const selected = selectSavedMetaAccount(
+    context.accounts,
+    context.selectedId,
+    context.blockedIds,
+  );
   return {
     selectedId: selected?.id ?? null,
-    accounts: context.accounts
-      .filter(
-        (a) =>
-          !context.blockedIds.some((id) => sameAdAccountId("meta", id, a.id)),
-      )
-      .map((a) => ({
-        id: a.id,
-        name: a.name ?? a.id,
-        businessName:
-          typeof a.businessName === "string" ? a.businessName : null,
-        currency: a.currency ?? null,
-        selectable: a.selectable !== false,
-        reason:
-          a.selectable === false
-            ? "This account cannot currently run ads. Contact your Wander team."
-            : null,
-      })),
+    accounts: (selected ? [selected] : []).map((a) => ({
+      id: a.id,
+      name: a.name ?? a.id,
+      businessName: typeof a.businessName === "string" ? a.businessName : null,
+      currency: a.currency ?? null,
+      selectable: a.selectable !== false,
+      reason:
+        a.selectable === false
+          ? "This account cannot currently run ads. Contact your Wander team."
+          : null,
+    })),
   };
 }
 
@@ -355,6 +362,50 @@ async function createPixelOnce(input: {
       .where(eq(workflowRunTable.id, receipt.run.id));
     throw error;
   }
+}
+
+/** Save the explicit brand/account relationship before optional tracking setup. */
+export async function saveMetaAccountDestination(
+  brandId: string,
+  connectionAccountId: string,
+  account: { id: string; name?: string },
+) {
+  await db
+    .insert(adAccountTable)
+    .values({
+      brandId,
+      platform: "facebook",
+      externalId: account.id,
+      name: account.name,
+      isAllowed: true,
+      isShared: false,
+      note: "Selected from the client's own Meta authorization",
+    })
+    .onConflictDoNothing({
+      target: [
+        adAccountTable.brandId,
+        adAccountTable.platform,
+        adAccountTable.externalId,
+      ],
+    });
+  const allowed = await db.query.adAccountTable.findFirst({
+    where: and(
+      eq(adAccountTable.brandId, brandId),
+      eq(adAccountTable.platform, "facebook"),
+      eq(adAccountTable.externalId, account.id),
+      eq(adAccountTable.isAllowed, true),
+      eq(adAccountTable.isShared, false),
+    ),
+    columns: { id: true },
+  });
+  if (!allowed)
+    throw new Error("The selected ad account is not allowed for this client");
+  await db
+    .update(brandTable)
+    .set({
+      performanceSettings: sql`(coalesce(${brandTable.performanceSettings}, '{}'::jsonb) - 'adsConnectionBrandId') || ${JSON.stringify({ metaAdsDestination: { connectionAccountId, adAccountId: account.id } })}::jsonb`,
+    })
+    .where(eq(brandTable.id, brandId));
 }
 
 /** Complete the client's own Meta authorization. Discovery is used only for
@@ -451,44 +502,7 @@ export async function completeMetaConnectSetup(
       );
       return;
     }
-    // The callback's sole reachable account (or a previously selected account)
-    // becomes the explicit brand allowlist entry before any tracking reads.
-    await db
-      .insert(adAccountTable)
-      .values({
-        brandId,
-        platform: "facebook",
-        externalId: account.id,
-        name: account.name,
-        isAllowed: true,
-        isShared: false,
-        note: "Selected from the client's own Meta authorization",
-      })
-      .onConflictDoNothing({
-        target: [
-          adAccountTable.brandId,
-          adAccountTable.platform,
-          adAccountTable.externalId,
-        ],
-      });
-    const allowed = await db.query.adAccountTable.findFirst({
-      where: and(
-        eq(adAccountTable.brandId, brandId),
-        eq(adAccountTable.platform, "facebook"),
-        eq(adAccountTable.externalId, account.id),
-        eq(adAccountTable.isAllowed, true),
-        eq(adAccountTable.isShared, false),
-      ),
-      columns: { id: true },
-    });
-    if (!allowed)
-      throw new Error("The selected ad account is not allowed for this client");
-    await db
-      .update(brandTable)
-      .set({
-        performanceSettings: sql`(coalesce(${brandTable.performanceSettings}, '{}'::jsonb) - 'adsConnectionBrandId') || ${JSON.stringify({ metaAdsDestination: { connectionAccountId, adAccountId: account.id } })}::jsonb`,
-      })
-      .where(eq(brandTable.id, brandId));
+    await saveMetaAccountDestination(brandId, connectionAccountId, account);
     // A saved destination is Meta connected: close the onboarding checklist's
     // "Connect Facebook / Meta" and any earlier connection review with it.
     await db

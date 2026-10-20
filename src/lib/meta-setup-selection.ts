@@ -18,3 +18,18 @@ export function selectMetaSetupAccount<T extends { id: string }>(
     ? candidate
     : null;
 }
+
+/** A stored connection alone never authorizes exposing its other businesses. */
+export function selectSavedMetaAccount<T extends { id: string }>(
+  accounts: T[],
+  savedId: string | undefined,
+  blockedIds: string[],
+  requestedId?: string,
+): T | null {
+  if (
+    !savedId ||
+    (requestedId && !sameAdAccountId("meta", savedId, requestedId))
+  )
+    return null;
+  return selectMetaSetupAccount(accounts, savedId, blockedIds);
+}
