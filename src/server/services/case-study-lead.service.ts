@@ -26,16 +26,24 @@ const lead = z.object({
     .describe("Indexes of the two or three figures to show large."),
 });
 
-const SYSTEM = `You write the opening of a sales case study for Performance by Wander, a paid-media program for vacation rental operators with their own booking website. Readers are other operators deciding whether to join.
-Lead with what an operator cares about most, not the largest percentage: booking value first, then the value of each booking, then demand such as visits. Feature two or three figures that each say something different; never two that measure nearly the same thing, such as a median and an average.
+const PRODUCT = {
+  performance:
+    "Performance by Wander, a paid-media program for vacation rental operators with their own booking website",
+  wanderos:
+    "WanderOS, the direct booking website platform for vacation rental operators",
+};
+
+const system = (product: keyof typeof PRODUCT) =>
+  `You write the opening of a sales case study for ${PRODUCT[product]}. Readers are other operators deciding whether to join.
+Lead with what an operator cares about most, not the largest percentage: booking value and conversion first, then the value of each booking, then demand such as visits. Feature two or three figures that each say something different; never two that measure nearly the same thing, such as a median and an average.
 The headline is a short outcome in sentence case with no numbers, like "Higher-value direct bookings."
-In the summary, write changes as plain percentages without a plus sign ("rose 32%"), using only the figures supplied. Never state money amounts, booking counts or any number not supplied, apart from dates.
+In the summary, write changes as plain percentages without a plus sign ("rose 32%"), using only the figures supplied. A rate figure's before and after values may be quoted too ("from 0.46% to 0.71%"). Never state money amounts, booking counts or any number not supplied, apart from dates.
 "Direct website" figures cover the whole website, whatever brought each visit: describe them as what happened after launch, never as caused by the ads. "Paid ads" figures are what the ad platform attributes to the ads.
 Plain, specific language. No dashes as punctuation, no superlatives, no promises.`;
 
-/** Percent changes in the text must be ones the case study shows. */
+/** Percentages in the text must be changes or rates the case study shows. */
 function unsupported(text: string, allowed: Set<string>) {
-  return [...text.matchAll(/[+−-]?\d+(?:\.\d+)?\s?(?:%|pts)/g)]
+  return [...text.matchAll(/[+−-]?\d+(?:\.\d+)?%/g)]
     .map((match) => match[0].replace(/^-/, "−").replace(/^(\d)/, "+$1"))
     .filter((figure) => !allowed.has(figure));
 }
@@ -55,7 +63,14 @@ export async function writeCaseStudyLead(
 
   const measures = study.comparison.measures;
   const changes = measures.map(caseStudyChange);
-  const allowed = new Set(changes);
+  // Rates may be quoted at the precision a reader would round them to.
+  const rates = measures
+    .filter((measure) => measure.unit === "percent")
+    .flatMap((measure) => [measure.before, measure.after])
+    .flatMap((rate) =>
+      [1, 2].map((digits) => `+${(rate * 100).toFixed(digits)}%`),
+    );
+  const allowed = new Set([...changes, ...rates]);
   const prompt = JSON.stringify({
     client: workspace.clientName,
     launched: study.comparison.after.startDate,
@@ -80,7 +95,7 @@ export async function writeCaseStudyLead(
   for (let attempt = 0; attempt < 3; attempt++) {
     const { output } = await generateText({
       model: anthropic(CLAUDE_MODELS.SONNET_5),
-      system: SYSTEM,
+      system: system(study.product),
       prompt,
       output: Output.object({ schema: lead }),
     });

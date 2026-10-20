@@ -44,6 +44,7 @@ export default async function CaseStudyPage({
         publishedAt: null,
       })}
       study={study}
+      logoUrl={brand.logo}
       controls={<CaseStudyControls brandId={brand.id} draft={draft} />}
     />
   );

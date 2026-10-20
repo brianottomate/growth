@@ -193,6 +193,8 @@ export const performanceCaseStudy = z
   .object({
     headline: z.string().trim().min(1).max(160),
     summary: z.string().trim().min(1),
+    /** What the story is about: the ad program, or the website platform. */
+    product: z.enum(["performance", "wanderos"]).default("performance"),
     /** The report's ad highlights, shown as a creative section. */
     showCreative: z.boolean().default(false),
     /** Null until the client agrees; the page then says approval is required. */
@@ -239,12 +241,8 @@ export const performanceCaseStudy = z
   .strict();
 export type PerformanceCaseStudy = z.infer<typeof performanceCaseStudy>;
 
-/** Shares change in points; everything else changes relative to before. */
+/** Every change is relative to before, rates included (0.46% → 0.71% is +54%). */
 export function caseStudyChange(measure: PerformanceCaseStudyMeasure) {
-  if (measure.unit === "percent") {
-    const points = (measure.after - measure.before) * 100;
-    return `${points >= 0 ? "+" : "−"}${Math.abs(points).toFixed(1)} pts`;
-  }
   if (!measure.before) return "New";
   const rounded = Math.round(
     ((measure.after - measure.before) / measure.before) * 100,

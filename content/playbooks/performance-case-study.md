@@ -18,7 +18,7 @@ The page reads only the stored snapshot. Pull the data in the chat session (BigQ
 
 - **Launch date**: the day paid traffic started, confirmed in the site's paid-social sessions, not the date in a deck.
 - **Before and after**: two equal windows that end the day before launch and start on launch day. Exclude today, since it is partial.
-- **Baseline**: the before window must sit on the same platform and the same tracking as the after window. A site that moved to WanderOS recently has no fair baseline before its go-live date (`wos_datastream.public_SaasWebsite.domainDnsSetActiveAt`). Never compare against a client's old GA4 numbers.
+- **Baseline**: the before window should sit on the same platform and tracking as the after window. For a WanderOS before/after, the only pre-launch source is the client's own Google Analytics: use it only when its after-period figures agree with our warehouse (bookings and visitors within roughly 10–15%), and record both in the source note. A site that moved to WanderOS recently has no fair baseline before its go-live date (`wos_datastream.public_SaasWebsite.domainDnsSetActiveAt`). Never compare against a client's old GA4 numbers.
 
 ## 2. Pull the figures
 
@@ -48,6 +48,8 @@ Write the report JSON as in the client-performance-report playbook, plus `caseSt
 
 - `headline`, `summary`: a placeholder is fine. **Write the lead** on the page replaces them and picks the featured figures from what is stored; every percentage it writes must match a stored figure. Press it again to regenerate.
 - `showCreative`: whether the report's ad highlights print as a creative section. Toggle it on the page.
+- `product`: `performance` for an ad-program story, `wanderos` for a website-platform story. It sets the eyebrow and how the lead is written. The client's logo comes from its brand.
+- Rates (`unit: "percent"`) show their real values and a relative change (0.46% → 0.71% is +54%); other figures are indexed.
 - `approval`: `null` until the client agrees. The page then shows "Internal draft · customer approval required". Record `approvedBy`, `approvedOn` and `scope` (`sales` or `public`) once they do.
 - `comparison.measures`: each with a `scope` (`site`, `all_channels` or `paid`), a `unit`, and `before`/`after` values. Percent values are fractions (0.42).
 - `series`: weekly points (Monday starts) covering both windows; mark an incomplete week `partial`.

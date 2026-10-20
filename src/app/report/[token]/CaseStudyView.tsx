@@ -31,7 +31,8 @@ const scopeNote: Record<Scope, string> = {
 };
 
 /** Rates are the only raw values a case study shows; they reveal no volume. */
-const rate = (value: number) => `${(value * 100).toFixed(1)}%`;
+const rate = (value: number) =>
+  `${(value * 100).toFixed(value < 0.1 ? 2 : 1)}%`;
 
 function formatDate(date: string, year = false) {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
@@ -110,76 +111,87 @@ function Comparison({ study }: { study: PerformanceCaseStudy }) {
   );
 }
 
-/** Before = 100 on a zero-based scale, so bar lengths compare honestly. */
+/**
+ * Before and after on a zero-based scale. Rates show their real values
+ * (0.46% → 0.71%); everything else is indexed so volumes stay private.
+ */
 function IndexBars({ measures }: { measures: PerformanceCaseStudyMeasure[] }) {
-  const indexed = measures.map((measure) => ({
-    measure,
-    after:
-      measure.unit === "percent" || !measure.before
-        ? null
-        : (measure.after / measure.before) * 100,
-  }));
-  const max = Math.max(
-    150,
-    ...indexed.map((row) => Math.ceil((row.after ?? 0) / 50) * 50),
+  const rows = measures.map((measure) => {
+    const isRate = measure.unit === "percent";
+    const scale = isRate ? Math.max(measure.before, measure.after) : 0;
+    return {
+      measure,
+      before: isRate ? measure.before / scale : 1,
+      after: isRate
+        ? measure.after / scale
+        : measure.before
+          ? measure.after / measure.before
+          : 0,
+      labels: isRate
+        ? [rate(measure.before), rate(measure.after)]
+        : [
+            "100",
+            measure.before
+              ? ((measure.after / measure.before) * 100).toFixed(1)
+              : "–",
+          ],
+    };
+  });
+  const indexMax = Math.max(
+    1.5,
+    ...rows
+      .filter((row) => row.measure.unit !== "percent")
+      .map((row) => Math.ceil(row.after * 2) / 2),
   );
-  const width = (value: number) => `${(value / max) * 100}%`;
+  const width = (row: (typeof rows)[number], value: number) =>
+    `${(value / (row.measure.unit === "percent" ? 1 : indexMax)) * 100}%`;
   return (
     <div className="grid grid-cols-1 gap-6 print:grid-cols-2 print:gap-x-10 print:gap-y-4">
-      {indexed.map(({ measure, after }) => (
+      {rows.map((row) => (
         <div
-          key={`${measure.scope}-${measure.label}`}
+          key={`${row.measure.scope}-${row.measure.label}`}
           className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_120px] sm:items-center print:break-inside-avoid print:grid-cols-[1fr_72px] print:gap-2"
         >
           <div className="space-y-1.5">
             <div className="text-[15px] font-semibold">
-              {measure.label}
+              {row.measure.label}
               <span className="ml-2 text-xs font-normal text-muted-foreground">
-                {scopeLabel[measure.scope]}
+                {scopeLabel[row.measure.scope]}
               </span>
             </div>
-            {after === null ? (
-              <div className="text-sm text-muted-foreground">
-                {rate(measure.before)} → {rate(measure.after)}
+            {[row.before, row.after].map((value, index) => (
+              <div key={index} className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    "h-6 rounded-md",
+                    index ? "bg-emerald-700" : "bg-neutral-300",
+                  )}
+                  style={{ width: width(row, value) }}
+                />
+                <span
+                  className={cn(
+                    "text-sm tabular-nums",
+                    !index && "text-muted-foreground",
+                  )}
+                >
+                  {row.labels[index]}
+                </span>
               </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="h-6 rounded-md bg-neutral-300"
-                    style={{ width: width(100) }}
-                  />
-                  <span className="text-sm text-muted-foreground tabular-nums">
-                    100
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="h-6 rounded-md bg-neutral-900"
-                    style={{ width: width(after) }}
-                  />
-                  <span className="text-sm tabular-nums">
-                    {after.toFixed(1)}
-                  </span>
-                </div>
-              </>
-            )}
-            {measure.note && (
-              <p className="text-xs text-muted-foreground">{measure.note}</p>
+            ))}
+            {row.measure.note && (
+              <p className="text-xs text-muted-foreground">
+                {row.measure.note}
+              </p>
             )}
           </div>
-          <div
-            className={cn(
-              "text-3xl font-semibold tracking-tight tabular-nums sm:text-right print:text-xl",
-              measure.after < measure.before && "text-muted-foreground",
-            )}
-          >
-            {caseStudyChange(measure)}
+          <div className="text-3xl font-semibold tracking-tight text-emerald-700 tabular-nums sm:text-right print:text-xl">
+            {caseStudyChange(row.measure)}
           </div>
         </div>
       ))}
       <div className="text-xs text-muted-foreground print:col-span-2">
-        Index: before = 100, on a zero-based scale.
+        Zero-based scale. Rates show their values; other figures are indexed to
+        before = 100.
       </div>
     </div>
   );
@@ -367,12 +379,15 @@ export function CaseStudyView({
   report,
   study,
   controls,
+  logoUrl,
 }: {
   token?: string;
   report: PerformanceReportPage;
   study: PerformanceCaseStudy;
   /** Editing controls on the in-app page; never printed. */
   controls?: React.ReactNode;
+  /** The client's own logo, from its brand. */
+  logoUrl?: string | null;
 }) {
   // The first section introduces the client and the program, so it opens the story.
   const [intro, ...rest] = study.sections;
@@ -429,7 +444,20 @@ export function CaseStudyView({
 
         <div className="grid grid-cols-1 overflow-hidden rounded-2xl bg-muted/50 md:grid-cols-2 print:break-inside-avoid print:grid-cols-[1fr_1.1fr]">
           <div className="flex flex-col justify-center gap-4 p-8 print:p-6">
-            <Eyebrow>Performance by Wander · Customer story</Eyebrow>
+            {logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt={`${report.clientName} logo`}
+                className="h-12 w-auto max-w-48 self-start object-contain"
+              />
+            )}
+            <Eyebrow>
+              {study.product === "wanderos"
+                ? "WanderOS"
+                : "Performance by Wander"}{" "}
+              · Customer story
+            </Eyebrow>
             <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
               {report.clientName}
             </h1>
@@ -463,7 +491,7 @@ export function CaseStudyView({
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
               {featured.map((measure) => (
                 <div key={`${measure.scope}-${measure.label}`}>
-                  <div className="text-5xl font-semibold tracking-tight tabular-nums">
+                  <div className="text-5xl font-semibold tracking-tight text-emerald-700 tabular-nums">
                     {caseStudyChange(measure)}
                   </div>
                   <div className="mt-2 text-[15px] font-semibold">
