@@ -357,6 +357,13 @@ export const growthActionPolicies = {
   },
   emailWrite: {
     prepareBroadcast: write(),
+    sendBroadcastTest: write({
+      approval: "user",
+      consequence: "provider-write",
+      idempotent: false,
+      reversible: false,
+      surfaces: CONFIRMED,
+    }),
     scheduleBroadcasts: write({
       approval: "user",
       consequence: "background-run",

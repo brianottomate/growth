@@ -1,5 +1,6 @@
 import {
   prepareBroadcast,
+  sendBroadcastTest,
   previewBroadcasts,
   scheduleBroadcastsAction,
   pauseBroadcastAction,
@@ -668,6 +669,7 @@ export const emailWrite = growthDomainTool({
     "Plan and edit email content, audiences and sequences; manage sequence delivery with explicit approval for actions that can send.",
   actions: {
     prepareBroadcast,
+    sendBroadcastTest,
     scheduleBroadcasts: scheduleBroadcastsAction,
     pauseBroadcast: pauseBroadcastAction,
     recoverBroadcast: recoverBroadcastAction,

@@ -195,6 +195,14 @@ workspace checks and one typed FK membership table. See [Initiatives](initiative
 
 ## Performance Email sequences
 
+For scheduled Performance broadcasts, `emailWrite.prepareBroadcast` freezes one
+approved email and audience, `emailRead.previewBroadcasts` returns the exact set
+and review hash, and the approval-gated `emailWrite.sendBroadcastTest` sends one
+frozen prepared email to one explicit seed-inbox address without reading the
+guest audience or changing delivery state. Scheduling, pause, recovery and
+status stay on the same native content-post/QStash/Postmark path described in
+[`scheduled-broadcasts.md`](scheduled-broadcasts.md).
+
 `emailRead` exposes listSequences, getSequence, sequenceEmails, previewSequence and
 sequenceStatus. `emailWrite` exposes saveSequence, prepareSequence, pauseSequence,
 cancelSequenceEnrollment and archiveSequence. These use the same scoped services

@@ -33,3 +33,32 @@ export function broadcastJobCanRun(
     schedule.runtimeId === job.runtimeId,
   );
 }
+
+/** A newly approved send for one email revokes older unstarted queue authority. */
+export function shouldPauseSupersededBroadcast(
+  selectedSendId: string,
+  sibling: {
+    id: string;
+    status: string;
+    schedule?: { state: string };
+  },
+) {
+  return Boolean(
+    sibling.id !== selectedSendId &&
+    sibling.status === "approved" &&
+    sibling.schedule &&
+    (sibling.schedule.state === "approved" ||
+      sibling.schedule.state === "scheduled"),
+  );
+}
+
+/** Persist a worker error only while this exact queue message is authoritative. */
+export function shouldPersistBroadcastJobFailure(
+  send: {
+    status: string;
+    schedule?: { state: string; dueAt: string; runtimeId: string };
+  },
+  job: { dueAt: string; runtimeId: string },
+) {
+  return send.status === "approved" && broadcastJobCanRun(send.schedule, job);
+}

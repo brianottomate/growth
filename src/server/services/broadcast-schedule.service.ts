@@ -6,8 +6,11 @@ import { db, withTransaction } from "@/server/db";
 import { messageSendTable, platformPostTable } from "@/server/db/schema";
 import { emailDocumentDraftSchema } from "@/lib/email-document";
 import { brandSendBlockers } from "@/lib/email-delivery";
+import { canOperateEmailDelivery } from "@/lib/email-delivery-role";
 import {
   broadcastJobCanRun,
+  shouldPauseSupersededBroadcast,
+  shouldPersistBroadcastJobFailure,
   type BroadcastScheduleInput,
 } from "@/lib/broadcast-schedule";
 import {
@@ -22,6 +25,7 @@ import {
   publishEmailJob,
   requireLifecycleRuntime,
 } from "./lifecycle-runtime/providers";
+import { requireEmailDeliveryOperator } from "./email-delivery-authorization.service";
 
 type Actor = { organizationId: string; userId: string };
 const sha = (value: unknown) =>
@@ -118,17 +122,53 @@ export async function previewBroadcastSchedule(
   };
 }
 
+async function persistActiveQueueFailure(
+  input: { messageSendId: string; dueAt: string; runtimeId: string },
+  error: unknown,
+) {
+  await withTransaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(messageSendTable)
+      .where(eq(messageSendTable.id, input.messageSendId))
+      .for("update");
+    if (
+      !current ||
+      !shouldPersistBroadcastJobFailure(
+        { status: current.status, schedule: current.snapshot.schedule },
+        input,
+      )
+    )
+      return;
+    const message =
+      error instanceof Error ? error.message : "Queue publication failed";
+    await tx
+      .update(messageSendTable)
+      .set({
+        error: `Queue publication failed: ${message}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(messageSendTable.id, current.id));
+  });
+}
+
 async function queueSend(
   messageSendId: string,
   dueAt: string,
   runtimeId: string,
 ) {
-  const receipt = await publishEmailJob({
-    path: "/api/jobs/email-broadcast",
-    key: `broadcast-${messageSendId}-${Date.parse(dueAt)}`,
-    body: { messageSendId, dueAt, runtimeId },
-    dueAt: new Date(dueAt),
-  });
+  let receipt;
+  try {
+    receipt = await publishEmailJob({
+      path: "/api/jobs/email-broadcast",
+      key: `broadcast-${messageSendId}-${Date.parse(dueAt)}`,
+      body: { messageSendId, dueAt, runtimeId },
+      dueAt: new Date(dueAt),
+    });
+  } catch (error) {
+    await persistActiveQueueFailure({ messageSendId, dueAt, runtimeId }, error);
+    throw error;
+  }
   // Scheduled is a queue receipt, not an approval or a calendar date.
   const send = await db.query.messageSendTable.findFirst({
     where: eq(messageSendTable.id, messageSendId),
@@ -156,6 +196,7 @@ async function queueSend(
     await tx
       .update(messageSendTable)
       .set({
+        error: null,
         snapshot: {
           ...current.snapshot,
           schedule: {
@@ -182,6 +223,7 @@ export async function scheduleBroadcasts(
   },
   actor: Actor,
 ) {
+  await requireEmailDeliveryOperator(actor);
   requireLifecycleRuntime();
   const preview = await previewBroadcastSchedule(input, actor);
   if (preview.reviewedHash !== input.reviewedHash)
@@ -213,6 +255,33 @@ export async function scheduleBroadcasts(
         send.contentHash !== item.contentHash
       )
         throw new Error("A send already started or changed.");
+      const siblings = await tx
+        .select()
+        .from(messageSendTable)
+        .where(eq(messageSendTable.platformPostId, item.platformPostId))
+        .for("update");
+      for (const sibling of siblings) {
+        const siblingSchedule = sibling.snapshot.schedule;
+        if (
+          !siblingSchedule ||
+          !shouldPauseSupersededBroadcast(send.id, {
+            id: sibling.id,
+            status: sibling.status,
+            schedule: siblingSchedule,
+          })
+        )
+          continue;
+        await tx
+          .update(messageSendTable)
+          .set({
+            snapshot: {
+              ...sibling.snapshot,
+              schedule: { ...siblingSchedule, state: "paused" },
+            },
+            updatedAt: new Date(),
+          })
+          .where(eq(messageSendTable.id, sibling.id));
+      }
       await tx
         .update(messageSendTable)
         .set({
@@ -252,6 +321,7 @@ export async function scheduleBroadcasts(
 }
 
 export async function pauseBroadcast(messageSendId: string, actor: Actor) {
+  await requireEmailDeliveryOperator(actor);
   const { send } = await ownedSend(messageSendId, actor);
   await withTransaction(async (tx) => {
     const [post] = await tx
@@ -303,6 +373,7 @@ export async function broadcastScheduleStatus(
 
 /** Recovery only republishes unstarted, approved work. Never retries uncertain provider attempts. */
 export async function recoverBroadcast(messageSendId: string, actor: Actor) {
+  await requireEmailDeliveryOperator(actor);
   const { send } = await ownedSend(messageSendId, actor);
   const schedule = send.snapshot.schedule;
   if (
@@ -316,6 +387,37 @@ export async function recoverBroadcast(messageSendId: string, actor: Actor) {
     );
   await queueSend(send.id, schedule.dueAt, schedule.runtimeId);
   return { queued: true };
+}
+
+async function persistActiveJobFailure(
+  input: { messageSendId: string; dueAt: string; runtimeId: string },
+  error: unknown,
+) {
+  await withTransaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(messageSendTable)
+      .where(eq(messageSendTable.id, input.messageSendId))
+      .for("update");
+    if (
+      !current ||
+      !shouldPersistBroadcastJobFailure(
+        { status: current.status, schedule: current.snapshot.schedule },
+        input,
+      )
+    )
+      return;
+    const message = error instanceof Error ? error.message : "Send failed";
+    await tx
+      .update(messageSendTable)
+      .set({
+        status: "failed",
+        error: message,
+        failedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(messageSendTable.id, current.id));
+  });
 }
 
 export async function executeBroadcastJob(input: {
@@ -336,16 +438,22 @@ export async function executeBroadcastJob(input: {
     return { status: "inactive" };
   if (!send.approvedBy) throw new Error("Missing approving operator.");
   const membership = await getWanderMembership(send.approvedBy);
-  if (!membership) return { status: "access_revoked" };
+  if (!canOperateEmailDelivery(membership?.role))
+    return { status: "access_revoked" };
   if (Date.parse(input.dueAt) > Date.now()) {
     await queueSend(send.id, input.dueAt, input.runtimeId);
     return { status: "queued" };
   }
-  await dispatchBrandSend({
-    messageSendId: send.id,
-    organizationId: membership.organizationId,
-    userId: send.approvedBy,
-    scheduledJob: input,
-  });
+  try {
+    await dispatchBrandSend({
+      messageSendId: send.id,
+      organizationId: membership.organizationId,
+      userId: send.approvedBy,
+      scheduledJob: input,
+    });
+  } catch (error) {
+    await persistActiveJobFailure(input, error);
+    throw error;
+  }
   return { status: "sent" };
 }

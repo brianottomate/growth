@@ -58,6 +58,7 @@ import {
   getEmailAudienceSnapshot,
   readEmailAudienceBatch,
 } from "@/server/services/email-audience.service";
+import { requireEmailDeliveryOperator } from "@/server/services/email-delivery-authorization.service";
 
 // Brand marketing email through the brand's own provider (Postmark today). The
 // steps are the same ones every send takes: prepare (freeze the rendered email
@@ -169,6 +170,81 @@ export async function sendBrandTestEmail(
 }
 
 /**
+ * Send one frozen prepared broadcast to exactly one explicit test address.
+ * This never reads the audience, creates a recipient ledger row, approves the
+ * send, changes its status or schedules guest delivery.
+ */
+export async function sendPreparedBrandTestEmail(
+  input: { messageSendId: string; recipientEmail: string } & Actor,
+) {
+  await requireEmailDeliveryOperator(input);
+  const recipientEmail = input.recipientEmail.trim().toLowerCase();
+  const send = await db.query.messageSendTable.findFirst({
+    where: eq(messageSendTable.id, input.messageSendId),
+  });
+  const snapshot = send?.snapshot;
+  if (
+    send?.provider !== "postmark" ||
+    !["draft", "approved"].includes(send.status) ||
+    snapshot?.audience.provider !== "postmark" ||
+    !snapshot.sender
+  )
+    throw new Error("Prepared Postmark send not found.");
+  const spot = await requireOwnedEmailSpot(
+    send.platformPostId,
+    input.organizationId,
+  );
+  const blockers = brandSendBlockers(spot.brand);
+  if (blockers.length) throw new Error(blockers.join(" "));
+  const audience = snapshot.audience;
+  const sender = snapshot.sender;
+  const token = await postmarkServerToken(audience.serverId);
+  const ownUnsubscribe = await growthHandlesUnsubscribes(
+    token,
+    audience.messageStream,
+  );
+  const own = ownUnsubscribe
+    ? personalUnsubscribe(spot.brandId, recipientEmail)
+    : null;
+  // Seed tests prove the final tracked link shape without creating a guest
+  // attribution identity or a recipient-ledger claim.
+  const exactBody = (body: string) =>
+    body.replaceAll(RECIPIENT_KEY_PLACEHOLDER, "seed-test");
+  const [result] = await sendPostmarkBatch(token, [
+    {
+      From: fromHeader(sender),
+      To: recipientEmail,
+      ...(sender.replyTo ? { ReplyTo: sender.replyTo } : {}),
+      Subject: `[Test] ${snapshot.email.subject}`,
+      HtmlBody: own
+        ? withUnsubscribeUrl(exactBody(snapshot.preview.html), own.url)
+        : exactBody(snapshot.preview.html),
+      TextBody: own
+        ? withUnsubscribeUrl(exactBody(snapshot.preview.text), own.url)
+        : exactBody(snapshot.preview.text),
+      ...(own ? { Headers: own.headers } : {}),
+      MessageStream: audience.messageStream,
+      Tag: "growth-test",
+      TrackOpens: true,
+      TrackLinks: "HtmlAndText",
+      Metadata: {
+        message_send_id: send.id,
+        platform_post_id: spot.id,
+        test: "true",
+      },
+    },
+  ]);
+  if (result?.ErrorCode !== 0)
+    throw new Error(`Postmark refused the test: ${result?.Message}`);
+  return {
+    to: recipientEmail,
+    messageId: result.MessageID ?? null,
+    messageSendId: send.id,
+    contentHash: send.contentHash,
+  };
+}
+
+/**
  * Freeze the current email and a compiled audience into a draft send. A
  * changed email or a new snapshot makes a new draft; the approval belongs to
  * exactly what was prepared.
@@ -176,6 +252,7 @@ export async function sendBrandTestEmail(
 export async function prepareBrandSend(
   input: { platformPostId: string; snapshotId: string } & Actor,
 ) {
+  await requireEmailDeliveryOperator(input);
   const spot = await requireOwnedEmailSpot(
     input.platformPostId,
     input.organizationId,

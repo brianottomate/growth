@@ -26,10 +26,13 @@ booking tags, fresh opt-outs, suppression handling and recipient deduplication.
 4. `emailRead.previewBroadcasts` takes one brand, timezone and prepared-send IDs
    with explicit UTC/offset instants. Inspect all creative, sender, recipient
    counts, dates/local times and the returned reviewedHash.
-5. After stopping conflicting Customer.io broadcasts, explicitly approve
+5. Explicitly approve `emailWrite.sendBroadcastTest` with one prepared-send ID
+   and one seed-inbox address. It sends the frozen prepared creative to only
+   that address, creates no audience claim and changes no schedule or send state.
+6. After stopping conflicting Customer.io broadcasts, explicitly approve
    `emailWrite.scheduleBroadcasts` with that hash and `customerIoStopped: true`.
    A false queued result means authorization was saved but queue recovery is needed.
-6. `emailRead.broadcastStatus`, `emailWrite.pauseBroadcast` and
+7. `emailRead.broadcastStatus`, `emailWrite.pauseBroadcast` and
    `emailWrite.recoverBroadcast` inspect, pause and recover unstarted work.
    Recovery of an overdue approved send can dispatch immediately and is gated
    by normal user approval. Failed/provider-uncertain work requires investigation.
@@ -78,4 +81,6 @@ coexist. `bun run check`, 222 offline tests, and AI contracts (350 catalog tools
 calendar and independent tentative date, creative review and delivery states;
 no draft, approval, audience or queue was changed during verification.
 The scheduling code can ship without activating any guest send. Runtime setup
-and controlled inbox verification remain prerequisites for actual activation.
+remains a prerequisite for actual activation. Controlled inbox verification is
+available through the approval-gated `emailWrite.sendBroadcastTest` action after
+the deployment includes it.

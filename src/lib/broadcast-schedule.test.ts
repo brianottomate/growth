@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { broadcastJobCanRun } from "./broadcast-schedule";
+import {
+  broadcastJobCanRun,
+  shouldPauseSupersededBroadcast,
+  shouldPersistBroadcastJobFailure,
+} from "./broadcast-schedule";
 import { resolveZonedDateTime } from "./scheduling-time";
 
 describe("broadcast delivery authorization", () => {
@@ -40,5 +44,45 @@ describe("broadcast delivery authorization", () => {
     });
     expect(before).toBe("2026-10-30T16:00:00.000Z");
     expect(after).toBe("2026-11-06T17:00:00.000Z");
+  });
+  test("a newly selected send pauses an older active sibling", () => {
+    expect(
+      shouldPauseSupersededBroadcast("new", {
+        id: "old",
+        status: "approved",
+        schedule: { state: "scheduled" },
+      }),
+    ).toBe(true);
+    expect(
+      shouldPauseSupersededBroadcast("new", {
+        id: "old",
+        status: "approved",
+        schedule: { state: "paused" },
+      }),
+    ).toBe(false);
+    expect(
+      shouldPauseSupersededBroadcast("new", {
+        id: "new",
+        status: "approved",
+        schedule: { state: "scheduled" },
+      }),
+    ).toBe(false);
+  });
+  test("worker errors persist only for the still-authoritative job", () => {
+    expect(
+      shouldPersistBroadcastJobFailure({ status: "approved", schedule }, job),
+    ).toBe(true);
+    expect(
+      shouldPersistBroadcastJobFailure(
+        { status: "approved", schedule: { ...schedule, state: "paused" } },
+        job,
+      ),
+    ).toBe(false);
+    expect(
+      shouldPersistBroadcastJobFailure(
+        { status: "approved", schedule },
+        { ...job, dueAt: "2026-11-13T17:00:00.000Z" },
+      ),
+    ).toBe(false);
   });
 });

@@ -9,8 +9,12 @@ import {
   recoverBroadcast,
   broadcastScheduleStatus,
 } from "@/server/services/broadcast-schedule.service";
-import { prepareBrandSend } from "@/server/services/brand-email-send.service";
+import {
+  prepareBrandSend,
+  sendPreparedBrandTestEmail,
+} from "@/server/services/brand-email-send.service";
 import { getEmailDraftOutputSchema } from "./outputs/email";
+import { emailSchema } from "@/lib/validators";
 const actor = (ctx: { orgId: string; userId: string }) => ({
   organizationId: ctx.orgId,
   userId: ctx.userId,
@@ -28,6 +32,22 @@ export const prepareBroadcast = growthAction({
       createdAt: z.date(),
     }),
   execute: (input, ctx) => prepareBrandSend({ ...input, ...actor(ctx) }),
+});
+export const sendBroadcastTest = growthAction({
+  description:
+    "Send exactly one frozen prepared Postmark broadcast to one explicitly supplied seed-inbox address. Uses the prepared sender, creative, links, stream and unsubscribe handling, but never reads or claims the guest audience, changes delivery state or schedules guests. Requires explicit user approval.",
+  inputSchema: z.object({
+    messageSendId: z.string().min(1),
+    recipientEmail: emailSchema,
+  }),
+  outputSchema: z.object({
+    to: emailSchema,
+    messageId: z.string().nullable(),
+    messageSendId: z.string(),
+    contentHash: z.string(),
+  }),
+  execute: (input, ctx) =>
+    sendPreparedBrandTestEmail({ ...input, ...actor(ctx) }),
 });
 const previewSend = z.object({
   messageSendId: z.string(),

@@ -1,5 +1,6 @@
 import {
   prepareBroadcast,
+  sendBroadcastTest,
   previewBroadcasts,
   scheduleBroadcastsAction,
   pauseBroadcastAction,
@@ -113,6 +114,7 @@ async function deliveryOrganizationIdForUser(
 
 export const newsletterRouter = {
   prepareBroadcast: actionProcedure(prepareBroadcast),
+  sendPreparedTest: actionProcedure(sendBroadcastTest),
   previewBroadcasts: actionProcedure(previewBroadcasts),
   scheduleBroadcasts: actionProcedure(scheduleBroadcastsAction),
   pauseBroadcast: actionProcedure(pauseBroadcastAction),

@@ -186,6 +186,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   ],
   emailWrite: [
     "prepareBroadcast",
+    "sendBroadcastTest",
     "scheduleBroadcasts",
     "pauseBroadcast",
     "recoverBroadcast",
