@@ -66,7 +66,7 @@ function validationMessage(error: unknown) {
 function previewDocument(html: string, theme: string, host: string) {
   // Only trusted, server-provided widget HTML runs here. Edited JSON is sent as data.
   // The opaque-origin sandbox and CSP keep the preview away from app sessions.
-  const bootstrap = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src about:; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://growth-red.vercel.app https://www.wander.com https://assets.wander.com https://assets-websites.wander.com; connect-src 'none'; form-action 'none'; base-uri 'none'"><style>:root{color-scheme:${theme}!important}</style><script>
+  const bootstrap = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src about:; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https:; connect-src 'none'; form-action 'none'; base-uri 'none'"><style>:root{color-scheme:${theme}!important}</style><script>
 var waiters={},counter=0;
 window.openai={theme:${JSON.stringify(theme)},toolOutput:null};
 ${host === "openai" ? `window.openai.sendFollowUpMessage=function(args){return new Promise(function(resolve,reject){var id='openai-'+(++counter);waiters[id]={resolve:resolve,reject:reject};window.parent.postMessage({jsonrpc:'2.0',id:id,method:'openai/sendFollowUpMessage',params:args},'*')})};` : ""}
@@ -77,7 +77,7 @@ window.addEventListener('DOMContentLoaded',function(){new ResizeObserver(functio
   return html.replace("<head>", `<head>${bootstrap}`);
 }
 
-function WidgetPreview({
+export function WidgetPreview({
   widget,
   payload,
   theme,
@@ -85,6 +85,7 @@ function WidgetPreview({
   reject,
   loading,
   revision,
+  compact = false,
 }: {
   widget: ConnectorWidget;
   payload: unknown;
@@ -93,6 +94,8 @@ function WidgetPreview({
   reject: boolean;
   loading: boolean;
   revision: number;
+  /** Frame only: no handoff or message log panels. */
+  compact?: boolean;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const ready = useRef(false);
@@ -235,40 +238,44 @@ function WidgetPreview({
     // Listener lives for this preview session and reads current controls from a ref.
   }, [theme]);
 
+  const frameCard = (
+    <div
+      className="overflow-hidden rounded-2xl border"
+      style={{
+        background: theme === "dark" ? "#111827" : "#fff",
+        color: theme === "dark" ? "#f8fafc" : "#111827",
+      }}
+    >
+      <div className="flex items-center justify-between border-b border-current/10 px-4 py-3 text-xs">
+        <span>
+          {host === "openai"
+            ? "External · ChatGPT · OpenAI globals"
+            : "External · ChatGPT / Claude · MCP Apps"}
+        </span>
+        <span role="status">
+          {connected
+            ? loading
+              ? "Waiting for tool result"
+              : "Connected"
+            : "Connecting…"}
+        </span>
+      </div>
+      {mounted && (
+        <iframe
+          ref={frame}
+          title={`${widget.title} connector preview`}
+          sandbox="allow-scripts allow-forms"
+          srcDoc={document}
+          className="block w-full border-0"
+          style={{ height }}
+        />
+      )}
+    </div>
+  );
+  if (compact) return frameCard;
   return (
     <div className="space-y-6">
-      <div
-        className="overflow-hidden rounded-2xl border"
-        style={{
-          background: theme === "dark" ? "#111827" : "#fff",
-          color: theme === "dark" ? "#f8fafc" : "#111827",
-        }}
-      >
-        <div className="flex items-center justify-between border-b border-current/10 px-4 py-3 text-xs">
-          <span>
-            {host === "openai"
-              ? "External · ChatGPT · OpenAI globals"
-              : "External · ChatGPT / Claude · MCP Apps"}
-          </span>
-          <span role="status">
-            {connected
-              ? loading
-                ? "Waiting for tool result"
-                : "Connected"
-              : "Connecting…"}
-          </span>
-        </div>
-        {mounted && (
-          <iframe
-            ref={frame}
-            title={`${widget.title} connector preview`}
-            sandbox="allow-scripts allow-forms"
-            srcDoc={document}
-            className="block w-full border-0"
-            style={{ height }}
-          />
-        )}
-      </div>
+      {frameCard}
       <section className="rounded-xl border p-4">
         <h2 className="font-medium">Captured handoffs</h2>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -381,6 +388,69 @@ function InternalSummaryPreview({
   );
 }
 
+/** The Growth-chat rendering of one tool result, picked by widget. */
+export function InternalPreview({
+  widget,
+  payload,
+  theme,
+  loading,
+  reject,
+  width,
+}: {
+  widget: ConnectorWidget;
+  payload: unknown;
+  theme: string;
+  loading: boolean;
+  reject: boolean;
+  width: number;
+}) {
+  if (widget.id === "options")
+    return (
+      <div className="mx-auto w-full min-w-0" style={{ maxWidth: width }}>
+        <InternalNextOptionsPreview
+          payload={payload}
+          theme={theme}
+          loading={loading}
+          reject={reject}
+        />
+      </div>
+    );
+  if (widget.id === "social")
+    return (
+      <div
+        data-theme={theme}
+        className="mx-auto w-full min-w-0 overflow-hidden rounded-2xl border bg-background text-foreground"
+        style={{ maxWidth: width }}
+      >
+        <div className="flex items-center justify-between border-b px-4 py-3 text-xs">
+          <span>Internal · Growth chat</span>
+          <span role="status">
+            {loading ? "Waiting for tool result" : "Ready"}
+          </span>
+        </div>
+        <div className="p-4">
+          {loading ? (
+            <p className="text-xs text-muted-foreground">
+              Waiting for tool result…
+            </p>
+          ) : (
+            <SocialPostSummary result={payload} />
+          )}
+        </div>
+      </div>
+    );
+  return (
+    <InternalSummaryPreview
+      kind={widget.id}
+      payload={payload}
+      theme={theme}
+      loading={loading}
+      reject={reject}
+      width={width}
+    />
+  );
+}
+
 export function ConnectorWorkbench({
   widgets,
   fixturesByWidget,
@@ -459,9 +529,14 @@ export function ConnectorWorkbench({
               Generative UI, in the conversation.
             </h1>
           </div>
-          <Button variant="outline" asChild>
-            <Link href="/lab/design-system/chat">Assistant gallery</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/lab/design-system/connectors/all">All at once</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/lab/design-system/chat">Assistant gallery</Link>
+            </Button>
+          </div>
         </div>
         <p className="max-w-2xl text-sm text-muted-foreground">
           {widgets.length} tool results. Compare compact summaries in Growth
@@ -666,55 +741,17 @@ export function ConnectorWorkbench({
                   : "grid grid-cols-1"
               }
             >
-              {widget.id === "options" && surface !== "external" && (
-                <div
-                  className="mx-auto w-full min-w-0"
-                  style={{ maxWidth: Number(width) }}
-                >
-                  <InternalNextOptionsPreview
-                    key={`internal-${session}-${revision}`}
-                    payload={payload}
-                    theme={theme}
-                    loading={loading}
-                    reject={reject}
-                  />
-                </div>
+              {surface !== "external" && (
+                <InternalPreview
+                  key={`${widget.id}-${session}-${revision}`}
+                  widget={widget}
+                  payload={payload}
+                  theme={theme}
+                  loading={loading}
+                  reject={reject}
+                  width={Number(width)}
+                />
               )}
-              {widget.id === "social" && surface !== "external" && (
-                <div
-                  data-theme={theme}
-                  className="mx-auto w-full min-w-0 overflow-hidden rounded-2xl border bg-background text-foreground"
-                  style={{ maxWidth: Number(width) }}
-                >
-                  <div className="flex items-center justify-between border-b px-4 py-3 text-xs">
-                    <span>Internal · Growth chat</span>
-                    <span role="status">
-                      {loading ? "Waiting for tool result" : "Ready"}
-                    </span>
-                  </div>
-                  <div className="p-4">
-                    {loading ? (
-                      <p className="text-xs text-muted-foreground">
-                        Waiting for tool result…
-                      </p>
-                    ) : (
-                      <SocialPostSummary result={payload} />
-                    )}
-                  </div>
-                </div>
-              )}
-              {!["options", "social"].includes(widget.id) &&
-                surface !== "external" && (
-                  <InternalSummaryPreview
-                    key={`${widget.id}-${session}-${revision}`}
-                    kind={widget.id}
-                    payload={payload}
-                    theme={theme}
-                    loading={loading}
-                    reject={reject}
-                    width={Number(width)}
-                  />
-                )}
               {surface !== "internal" && (
                 <div
                   className="mx-auto w-full min-w-0"

@@ -187,15 +187,18 @@ export function growthResultSummary(
       `${count(ready.completed)}/${count(ready.total)} checks complete`,
       `${list(d.platformPosts).length} platform drafts`,
     ];
+    const hook = text(obj(d.brief).hook);
     summary.rows = [
       {
-        title: text(obj(d.brief).hook, "Brief not filled in"),
-        detail: text(
-          obj(ready.next).detail,
-          ready.readyForReview
-            ? "Ready for review"
-            : "Review outstanding checks",
-        ),
+        title: hook || "No brief yet",
+        detail: hook
+          ? text(
+              obj(ready.next).detail,
+              ready.readyForReview
+                ? "Ready for review"
+                : "Review outstanding checks",
+            )
+          : "Add a hook and creative direction to start.",
         thumbnail: thumbnail(list(d.media)[0]),
       },
     ];
@@ -208,14 +211,29 @@ export function growthResultSummary(
     summary.description = [text(brand.name), status(campaign.status)]
       .filter(Boolean)
       .join(" · ");
-    summary.facts = [
-      `${list(d.ads).length} creative drafts`,
-      `${list(d.audiences).length} audiences`,
-      `${list(d.platformCampaigns).length} platform campaigns`,
-    ];
-    summary.description += text(handoff.nextAction)
-      ? ` · ${text(handoff.nextAction)}`
-      : "";
+    const ads = list(d.ads).length,
+      audiences = list(d.audiences).length,
+      platforms = list(d.platformCampaigns).length;
+    const planned = ads + audiences + platforms > 0;
+    summary.facts = planned
+      ? [
+          `${ads} creative drafts`,
+          `${audiences} audiences`,
+          `${platforms} platform campaigns`,
+        ]
+      : [];
+    summary.rows = planned
+      ? []
+      : [
+          {
+            title: "Nothing planned yet",
+            detail: "Add creative and audiences in Growth to plan delivery.",
+          },
+        ];
+    summary.description +=
+      planned && text(handoff.nextAction)
+        ? ` · ${text(handoff.nextAction)}`
+        : "";
     summary.href = path(
       handoff.reviewPath,
       text(campaign.id)
@@ -268,16 +286,25 @@ export function growthResultSummary(
       included = cards.filter((c) => c.included);
     summary.title = "Catalog batch";
     summary.description = `${cards.length} returned cards`;
-    summary.facts = [
-      `${included.length} included`,
-      `${included.filter((c) => c.approved).length} approved`,
-      `${Array.isArray(d.unwritten) ? d.unwritten.length : 0} unwritten`,
-    ];
-    summary.rows = included.slice(0, 2).map((c) => ({
-      title: text(c.title, "Catalog card"),
-      detail: c.approved ? "Approved" : "Needs approval",
-      thumbnail: thumbnail(c),
-    }));
+    summary.facts = cards.length
+      ? [
+          `${included.length} included`,
+          `${included.filter((c) => c.approved).length} approved`,
+          `${Array.isArray(d.unwritten) ? d.unwritten.length : 0} unwritten`,
+        ]
+      : [];
+    summary.rows = cards.length
+      ? included.slice(0, 2).map((c) => ({
+          title: text(c.title, "Catalog card"),
+          detail: c.approved ? "Approved" : "Needs approval",
+          thumbnail: thumbnail(c),
+        }))
+      : [
+          {
+            title: "No cards yet",
+            detail: "Refresh homes in Growth to build the first batch.",
+          },
+        ];
     summary.href = path(d.reviewPath, "/app/performance/brands");
     summary.linkLabel = text(d.reviewPath) ? "View catalog" : "View brands";
     summary.note = text(d.enrichmentError) || undefined;
@@ -291,7 +318,7 @@ export function growthResultSummary(
         b.tagline,
         b.surfaces
           ? `${count(obj(b.surfaces).pendingReviews)} pending reviews`
-          : text(b.relationship),
+          : "",
       ),
       href: path(
         b.url,
