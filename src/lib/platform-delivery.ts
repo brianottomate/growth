@@ -40,9 +40,13 @@ export const deliveryGroupConfigurationSchema = z.discriminatedUnion(
       platform: z.literal("linkedin_ads"),
       targeting: targetingSchema.optional(),
     }),
+    z.strictObject({
+      platform: z.literal("openai_ads"),
+      // Country is the only dimension OpenAI honours; ages are reported and left out.
+      targeting: targetingSchema.optional(),
+    }),
     // Other platforms retain native snapshots; executable support is added explicitly.
     z.strictObject({ platform: z.literal("reddit_ads") }),
-    z.strictObject({ platform: z.literal("openai_ads") }),
     z.strictObject({ platform: z.literal("x_ads") }),
     z.strictObject({ platform: z.literal("tiktok_ads") }),
     z.strictObject({ platform: z.literal("pinterest_ads") }),
