@@ -9,6 +9,7 @@ import {
   listZernioPixels,
 } from "@/server/clients/zernio.client";
 import { setBrandAdAccountAllowed } from "./brand-ad-accounts.service";
+import { setupBrandMetaPixel } from "./meta-connect-setup.service";
 
 async function authorizedOwner(userId: string, ownerId: string) {
   const owner = await db.query.brandTable.findFirst({
@@ -101,6 +102,7 @@ export async function sharedAdsConnections(userId: string, ownerId: string) {
       .map((b) => ({
         id: b.id,
         name: b.name,
+        organizationId: owner.organizationId!,
         pageId: b.metaPageId,
         managed: b.performanceSettings?.adsConnectionBrandId === owner.id,
         accountIds: allowed
@@ -147,7 +149,14 @@ export async function saveSharedAdsConnection(
     isAllowed: true,
     decidedBy: userId,
   });
-  return { saved: true };
+  // The account is saved either way; a pixel problem is reported, not undone.
+  const pixel = await setupBrandMetaPixel({
+    organizationId: client.organizationId,
+    brandId: client.id,
+  }).catch((error: unknown) => ({
+    error: error instanceof Error ? error.message : "Pixel setup failed",
+  }));
+  return { saved: true, pixel };
 }
 
 export async function readTrackingChoices(
@@ -187,7 +196,9 @@ export async function saveTrackingDefaults(
   await db
     .update(brandTable)
     .set({
-      performanceSettings: sql`jsonb_set(coalesce(${brandTable.performanceSettings}, '{}'::jsonb), '{metaTrackingDefaults}', coalesce(${brandTable.performanceSettings}->'metaTrackingDefaults', '{}'::jsonb) || ${JSON.stringify({ [input.accountId]: { pixelId: input.pixelId, customEventType: input.customEventType } })}::jsonb) || ${JSON.stringify({ metaAdsDestination: { connectionAccountId: input.connectionId, adAccountId: input.accountId } })}::jsonb`,
+      // Defaults are keyed by account. The owner's own pinned destination is
+      // not this account's, so it is left alone.
+      performanceSettings: sql`jsonb_set(coalesce(${brandTable.performanceSettings}, '{}'::jsonb), '{metaTrackingDefaults}', coalesce(${brandTable.performanceSettings}->'metaTrackingDefaults', '{}'::jsonb) || ${JSON.stringify({ [input.accountId]: { pixelId: input.pixelId, customEventType: input.customEventType } })}::jsonb)`,
     })
     .where(eq(brandTable.id, ownerId));
   return { saved: true };

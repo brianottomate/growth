@@ -4,7 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { TrackingDefaults } from "./TrackingDefaults";
 import { Button } from "@/components/ui/button";
-import type { sharedAdsConnections } from "@/server/services/ads-connection.service";
+import type {
+  saveSharedAdsConnection,
+  sharedAdsConnections,
+} from "@/server/services/ads-connection.service";
 type State = Awaited<ReturnType<typeof sharedAdsConnections>>;
 export function SharedAdsConnections({ brandId }: { brandId: string }) {
   const queryClient = useQueryClient();
@@ -45,13 +48,25 @@ export function SharedAdsConnections({ brandId }: { brandId: string }) {
           pageId,
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as {
+        error?: string;
+        pixel?: Awaited<ReturnType<typeof saveSharedAdsConnection>>["pixel"];
+      };
       if (!response.ok) throw new Error(result.error ?? "Could not save");
       await queryClient.invalidateQueries({
         queryKey: ["shared-ads-connections", brandId],
       });
+      const pixel = result.pixel;
       setMessage(
-        "Saved. This brand’s ads use the selected Page and ad account.",
+        `Saved. This brand’s ads use the selected Page and ad account. ${
+          !pixel
+            ? ""
+            : "error" in pixel
+              ? `Pixel setup stopped: ${pixel.error}`
+              : pixel.pendingChoice
+                ? "Several pixels exist; confirm one in the brand’s tasks."
+                : `Pixel ${pixel.pixelId}${pixel.created ? " was created in the client’s ad account" : " is the default"}.`
+        }`,
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save");

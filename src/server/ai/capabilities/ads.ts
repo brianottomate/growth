@@ -47,6 +47,9 @@ import {
   setDeliveryActionOutputSchema,
   deletePlatformCampaignActionOutputSchema,
   createGoogleAdsAccountActionOutputSchema,
+  listPixelsActionOutputSchema,
+  setupMetaPixelActionOutputSchema,
+  setTrackingDefaultsActionOutputSchema,
   createReportingConversionActionOutputSchema,
   createLeadFormActionOutputSchema,
   listLeadFormsActionOutputSchema,
@@ -192,6 +195,11 @@ import { channelPlatformEnum } from "@/server/db/channel-schema";
 import { writeGoogleTextAds } from "@/server/services/google-text-ads.service";
 import { HAND_MADE_AD_FORMATS } from "@/lib/performance-ads";
 
+import {
+  listBrandMetaPixels,
+  setBrandMetaTrackingDefaults,
+  setupBrandMetaPixel,
+} from "@/server/services/meta-connect-setup.service";
 import { GrowthActionError, growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
@@ -1094,6 +1102,43 @@ export const createGoogleAdsAccountAction = growthAction({
   }),
   execute: async (input, ctx) =>
     ensureBrandGoogleAdsAccount(input, { organizationId: ctx.orgId }),
+});
+
+export const listPixelsAction = growthAction({
+  outputSchema: listPixelsActionOutputSchema,
+  description:
+    "List the Meta pixels on a brand's pinned ad account: which is the saved default (the tracking campaigns inherit) and which the brand's WanderOS site fires (firesOnSite null when the site could not be read). Reads only.",
+  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+  execute: async (input, ctx) =>
+    listBrandMetaPixels({ ...input, organizationId: ctx.orgId }),
+});
+
+export const setupMetaPixelAction = growthAction({
+  outputSchema: setupMetaPixelActionOutputSchema,
+  description:
+    "Settle a brand's default Meta pixel on its pinned ad account, the same step that runs when the client connects Meta: keep the saved or site pixel, adopt a sole pixel, CREATE one in the client's own ad account when it has none (once per brand and account, never retried), or open a pixel-choice task when several exist (pendingChoice). Also opens a task to install the pixel on the WanderOS site when the site does not fire it. Spends nothing and changes no campaign.",
+  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+  execute: async (input, ctx) =>
+    setupBrandMetaPixel({ ...input, organizationId: ctx.orgId }),
+});
+
+export const setTrackingDefaultsAction = growthAction({
+  outputSchema: setTrackingDefaultsActionOutputSchema,
+  description:
+    "Save the default Meta pixel and conversion event for a brand's pinned ad account; campaigns inherit them unless a draft overrides. The pixel must be one adsRead.listPixels returns. Closes any open pixel-choice task and opens a site-install task when the site does not fire it. Local only.",
+  inputSchema: z.object({
+    brandId: z.string().trim().min(1),
+    pixelId: z.string().trim().regex(/^\d+$/),
+    customEventType: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .default("PURCHASE")
+      .describe("Meta conversion event; PURCHASE for bookings."),
+  }),
+  execute: async (input, ctx) =>
+    setBrandMetaTrackingDefaults({ ...input, organizationId: ctx.orgId }),
 });
 
 export const listCampaignsAction = growthAction({

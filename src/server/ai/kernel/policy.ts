@@ -424,6 +424,7 @@ export const growthActionPolicies = {
     scope: read("provider-read"),
     top: read("provider-read"),
     listDestinations: read("provider-read"),
+    listPixels: read("provider-read"),
     listLeadForms: read("provider-read"),
     openCampaign: read(),
     listCampaigns: read(),
@@ -532,6 +533,16 @@ export const growthActionPolicies = {
       idempotent: true,
       reversible: false,
     }),
+    // May create one pixel in the client's ad account, recorded once per
+    // brand and account and never retried. Meta cannot delete a pixel; it
+    // spends nothing and changes no campaign.
+    setupMetaPixel: write({
+      consequence: "provider-write",
+      idempotent: true,
+      reversible: false,
+    }),
+    // Local default the next campaign draft inherits.
+    setTrackingDefaults: write({ idempotent: true }),
     // Downloads from the platform CDN into R2; dedupes by source url.
     importCreative: write({ idempotent: true, reversible: true }),
     // Draft deletes drop local rows and are refused once the thing exists on

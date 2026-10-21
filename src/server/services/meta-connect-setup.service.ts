@@ -23,6 +23,7 @@ import {
 import { metaAdBillingStatus } from "@/lib/meta-ad-billing";
 import { sameAdAccountId } from "@/lib/zernio-ads";
 import { sitePixels } from "./performance-connections.service";
+import { metaTrackingDefaults } from "./meta-tracking-defaults";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
 import { z } from "zod";
@@ -408,6 +409,201 @@ export async function saveMetaAccountDestination(
     .where(eq(brandTable.id, brandId));
 }
 
+type PixelBrand = SetupBrand & { organizationId: string };
+
+/** Settle the account's default pixel: keep the saved or site pixel, adopt a
+ * sole pixel, create one in the client's ad account when it has none, or ask
+ * a person to choose between several. Shared by every way a client's Meta ad
+ * account is connected.
+ */
+export async function setupMetaPixel(
+  brand: PixelBrand,
+  connectionAccountId: string,
+  account: { id: string; name: string | null },
+) {
+  const pixels = await listZernioPixels(connectionAccountId, account.id);
+  const site = await sitePixels(brand.website, brand.wanderOsWebsiteId);
+  // The brand's own default, else its managing brand's for this account.
+  const saved = await metaTrackingDefaults(brand.id, account.id);
+  let pixelId =
+    saved?.pixelId && pixels.some((p) => p.id === saved.pixelId)
+      ? saved.pixelId
+      : site.customerId && pixels.some((p) => p.id === site.customerId)
+        ? site.customerId
+        : pixels.length === 1
+          ? pixels[0]!.id
+          : null;
+  let created = false;
+  if (!pixelId && pixels.length === 0) {
+    pixelId = await createPixelOnce({
+      brandId: brand.id,
+      organizationId: brand.organizationId,
+      connectionAccountId,
+      adAccountId: account.id,
+      name: `${brand.name} · Website`.slice(0, 200),
+    });
+    created = true;
+  }
+  if (!pixelId) {
+    const advice = await recommendMetaPixel(brand, pixels, site.ids);
+    const recommended = advice.options.find(
+      (o) => o.id === advice.recommendedId,
+    );
+    await insertSetupTask(
+      brand,
+      `pixel-choice:${account.id}`,
+      "Confirm the client's Meta pixel",
+      `Several pixels exist on ${account.name ?? account.id}: ${pixels.map((p) => `${p.name.trim()} (${p.id})`).join(", ")}.${recommended ? ` ${advice.recommendedBy === "model" ? "Suggested from the pixel names" : "Recommended"}: ${recommended.name} (${recommended.id}), ${advice.why}.` : ""} Confirm one; nothing is applied until then. No additional pixel was created.`,
+      {
+        decision: {
+          type: "meta_pixel",
+          adAccountId: account.id,
+          adAccountName: account.name,
+          ...advice,
+        },
+      },
+    );
+    return { pixelId: null, created, pendingChoice: true };
+  }
+  await settleMetaPixel(
+    brand,
+    account,
+    pixelId,
+    saved?.customEventType ?? "PURCHASE",
+    site.ids,
+  );
+  return { pixelId, created, pendingChoice: false };
+}
+
+/** Record the default and close any open choice for the account, so a stale
+ * choice cannot overwrite it later. */
+async function settleMetaPixel(
+  brand: SetupBrand,
+  account: { id: string; name: string | null },
+  pixelId: string,
+  customEventType: string,
+  siteIds: string[] | null,
+) {
+  await recordMetaPixel(brand, account, pixelId, customEventType, siteIds);
+  await db
+    .update(brandTaskTable)
+    .set({ status: "done", completedAt: new Date() })
+    .where(
+      and(
+        eq(brandTaskTable.brandId, brand.id),
+        eq(brandTaskTable.templateKey, `meta-setup:pixel-choice:${account.id}`),
+        isNull(brandTaskTable.deletedAt),
+      ),
+    );
+}
+
+/** The brand's pinned Meta destination, scoped to the workspace. */
+async function pinnedMetaBrand(organizationId: string, brandId: string) {
+  const brand = await db.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.id, brandId),
+      eq(brandTable.organizationId, organizationId),
+      isNull(brandTable.deletedAt),
+    ),
+  });
+  if (!brand) throw new Error("Brand not found in this workspace");
+  const destination = brand.performanceSettings?.metaAdsDestination;
+  if (!destination?.connectionAccountId || !destination.adAccountId)
+    throw new Error("Connect the brand's Meta ad account before its pixel.");
+  const allowed = await db.query.adAccountTable.findFirst({
+    where: and(
+      eq(adAccountTable.brandId, brand.id),
+      eq(adAccountTable.platform, "facebook"),
+      eq(adAccountTable.externalId, destination.adAccountId),
+      eq(adAccountTable.isAllowed, true),
+    ),
+    columns: { name: true },
+  });
+  if (!allowed)
+    throw new Error("The brand's Meta ad account is not allowed for it.");
+  return {
+    brand: { ...brand, organizationId },
+    connectionAccountId: destination.connectionAccountId,
+    account: { id: destination.adAccountId, name: allowed.name ?? null },
+  };
+}
+
+/** Pixels on the brand's pinned ad account, with which is the saved default
+ * and which the WanderOS site fires. Reads only. */
+export async function listBrandMetaPixels(input: {
+  organizationId: string;
+  brandId: string;
+}) {
+  const { brand, connectionAccountId, account } = await pinnedMetaBrand(
+    input.organizationId,
+    input.brandId,
+  );
+  const [pixels, site] = await Promise.all([
+    listZernioPixels(connectionAccountId, account.id),
+    sitePixels(brand.website, brand.wanderOsWebsiteId),
+  ]);
+  const saved = await metaTrackingDefaults(brand.id, account.id);
+  return {
+    adAccountId: account.id,
+    adAccountName: account.name,
+    trackingDefaults: saved ?? null,
+    sitePixelIds: site.ids,
+    pixels: pixels.map((p) => ({
+      id: p.id,
+      name: p.name,
+      isDefault: p.id === saved?.pixelId,
+      firesOnSite: site.ids?.includes(p.id) ?? null,
+    })),
+  };
+}
+
+/** Run pixel setup on demand for the brand's pinned ad account. */
+export async function setupBrandMetaPixel(input: {
+  organizationId: string;
+  brandId: string;
+}) {
+  const { brand, connectionAccountId, account } = await pinnedMetaBrand(
+    input.organizationId,
+    input.brandId,
+  );
+  return {
+    adAccountId: account.id,
+    ...(await setupMetaPixel(brand, connectionAccountId, account)),
+  };
+}
+
+/** An operator's explicit choice of default pixel and conversion event. */
+export async function setBrandMetaTrackingDefaults(input: {
+  organizationId: string;
+  brandId: string;
+  pixelId: string;
+  customEventType: string;
+}) {
+  const { brand, connectionAccountId, account } = await pinnedMetaBrand(
+    input.organizationId,
+    input.brandId,
+  );
+  const [pixels, site] = await Promise.all([
+    listZernioPixels(connectionAccountId, account.id),
+    sitePixels(brand.website, brand.wanderOsWebsiteId),
+  ]);
+  if (!pixels.some((p) => p.id === input.pixelId))
+    throw new Error("Choose a pixel available to the brand's ad account.");
+  await settleMetaPixel(
+    brand,
+    account,
+    input.pixelId,
+    input.customEventType,
+    site.ids,
+  );
+  return {
+    adAccountId: account.id,
+    pixelId: input.pixelId,
+    customEventType: input.customEventType,
+    firesOnSite: site.ids?.includes(input.pixelId) ?? null,
+  };
+}
+
 /** Complete the client's own Meta authorization. Discovery is used only for
  * account selection; account data/tracking reads follow an explicit allow.
  * Called on the Meta callback, never on ordinary page reads.
@@ -536,70 +732,15 @@ export async function completeMetaConnectSetup(
       return;
     }
 
-    const pixels = await listZernioPixels(connectionAccountId, account.id);
-    const site = await sitePixels(brand.website, brand.wanderOsWebsiteId);
-    const saved = Object.entries(
-      brand.performanceSettings?.metaTrackingDefaults ?? {},
-    ).find(([id]) => sameAdAccountId("meta", id, account.id))?.[1];
-    let pixelId =
-      saved?.pixelId && pixels.some((p) => p.id === saved.pixelId)
-        ? saved.pixelId
-        : site.customerId && pixels.some((p) => p.id === site.customerId)
-          ? site.customerId
-          : pixels.length === 1
-            ? pixels[0]!.id
-            : null;
-    if (!pixelId && pixels.length === 0) {
-      pixelId = await createPixelOnce({
-        brandId,
-        organizationId,
-        connectionAccountId,
-        adAccountId: account.id,
-        name: `${brand.name} · Website`.slice(0, 200),
-      });
-    }
-    if (!pixelId) {
-      const advice = await recommendMetaPixel(brand, pixels, site.ids);
-      const recommended = advice.options.find(
-        (o) => o.id === advice.recommendedId,
-      );
-      await task(
-        `pixel-choice:${account.id}`,
-        "Confirm the client's Meta pixel",
-        `Several pixels exist on ${account.name ?? account.id}: ${pixels.map((p) => `${p.name.trim()} (${p.id})`).join(", ")}.${recommended ? ` ${advice.recommendedBy === "model" ? "Suggested from the pixel names" : "Recommended"}: ${recommended.name} (${recommended.id}), ${advice.why}.` : ""} Confirm one; nothing is applied until then. No additional pixel was created.`,
-        false,
-        {
-          type: "meta_pixel",
-          adAccountId: account.id,
-          adAccountName: account.name ?? null,
-          ...advice,
-        },
-      );
-      return { adAccountId: account.id, pixelId: null, billing };
-    }
-    await recordMetaPixel(
-      brand,
-      { id: account.id, name: account.name ?? null },
-      pixelId,
-      saved?.customEventType ?? "PURCHASE",
-      site.ids,
+    const pixel = await setupMetaPixel(
+      { ...brand, organizationId },
+      connectionAccountId,
+      {
+        id: account.id,
+        name: account.name ?? null,
+      },
     );
-    // The pixel is settled; an open choice for this account must not be
-    // able to overwrite it later.
-    await db
-      .update(brandTaskTable)
-      .set({ status: "done", completedAt: new Date() })
-      .where(
-        and(
-          eq(brandTaskTable.brandId, brandId),
-          eq(
-            brandTaskTable.templateKey,
-            `meta-setup:pixel-choice:${account.id}`,
-          ),
-          isNull(brandTaskTable.deletedAt),
-        ),
-      );
-    return { adAccountId: account.id, pixelId, billing };
+    return { adAccountId: account.id, pixelId: pixel.pixelId, billing };
   } catch (error) {
     await task(
       "review",

@@ -1048,6 +1048,37 @@ export const createGoogleAdsAccountActionOutputSchema = z.strictObject({
   conversionLabel: z.string().nullable(),
 });
 
+export const listPixelsActionOutputSchema = z.strictObject({
+  adAccountId: z.string(),
+  adAccountName: z.string().nullable(),
+  trackingDefaults: z
+    .strictObject({ pixelId: z.string(), customEventType: z.string() })
+    .nullable(),
+  sitePixelIds: z.array(z.string()).nullable(),
+  pixels: z.array(
+    z.strictObject({
+      id: z.string(),
+      name: z.string(),
+      isDefault: z.boolean(),
+      firesOnSite: z.boolean().nullable(),
+    }),
+  ),
+});
+
+export const setupMetaPixelActionOutputSchema = z.strictObject({
+  adAccountId: z.string(),
+  pixelId: z.string().nullable(),
+  created: z.boolean(),
+  pendingChoice: z.boolean(),
+});
+
+export const setTrackingDefaultsActionOutputSchema = z.strictObject({
+  adAccountId: z.string(),
+  pixelId: z.string(),
+  customEventType: z.string(),
+  firesOnSite: z.boolean().nullable(),
+});
+
 export const replaceAdCardActionOutputSchema = z.strictObject({
   adId: z.string(),
   cards: z.number(),
