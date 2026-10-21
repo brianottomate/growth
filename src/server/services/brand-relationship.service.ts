@@ -1,5 +1,6 @@
 import "server-only";
 import { generateBillingCycles } from "./billing-cycles.service";
+import { provisionBrandEmail } from "./brand-email-provisioning.service";
 
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -231,8 +232,30 @@ export async function setBrandRelationship(
  * Idempotent, and deliberately conservative about `signedAt`: a re-run keeps
  * the first date, because the first one is the true one and a stray second
  * click should not move a contract date.
+ *
+ * A client also gets its email server and sending domain here, so the
+ * intake's Email section has DNS records the first time they open it. A
+ * Postmark failure does not undo the signature; it comes back as `email.error`
+ * and a re-run picks up where it stopped.
  */
 export async function promoteBrandToClient(
+  actor: PerformanceActor,
+  input: { brandId: string; plan?: string | null; signedAt?: Date | null },
+): Promise<{ accountId: string; created: boolean; email: PromotionEmail }> {
+  const result = await openClientAccount(actor, input);
+  const email = await provisionBrandEmail(input.brandId).catch(
+    (error: unknown) => ({
+      error: error instanceof Error ? error.message : String(error),
+    }),
+  );
+  return { ...result, email };
+}
+
+type PromotionEmail =
+  | { serverId: number; sendingDomain: string | null }
+  | { error: string };
+
+async function openClientAccount(
   actor: PerformanceActor,
   input: { brandId: string; plan?: string | null; signedAt?: Date | null },
 ): Promise<{ accountId: string; created: boolean }> {

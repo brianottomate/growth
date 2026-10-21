@@ -395,7 +395,7 @@ export const verifyIntakeAccessAction = growthAction({
 
 export const promoteToClientAction = growthAction({
   description:
-    "Record that a brand signed: marks it a client and opens its commercial record with today's date, creating the performance account if the deal closed before they filled the form. Safe to repeat — a re-run keeps the original signing date.",
+    "Record that a brand signed: marks it a client and opens its commercial record with today's date, creating the performance account if the deal closed before they filled the form. Also creates the brand's Postmark server, broadcast stream and post.<domain> sending domain so the intake shows DNS records; sends nothing. Safe to repeat — a re-run keeps the original signing date and finishes any email setup that failed.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     plan: z
@@ -408,6 +408,14 @@ export const promoteToClientAction = growthAction({
     accountId: z.string(),
     /** False when they already had a commercial record. */
     created: z.boolean(),
+    email: z.union([
+      z.object({
+        serverId: z.number(),
+        /** Null when the brand has no website to derive a domain from. */
+        sendingDomain: z.string().nullable(),
+      }),
+      z.object({ error: z.string() }),
+    ]),
   }),
   examples: [{ brandId: "brand_winterpark" }],
   execute: (input, ctx) => promoteBrandToClient(actorFrom(ctx), input),

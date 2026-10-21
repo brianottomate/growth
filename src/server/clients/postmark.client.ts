@@ -5,20 +5,37 @@ import { env } from "@/env";
 // Postmark client. Postmark has two auth scopes: the account token (servers,
 // domains, sender signatures) and a per-server token (streams, stats,
 // messages, suppressions, webhooks, sending). Every server's token is on its
-// GET /servers row, so the account token reaches any server. The only write is
-// sendPostmarkBatch, which brand-email-send.service calls once a person has
-// approved the send.
+// GET /servers row, so the account token reaches any server. Writes: the sends,
+// which brand-email-send.service calls once a person has approved the send,
+// and the server/stream/webhook setup a brand gets when it becomes a client.
 
 const API_BASE = "https://api.postmarkapp.com";
 
 type Scope = { account: true } | { serverToken?: string };
 
-async function postmarkGet<T>(
+function postmarkGet<T>(
   path: string,
   scope: Scope,
   query?: Record<string, string | number | undefined>,
 ): Promise<T> {
+  return postmarkRequest<T>("GET", path, scope, { query });
+}
+
+function postmarkPost<T>(path: string, scope: Scope, body: object) {
+  return postmarkRequest<T>("POST", path, scope, { body });
+}
+
+async function postmarkRequest<T>(
+  method: "GET" | "POST",
+  path: string,
+  scope: Scope,
+  options: {
+    query?: Record<string, string | number | undefined>;
+    body?: object;
+  },
+): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
+  if (options.body) headers["Content-Type"] = "application/json";
   if ("account" in scope) {
     if (!env.POSTMARK_ACCOUNT_TOKEN) {
       throw new Error("POSTMARK_ACCOUNT_TOKEN is not set.");
@@ -31,14 +48,18 @@ async function postmarkGet<T>(
   }
 
   const url = new URL(path, API_BASE);
-  for (const [key, value] of Object.entries(query ?? {})) {
+  for (const [key, value] of Object.entries(options.query ?? {})) {
     if (value !== undefined) url.searchParams.set(key, String(value));
   }
 
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Postmark GET ${path} → ${response.status}: ${body}`);
+    throw new Error(`Postmark ${method} ${path} → ${response.status}: ${body}`);
   }
   return (await response.json()) as T;
 }
@@ -144,6 +165,14 @@ export function listPostmarkServers(count = 500, offset = 0) {
 
 export function getPostmarkServerById(serverId: number) {
   return postmarkGet<PostmarkServer>(`/servers/${serverId}`, { account: true });
+}
+
+export function createPostmarkServer(name: string) {
+  return postmarkPost<PostmarkServer>(
+    "/servers",
+    { account: true },
+    { Name: name, TrackOpens: true, TrackLinks: "HtmlAndText" },
+  );
 }
 
 /** A brand server's send token, read with the account token when needed. */
@@ -260,6 +289,53 @@ export function listPostmarkWebhooks(serverToken?: string) {
   return postmarkGet<{ Webhooks: PostmarkWebhook[] }>("/webhooks", {
     serverToken,
   });
+}
+
+/** A broadcast stream whose unsubscribes Postmark handles and suppresses. */
+export function createPostmarkBroadcastStream(
+  serverToken: string,
+  stream: { id: string; name: string },
+) {
+  return postmarkPost<PostmarkMessageStream>(
+    "/message-streams",
+    { serverToken },
+    {
+      ID: stream.id,
+      Name: stream.name,
+      MessageStreamType: "Broadcasts",
+      SubscriptionManagementConfiguration: {
+        UnsubscribeHandlingType: "Postmark",
+      },
+    },
+  );
+}
+
+export function createPostmarkWebhook(
+  serverToken: string,
+  webhook: {
+    url: string;
+    messageStream: string;
+    headers: { Name: string; Value: string }[];
+  },
+) {
+  const on = { Enabled: true };
+  return postmarkPost<PostmarkWebhook>(
+    "/webhooks",
+    { serverToken },
+    {
+      Url: webhook.url,
+      MessageStream: webhook.messageStream,
+      HttpHeaders: webhook.headers,
+      Triggers: {
+        Open: { ...on, PostFirstOpenOnly: false },
+        Click: on,
+        Delivery: on,
+        Bounce: { ...on, IncludeContent: false },
+        SpamComplaint: { ...on, IncludeContent: false },
+        SubscriptionChange: on,
+      },
+    },
+  );
 }
 
 export function listPostmarkBulkRequests(serverToken?: string) {

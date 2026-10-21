@@ -253,8 +253,10 @@ export const growthActionPolicies = {
     // Derived from campaign rows already in our DB; safe to re-run.
     refreshSpend: write({ idempotent: true }),
     // The signature. Re-running keeps the original signing date, so it is safe
-    // to repeat and cannot move a contract date by accident.
-    promoteToClient: write({ idempotent: true }),
+    // to repeat and cannot move a contract date by accident. It also sets up
+    // the brand's Postmark server and sending domain, adopting what exists;
+    // nothing is sent.
+    promoteToClient: write({ idempotent: true, consequence: "provider-write" }),
     // Writes the client's own answers into the records that own each fact.
     // Refuses a second run on the same intake, because re-applying would
     // reopen a cycle an operator may have since corrected. It records the
