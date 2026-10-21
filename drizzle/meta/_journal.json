@@ -358,6 +358,13 @@
       "when": 1792511852518,
       "tag": "0049_influencer_partnerships",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792599465648,
+      "tag": "0050_drop_retired_launch_checklist_items",
+      "breakpoints": true
     }
   ]
 }
