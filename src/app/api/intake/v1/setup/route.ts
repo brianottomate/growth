@@ -58,6 +58,18 @@ const actionSchema = z.discriminatedUnion("action", [
     token,
     replyTo: z.email().max(320),
     preferences: intakeEmailPreferencesSchema,
+    /** The email footer's sender, which marketing email must show. */
+    legalName: z.string().trim().min(1).max(200).optional(),
+    address: z
+      .strictObject({
+        line1: z.string().trim().min(1).max(200),
+        line2: z.string().trim().max(200).nullable(),
+        city: z.string().trim().min(1).max(100),
+        region: z.string().trim().max(100).nullable(),
+        postalCode: z.string().trim().max(20).nullable(),
+        country: z.string().trim().length(2).toUpperCase(),
+      })
+      .optional(),
   }),
 ]);
 

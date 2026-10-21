@@ -69,6 +69,7 @@ export async function notifyPerformanceIntakeEmail(input: {
   brandSlug: string | null;
   replyTo: string;
   programs: string[];
+  footer: string | null;
 }): Promise<void> {
   try {
     const brandName = escapeSlackMrkdwn(input.brandName).replace(
@@ -81,7 +82,7 @@ export async function notifyPerformanceIntakeEmail(input: {
     const programs = input.programs.length
       ? input.programs.join(", ")
       : "no guest email for now";
-    const text = `Performance email setup sent: ${brandName}\n${escapeSlackMrkdwn(programs)} · replies to ${escapeSlackMrkdwn(input.replyTo)}\n<${url}|View client>`;
+    const text = `Performance email setup sent: ${brandName}\n${escapeSlackMrkdwn(programs)} · replies to ${escapeSlackMrkdwn(input.replyTo)} · footer: ${input.footer ? escapeSlackMrkdwn(input.footer) : "missing"}\n<${url}|View client>`;
     const result = await postOnSlack({
       channel: "C0BSSECHK08", // #team-performance
       text,

@@ -7,7 +7,11 @@ import { brandMarketingDomainSchema } from "@/lib/email-dns";
 import { privatePerformanceLinks } from "@/lib/performance-client-links";
 import type { IntakeEmailPreferences } from "@/lib/intake-email-preferences";
 import { db } from "@/server/db";
-import { brandTable, performanceIntakeTable } from "@/server/db/schema";
+import {
+  brandTable,
+  performanceIntakeTable,
+  type BrandLegalIdentity,
+} from "@/server/db/schema";
 
 import {
   getBrandByConnectToken,
@@ -127,6 +131,8 @@ export async function intakeSetup(token: string) {
     email: {
       replyTo: brand.emailSender?.replyTo ?? null,
       preferences: brand.performanceSettings?.emailPreferences ?? null,
+      legalName: brand.legalIdentity?.legalName ?? null,
+      address: brand.legalIdentity?.address ?? null,
     },
   };
 }
@@ -196,22 +202,31 @@ export async function recheckIntakeEmailDomain(token: string) {
 
 /**
  * The email section's send. Reply-to lives on `emailSender`, which every
- * brand email reads; what we may send lives on Performance settings. A
- * second send replaces the first: an update, not a receipt.
+ * brand email reads; the footer's legal name and postal address on
+ * `legalIdentity`, keeping its phone and registration; what we may send on
+ * Performance settings. A second send replaces the first: an update, not a
+ * receipt.
  */
 export async function saveIntakeEmailPreferences(
   token: string,
   input: {
     replyTo: string;
     preferences: IntakeEmailPreferences;
+    legalName?: string;
+    address?: NonNullable<BrandLegalIdentity["address"]>;
   },
 ) {
   const brand = await getBrandByConnectToken(token);
   if (!brand?.organizationId) return null;
+  const footer = {
+    ...(input.legalName ? { legalName: input.legalName } : {}),
+    ...(input.address ? { address: input.address } : {}),
+  };
   await db
     .update(brandTable)
     .set({
       emailSender: sql`jsonb_build_object('fromName', ${brand.name}::text) || coalesce(${brandTable.emailSender}, '{}'::jsonb) || ${JSON.stringify({ replyTo: input.replyTo })}::jsonb`,
+      legalIdentity: sql`coalesce(${brandTable.legalIdentity}, '{}'::jsonb) || ${JSON.stringify(footer)}::jsonb`,
     })
     .where(eq(brandTable.id, brand.id));
   await setPerformanceSettings({
@@ -227,6 +242,11 @@ export async function saveIntakeEmailPreferences(
       brandSlug: brand.slug,
       replyTo: input.replyTo,
       programs: input.preferences.programs,
+      footer: input.address
+        ? [input.legalName, input.address.line1, input.address.city]
+            .filter(Boolean)
+            .join(", ")
+        : null,
     }),
   );
   return { ok: true };
