@@ -6,6 +6,30 @@ import { z } from "zod";
 
 import { newsletterTemplateIds } from "@/lib/newsletter-templates";
 
+export const emailPostalAddressSchema = z.strictObject({
+  line1: z.string(),
+  line2: z.string().nullable(),
+  city: z.string(),
+  region: z.string().nullable(),
+  postalCode: z.string().nullable(),
+  country: z.string().nullable(),
+});
+
+export const setEmailSenderIdentityOutputSchema = z.strictObject({
+  brandId: z.string(),
+  sendingDomain: z.string(),
+  emailSender: z.strictObject({
+    fromName: z.string(),
+    fromEmail: z.email(),
+    replyTo: z.email(),
+  }),
+  legalIdentity: z.strictObject({
+    legalName: z.string(),
+    address: emailPostalAddressSchema,
+  }),
+  sendBlockers: z.array(z.string()),
+});
+
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
 const digestSchema = listingsDigestSchema;
 

@@ -356,6 +356,7 @@ export const growthActionPolicies = {
   },
   emailWrite: {
     addAudienceMembers: write(),
+    setSenderIdentity: write({ idempotent: true }),
     prepareBroadcast: write(),
     scheduleBroadcasts: write({
       approval: "user",

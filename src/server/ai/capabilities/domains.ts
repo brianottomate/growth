@@ -689,6 +689,7 @@ export const emailWrite = growthDomainTool({
     cancelSequenceEnrollment,
     addAudienceMembers: addEmailAudienceMembersAction,
     saveAudience: saveEmailAudienceAction,
+    setSenderIdentity: EMAIL_TOOLS.setEmailSenderIdentity,
     createSlot: EMAIL_TOOLS.createEmailSlot,
     sharePreview: shareEmailPreviewAction,
     createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,

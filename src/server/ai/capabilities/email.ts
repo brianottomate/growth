@@ -10,6 +10,7 @@ import {
   createProductUpdateDraftOutputSchema,
   generateEmailDraftOutputSchema,
   deleteEmailDraftOutputSchema,
+  setEmailSenderIdentityOutputSchema,
 } from "./outputs/email";
 
 import "server-only";
@@ -42,6 +43,7 @@ import {
   saveEmailDocument,
   startEmailGeneration,
 } from "@/server/services/email-document.service";
+import { setBrandEmailIdentity } from "@/server/services/brand-email-identity.service";
 import {
   ContentService,
   deliveryBlockReason,
@@ -78,6 +80,67 @@ export const getEmailDraft = growthAction({
       preview: { ...preview, html: connectorEmailHtml(preview.html) },
       url: `/app/newsletters/${platformPostId}`,
     };
+  },
+});
+
+export const setEmailSenderIdentity = growthAction({
+  outputSchema: setEmailSenderIdentityOutputSchema,
+  description:
+    "Set one brand's canonical From, monitored Reply-To and legal footer after its marketing domain has been prepared. Owner/admin only. The From address must use the brand's saved sending domain. This changes no provider, audience, creative, schedule or delivery state.",
+  inputSchema: z.strictObject({
+    brandId: z.string().min(1),
+    fromName: z.string().trim().min(1).max(160),
+    fromEmail: z.email().max(254).toLowerCase(),
+    replyTo: z.email().max(254).toLowerCase(),
+    legalName: z.string().trim().min(1).max(240),
+    address: z.strictObject({
+      line1: z.string().trim().min(1).max(240),
+      line2: z.string().trim().max(240).nullable().optional(),
+      city: z.string().trim().min(1).max(120),
+      region: z.string().trim().max(120).nullable().optional(),
+      postalCode: z.string().trim().max(40).nullable().optional(),
+      country: z.string().trim().length(2).toUpperCase(),
+    }),
+  }),
+  examples: [
+    {
+      brandId: "brand_example",
+      fromName: "Example Stays",
+      fromEmail: "hello@post.example.com",
+      replyTo: "reservations@example.com",
+      legalName: "Example Stays LLC",
+      address: {
+        line1: "1 Main Street",
+        city: "Denver",
+        region: "CO",
+        postalCode: "80202",
+        country: "US",
+      },
+    },
+  ],
+  execute: async (input, ctx) => {
+    const membership = await db.query.memberTable.findFirst({
+      where: and(
+        eq(memberTable.userId, ctx.userId),
+        eq(memberTable.organizationId, ctx.orgId),
+      ),
+      columns: { role: true },
+    });
+    if (membership?.role !== "owner" && membership?.role !== "admin")
+      throw new GrowthActionError(
+        "forbidden",
+        "Only organization owners and admins can set email sender identity.",
+      );
+    return setBrandEmailIdentity({
+      ...input,
+      address: {
+        ...input.address,
+        line2: input.address.line2 ?? null,
+        region: input.address.region ?? null,
+        postalCode: input.address.postalCode ?? null,
+      },
+      organizationId: ctx.orgId,
+    });
   },
 });
 
@@ -597,4 +660,5 @@ export const EMAIL_TOOLS = {
   updateEmailDraft,
   generateEmailDraft,
   deleteEmailDraft,
+  setEmailSenderIdentity,
 } as const;
