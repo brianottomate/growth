@@ -46,7 +46,7 @@ const serviceDb = new Proxy(db, {
 await mock.module("@/server/db", () => ({ db: serviceDb }));
 const facts = {
   audience: "operator" as const,
-  minimumUnits: 1,
+  minimumUnits: 10,
   email: "operator@example.com",
   firstName: "Test",
   lastName: "Operator",
@@ -57,7 +57,7 @@ const facts = {
   primaryInterest: "Performance ads",
   marketsToday: null,
   monthlySpend: null,
-  qualificationReason: "One managed rental and a live direct site.",
+  qualificationReason: "Ten managed rentals.",
 };
 await mock.module("@ai-sdk/anthropic", () => ({
   anthropic: () => "test-model",
@@ -80,7 +80,7 @@ await mock.module("@/server/services/meta-lead-normalization.service", () => ({
       .object({ hostname: z.string(), pathname: z.string() })
       .nullable(),
   }),
-  normalizeMetaLead: async () => facts,
+  normalizeMetaLead: async () => ({ ...facts, minimumUnits: 1 }),
 }));
 let failCrm = false;
 let crmCalls = 0;
@@ -180,9 +180,17 @@ const uncertainApplicant = {
   directBookingStatus: "building" as const,
   bookingSite: null,
 };
-assert.equal(isQualifiedPerformanceLead(uncertainApplicant), true);
+assert.equal(isQualifiedPerformanceLead(uncertainApplicant), false);
 const newOperator = { ...facts, minimumUnits: 0 };
-assert.equal(isQualifiedPerformanceLead(newOperator), true);
+assert.equal(isQualifiedPerformanceLead(newOperator), false);
+const smallOperator = { ...facts, minimumUnits: 9 };
+assert.equal(isQualifiedPerformanceLead(smallOperator), false);
+const operatorWithoutWebsite = {
+  ...facts,
+  directBookingStatus: "building" as const,
+  bookingSite: null,
+};
+assert.equal(isQualifiedPerformanceLead(operatorWithoutWebsite), true);
 assert.equal(
   isQualifiedPerformanceLead({ ...facts, audience: "guest" }),
   false,

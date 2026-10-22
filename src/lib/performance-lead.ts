@@ -10,9 +10,14 @@ export function isPerformanceMetaForm(
   return PERFORMANCE_META_FORM_IDS.some((id) => id === formId);
 }
 
-/** Broad beta fit: only explicit guest/booking inquiries are excluded. */
+/** Performance beta fit: at least ten managed properties, excluding guest inquiries. */
 export function isQualifiedPerformanceLead(input: {
   audience: "operator" | "guest" | "unknown";
+  minimumUnits: number | null;
 }): boolean {
-  return input.audience !== "guest";
+  return (
+    input.audience !== "guest" &&
+    input.minimumUnits !== null &&
+    input.minimumUnits >= 10
+  );
 }
