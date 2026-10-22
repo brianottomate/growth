@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import { performanceApplicationTable } from "@/server/db/performance-schema";
 import {
   normalizePerformanceLead,
+  PERFORMANCE_APPLICATIONS_CHANNEL,
   upsertPerformanceLeadContact,
 } from "@/server/services/performance-lead.service";
 import { HUBSPOT_ACCOUNT_ID } from "@/server/clients/hubspot.client";
@@ -25,24 +26,20 @@ import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
  */
 
 /**
- * #team-performance, by Kyle's call: the desk that works these wants to jump on
- * every lead while the volume is low. Deliberately NOT #radio-core-inbound,
- * which is the WanderOS AE rota's channel — routing there would have undone in
- * Slack the separation this whole route exists to keep.
- *
- * Move to #radio-performance when it gets noisy enough to want its own feed.
- *
+ * Alerts go to #radio-performance (PERFORMANCE_APPLICATIONS_CHANNEL), shared
+ * with the Meta lead alerts, so #team-performance keeps its signal. Deliberately
+ * NOT #radio-core-inbound, which is the WanderOS AE rota's channel; routing
+ * there would undo in Slack the separation this route exists to keep.
  */
 export const maxDuration = 120;
 
-const PERFORMANCE_CHANNEL = "C0BSSECHK08";
 const SLACK_TESTING_CHANNEL = "radio-slack-testing";
 
 /**
  * Jenny owns every application; Kyle keeps the existing notification.
  *
- * Volume is low: Jenny follows up on every application and Kyle retains
- * visibility in the same Performance channel.
+ * Jenny follows up on every application and Kyle retains visibility in the
+ * same Performance applications channel.
  */
 const PERFORMANCE_OWNER_SLACK_ID = "U0C5NV73Z9B"; // Jenny Gale Howe
 const KYLE_SLACK_ID = "U025DTBSU01";
@@ -153,7 +150,7 @@ async function notify(
     .join(" · ");
 
   const result = await postOnSlack({
-    channel: test ? SLACK_TESTING_CHANNEL : PERFORMANCE_CHANNEL,
+    channel: test ? SLACK_TESTING_CHANNEL : PERFORMANCE_APPLICATIONS_CHANNEL,
     text: `🎯 ${application.name ?? application.email} applied to the Performance beta`,
     blocks: [
       {

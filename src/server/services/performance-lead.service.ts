@@ -21,7 +21,12 @@ import {
 const JENNY_HUBSPOT_OWNER_ID = "101168977";
 const JENNY_SLACK_ID = "U0C5NV73Z9B";
 const KYLE_SLACK_ID = "U025DTBSU01";
-const PERFORMANCE_CHANNEL = "C0BSSECHK08"; // #team-performance
+/**
+ * Every Performance beta application alert, qualified or not, posts to
+ * #radio-performance so #team-performance keeps its signal (Kyle, 2026-10-22).
+ * The application record and HubSpot contact are unchanged.
+ */
+export const PERFORMANCE_APPLICATIONS_CHANNEL = "C0CB9K4LM0T"; // #radio-performance
 
 const schema = metaLeadNormalizationSchema.extend({
   directBookingStatus: z.enum(["live", "building", "none", "unknown"]),
@@ -131,7 +136,9 @@ export async function routePerformanceLead(
       `<https://app.hubspot.com/contacts/${HUBSPOT_ACCOUNT_ID}/contact/${contactId}|View HubSpot contact>`,
   ].filter((line): line is string => Boolean(line));
   const posted = await postOnSlack({
-    channel: input.test ? "radio-slack-testing" : PERFORMANCE_CHANNEL,
+    channel: input.test
+      ? "radio-slack-testing"
+      : PERFORMANCE_APPLICATIONS_CHANNEL,
     text: `Performance beta application: ${name}`,
     blocks: lines.map((line) => ({
       type: "section",

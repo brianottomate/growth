@@ -39,8 +39,8 @@ owner Jenny Gale Howe (`101168977`). Names/phone backfill blank fields; the late
 submitted portfolio/site/PMS, Performance summary in the existing `message` textarea and owner are written explicitly.
 The WanderOS `intent_inbound_form` enum is not used for Performance text.
 No WanderOS lifecycle stages, deals, companies, round robin or meeting waits are
-triggered. Alerts reuse `#team-performance`, tagging Jenny and Kyle and linking
-the contact. Only a successfully routed, qualified Meta lead sends the existing
+triggered. Alerts post to `#radio-performance` (website and Meta alike, qualified
+or not), tagging Jenny and Kyle and linking the contact. Only a successfully routed, qualified Meta lead sends the existing
 `Marketing Qualified Lead` CRM CAPI event with its original Meta lead id. A
 retry after CAPI failure does not reroute the contact or repost the alert.
 
