@@ -119,6 +119,7 @@ export const HS_OWNER_NAMES: Record<string, string> = {
   "90838484": "Connor Adams",
   "90936550": "James Caswell",
   "91455876": "Kris Salguero",
+  "99058498": "Luis Reyes",
   "202636522": "Chloey Sabino",
   "208326030": "Joanna Pascal",
   "214903427": "Dom Dawkins",
@@ -288,6 +289,7 @@ export const HS_SLACK_IDS: Record<string, string> = {
   "93221525": "U0B68E2TE9L", // Paige Madigan      paige@wander.com
   "454414503": "U026FDF1L74", // Matt Kowalewski    matt@wander.com
   "94290553": "U0B8Y1Y36M6", // Sean Kearney       sean@wander.com
+  "99058498": "U0BT6HZPPT4", // Luis Reyes         luis@wander.com
 };
 
 /** Resolve a HubSpot internal value to its display label; falls back to the raw value if unknown. */
