@@ -19,7 +19,7 @@ jobs:
     environment: Production
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:17
+        image: postgres:17
         env:
           POSTGRES_PASSWORD: migration-test
         ports: ['5432:5432']
