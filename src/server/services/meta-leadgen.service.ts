@@ -4,6 +4,15 @@ import { and, eq, gte, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { env } from "@/env";
 import {
+  isPerformanceMetaForm,
+  PERFORMANCE_META_FORM_IDS,
+  isQualifiedPerformanceLead,
+} from "@/lib/performance-lead";
+import {
+  normalizePerformanceLead,
+  routePerformanceLead,
+} from "./performance-lead.service";
+import {
   isMeetingLinkForm,
   isQualified,
   MEETING_LOOKUP_WINDOW_MS,
@@ -39,7 +48,7 @@ import {
   osInboundLeadRouter,
 } from "@/server/services/inbound-router.service";
 
-type ReceivedVia = "webhook" | "poll";
+type ReceivedVia = "webhook" | "poll" | "zernio";
 
 const HOUR = 3_600_000;
 /** How far back the backfill drains unfinished ledger rows. */
@@ -68,6 +77,8 @@ function routeCutoff(): Date | null {
 }
 
 function shouldRoute(row: MetaLeadgenLead, leadCreatedAt: Date | null) {
+  if (row.pageId === WANDER_PAGE_ID && isPerformanceMetaForm(row.formId))
+    return !row.routedAt;
   const cutoff = routeCutoff();
   const created = leadCreatedAt ?? row.leadCreatedAt;
   return Boolean(cutoff && created && created >= cutoff && !row.routedAt);
@@ -270,64 +281,125 @@ export async function processLead({
       campaignName: lead.campaign_name ?? row.campaignName,
       leadCreatedAt: new Date(lead.created_time),
     });
-    stage = "normalize";
-    const normalization = await normalizeMetaLead({
-      fields: lead.field_data,
-      formName: formName ?? row.formName,
-    });
-    const units =
-      normalization.audience === "operator" ? normalization.minimumUnits : null;
-    const qualified = isQualified(units);
-    Object.assign(patch, {
-      email: normalization.audience === "operator" ? normalization.email : null,
-      units,
-      qualified,
-    });
-    stage = "process";
-
-    if (qualified && !row.capiSentAt && (await claim(row.id, "capiSentAt"))) {
-      try {
-        await sendQualifiedLeadEvent({
-          leadgenId,
-          eventName: QUALIFIED_LEAD_EVENT,
-        });
-      } catch (err) {
-        await release(row.id, "capiSentAt");
-        errors.push(`capi: ${String(err)}`);
-      }
-    }
-
-    const createdAt = new Date(lead.created_time);
-    const resolvedFormName = formName ?? row.formName;
     if (
-      patch.email &&
-      normalization.audience === "operator" &&
-      shouldRoute(row, createdAt)
+      row.pageId === WANDER_PAGE_ID &&
+      isPerformanceMetaForm(lead.form_id ?? row.formId)
     ) {
-      const meeting = await meetingRepFor({
-        row,
-        email: patch.email,
-        formName: resolvedFormName,
-        createdAt,
-        patch,
-        errors,
+      stage = "performance normalize";
+      const normalized = await normalizePerformanceLead({
+        fields: lead.field_data,
+        formName: formName ?? row.formName,
       });
-      meetingWait = meeting.wait;
-      if (!meeting.wait && (await claim(row.id, "routedAt"))) {
+      const qualified = isQualifiedPerformanceLead(normalized);
+      Object.assign(patch, {
+        email: normalized.email,
+        units: normalized.minimumUnits,
+        qualified,
+      });
+      stage = "performance route";
+      let routed = Boolean(row.routedAt);
+      if (!row.routedAt && (await claim(row.id, "routedAt"))) {
         try {
-          if (
-            !(await routeLead(
-              lead,
-              resolvedFormName,
-              normalization,
-              meeting.salesRepEmail,
-            ))
-          ) {
-            await release(row.id, "routedAt");
-          }
-        } catch (err) {
+          await routePerformanceLead({
+            lead: normalized,
+            source: `Meta Lead Ad · ${formName ?? row.formName ?? lead.form_id ?? row.formId}`,
+            queryParams: new URLSearchParams({
+              utm_source: "facebook",
+              utm_medium: "paid_social",
+              leadgen_id: leadgenId,
+              form_id: lead.form_id ?? row.formId ?? "",
+              ...(lead.campaign_id && { campaign_id: lead.campaign_id }),
+              ...(lead.ad_id && { ad_id: lead.ad_id }),
+              ...(lead.campaign_name && { utm_campaign: lead.campaign_name }),
+            }).toString(),
+          });
+          routed = true;
+        } catch (error) {
           await release(row.id, "routedAt");
-          errors.push(`router: ${String(err)}`);
+          throw error;
+        }
+      }
+      // Only report CRM qualification once delivery to HubSpot has succeeded.
+      stage = "performance capi";
+      if (
+        routed &&
+        qualified &&
+        !row.capiSentAt &&
+        (await claim(row.id, "capiSentAt"))
+      ) {
+        try {
+          await sendQualifiedLeadEvent({
+            leadgenId,
+            eventName: QUALIFIED_LEAD_EVENT,
+          });
+        } catch (error) {
+          await release(row.id, "capiSentAt");
+          throw error;
+        }
+      }
+    } else {
+      stage = "normalize";
+      const normalization = await normalizeMetaLead({
+        fields: lead.field_data,
+        formName: formName ?? row.formName,
+      });
+      const units =
+        normalization.audience === "operator"
+          ? normalization.minimumUnits
+          : null;
+      const qualified = isQualified(units);
+      Object.assign(patch, {
+        email:
+          normalization.audience === "operator" ? normalization.email : null,
+        units,
+        qualified,
+      });
+      stage = "process";
+
+      if (qualified && !row.capiSentAt && (await claim(row.id, "capiSentAt"))) {
+        try {
+          await sendQualifiedLeadEvent({
+            leadgenId,
+            eventName: QUALIFIED_LEAD_EVENT,
+          });
+        } catch (err) {
+          await release(row.id, "capiSentAt");
+          errors.push(`capi: ${String(err)}`);
+        }
+      }
+
+      const createdAt = new Date(lead.created_time);
+      const resolvedFormName = formName ?? row.formName;
+      if (
+        patch.email &&
+        normalization.audience === "operator" &&
+        shouldRoute(row, createdAt)
+      ) {
+        const meeting = await meetingRepFor({
+          row,
+          email: patch.email,
+          formName: resolvedFormName,
+          createdAt,
+          patch,
+          errors,
+        });
+        meetingWait = meeting.wait;
+        if (!meeting.wait && (await claim(row.id, "routedAt"))) {
+          try {
+            if (
+              !(await routeLead(
+                lead,
+                resolvedFormName,
+                normalization,
+                meeting.salesRepEmail,
+              ))
+            ) {
+              await release(row.id, "routedAt");
+            }
+          } catch (err) {
+            await release(row.id, "routedAt");
+            errors.push(`router: ${String(err)}`);
+          }
         }
       }
     }
@@ -516,6 +588,11 @@ function unfinishedLeads() {
         or(
           isNull(t.qualified),
           and(eq(t.qualified, true), isNull(t.capiSentAt)),
+          and(
+            eq(t.pageId, WANDER_PAGE_ID),
+            or(...PERFORMANCE_META_FORM_IDS.map((id) => eq(t.formId, id))),
+            isNull(t.routedAt),
+          ),
           cutoff
             ? and(
                 isNotNull(t.email),

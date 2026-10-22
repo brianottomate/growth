@@ -4,6 +4,11 @@ import { z } from "zod";
 import { escapeSlackMrkdwn, postOnSlack } from "@/server/clients/slack.client";
 import { db } from "@/server/db";
 import { performanceApplicationTable } from "@/server/db/performance-schema";
+import {
+  normalizePerformanceLead,
+  upsertPerformanceLeadContact,
+} from "@/server/services/performance-lead.service";
+import { HUBSPOT_ACCOUNT_ID } from "@/server/clients/hubspot.client";
 import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
 
 /**
@@ -15,9 +20,8 @@ import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
  * means a form can put anyone straight onto the desk. A rep who wants to work
  * one promotes it with the code that already turns a lead into a prospect.
  *
- * HubSpot is untouched for the same reason /api/hubspot/v1/inbound is not the
- * route for this: that one feeds the WanderOS AE rota, and these are not those
- * leads.
+ * Contacts are projected to HubSpot with Jenny as owner; this funnel never
+ * enters the WanderOS AE rota or creates a deal.
  */
 
 /**
@@ -29,17 +33,19 @@ import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
  * Move to #radio-performance when it gets noisy enough to want its own feed.
  *
  */
+export const maxDuration = 120;
+
 const PERFORMANCE_CHANNEL = "C0BSSECHK08";
 const SLACK_TESTING_CHANNEL = "radio-slack-testing";
 
 /**
- * Kyle, mentioned on every application.
+ * Jenny owns every application; Kyle keeps the existing notification.
  *
- * The ping is the product here, not the room: volume is low and he wants to
- * jump on each lead himself. It also means a message still reaches him if the
- * channel above ever changes.
+ * Volume is low: Jenny follows up on every application and Kyle retains
+ * visibility in the same Performance channel.
  */
-const PERFORMANCE_OWNER_SLACK_ID = "U025DTBSU01";
+const PERFORMANCE_OWNER_SLACK_ID = "U0C5NV73Z9B"; // Jenny Gale Howe
+const KYLE_SLACK_ID = "U025DTBSU01";
 
 const body = z.object({
   email: z.string().trim().pipe(z.email("Enter a valid email")),
@@ -86,7 +92,34 @@ export async function POST(request: NextRequest) {
 
   // The row is the record; the ping is how anyone finds out. Deferred so a
   // Slack hiccup cannot fail a write that already succeeded.
-  after(() => notify(application!, input.test));
+  after(async () => {
+    let contactId: string | null = null;
+    try {
+      const lead = await normalizePerformanceLead({
+        formName: "Performance beta website application",
+        fields: Object.entries(input)
+          .filter(
+            ([key, value]) =>
+              !["test", "source", "queryParams"].includes(key) &&
+              value !== undefined,
+          )
+          .map(([name, value]) => ({ name, values: [String(value)] })),
+      });
+      contactId = await upsertPerformanceLeadContact({
+        lead: { ...lead, email: input.email.toLowerCase() },
+        source: input.source,
+        queryParams: input.queryParams,
+        test: input.test,
+      });
+    } catch (error) {
+      console.error("[performance/apply] HubSpot projection failed", {
+        applicationId: application!.id,
+        error,
+      });
+    }
+    // Alert the desk even when normalization or CRM is temporarily unavailable.
+    await notify(application!, input.test, contactId);
+  });
 
   return NextResponse.json({ success: true, id: application!.id });
 }
@@ -94,6 +127,7 @@ export async function POST(request: NextRequest) {
 async function notify(
   application: typeof performanceApplicationTable.$inferSelect,
   test?: boolean,
+  contactId?: string | null,
 ) {
   const esc = escapeSlackMrkdwn;
   const facts = [
@@ -127,9 +161,14 @@ async function notify(
         text: {
           type: "mrkdwn",
           text:
-            `🎯 New *Performance beta* application <@${PERFORMANCE_OWNER_SLACK_ID}>\n${facts}\n` +
+            `🎯 New *Performance beta* application <@${PERFORMANCE_OWNER_SLACK_ID}> <@${KYLE_SLACK_ID}>\n${facts}\n` +
             (qualifying ? `${qualifying}\n` : "") +
-            `from ${esc(application.source)}${application.queryParams ? ` · \`${esc(application.queryParams)}\`` : ""}`,
+            `from ${esc(application.source)}${application.queryParams ? ` · \`${esc(application.queryParams)}\`` : ""}` +
+            (contactId
+              ? `\n<https://app.hubspot.com/contacts/${HUBSPOT_ACCOUNT_ID}/contact/${contactId}|View HubSpot contact>`
+              : test
+                ? ""
+                : "\n⚠️ HubSpot sync failed; saved in Growth for follow-up."),
         },
       },
     ],

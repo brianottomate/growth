@@ -9,12 +9,19 @@ import {
   getZernioLeadForm,
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
+import {
+  normalizePerformanceLead,
+  routePerformanceLead,
+} from "./performance-lead.service";
+import { isPerformanceMetaForm } from "@/lib/performance-lead";
+import { WANDER_PAGE_ID } from "@/server/clients/meta-leadgen.client";
+import { processLead, recordLeadNotifications } from "./meta-leadgen.service";
 import { brandTable } from "@/server/db/brand-schema";
 import { metaLeadgenLeadTable } from "@/server/db/leads-schema";
 
 // Meta lead-form leads for Performance clients, delivered by Zernio's
 // `lead.received` webhook from the client's own Facebook Page. Wander's own
-// Page is served by the Graph webhook in meta-leadgen.service.ts; a client's
+// Performance acquisition forms share the Graph ledger below; a client's
 // lead never enters that path (no WanderOS qualification, no CAPI event, no
 // inbound router): it is kept in the ledger under the client's brand and
 // posted to the Performance team.
@@ -52,7 +59,8 @@ export type ZernioLeadOutcome =
   | "stored"
   | "duplicate"
   | "unknown_profile"
-  | "owner_brand";
+  | "owner_brand"
+  | "test";
 
 function answerText(value: unknown): string {
   if (Array.isArray(value)) return value.map(answerText).join(", ");
@@ -95,9 +103,13 @@ export async function receiveZernioLead(
     });
     return "unknown_profile";
   }
-  // Wander's own leads arrive by the Page webhook and go through WanderOS
-  // qualification there; this path is for the brands Wander advertises for.
-  if (brand.relationship !== "client") return "owner_brand";
+  // Only the registered Performance forms join the shared owner-Page ledger.
+  // Other Wander forms remain with the existing direct Page webhook.
+  const performance =
+    brand.slug === "wander" &&
+    brand.metaPageId === WANDER_PAGE_ID &&
+    isPerformanceMetaForm(lead.formId);
+  if (brand.relationship !== "client" && !performance) return "owner_brand";
 
   // The form's questions name the answers; Zernio sends option keys.
   const form = await getZernioLeadForm(lead.formId, account.id).catch(
@@ -121,6 +133,57 @@ export async function receiveZernioLead(
     label: label(key),
     value: option(key, answerText(raw)),
   }));
+
+  if (performance && payload.test) {
+    const normalized = await normalizePerformanceLead({
+      formName: form?.name ?? lead.formName ?? null,
+      fields: answers.map((answer) => ({
+        name: answer.key,
+        values: [answer.value],
+      })),
+    });
+    await routePerformanceLead({
+      lead: normalized,
+      source: `Meta Lead Ad · ${form?.name ?? lead.formId}`,
+      test: true,
+    });
+    return "test";
+  }
+
+  if (performance) {
+    // The same Meta lead id owns delivery stamps across Graph and Zernio.
+    await recordLeadNotifications(
+      [
+        {
+          leadgen_id: lead.leadgenId,
+          page_id: WANDER_PAGE_ID,
+          form_id: lead.formId,
+          ad_id: lead.adId ?? undefined,
+          created_time: Math.floor(new Date(lead.createdAt).getTime() / 1000),
+        },
+      ],
+      "zernio",
+    );
+    const row = await processLead({
+      leadgenId: lead.leadgenId,
+      pageToken: "", // Prefetched via Zernio; no direct Graph credential needed to read.
+      formName: form?.name ?? lead.formName ?? null,
+      lead: {
+        id: lead.leadgenId,
+        form_id: lead.formId,
+        ad_id: lead.adId ?? undefined,
+        campaign_id: lead.campaignId ?? undefined,
+        created_time: lead.createdAt,
+        field_data: answers.map((answer) => ({
+          name: answer.key,
+          values: [answer.value],
+        })),
+      },
+    });
+    if (row?.lastError)
+      throw new Error(`Performance lead processing failed: ${row.lastError}`);
+    return "stored";
+  }
 
   const pageId =
     brand.metaPageId ??

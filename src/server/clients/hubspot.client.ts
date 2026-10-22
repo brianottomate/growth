@@ -435,6 +435,8 @@ export type CompanyProperties = {
 };
 
 export type ContactProperties = {
+  /** Latest inbound application summary (existing HubSpot textarea property). */
+  message?: string;
   email?: string;
   firstname?: string;
   lastname?: string;

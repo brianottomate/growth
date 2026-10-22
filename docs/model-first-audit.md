@@ -1,5 +1,17 @@
 # Model-first simplification audit
 
+## Performance acquisition form identity (2026-10-22)
+
+WanderOS and Performance acquisition share Wander's Facebook Page, so Page or
+brand identity alone cannot select their sales workflow. The two existing
+Performance beta form ids now select a separate normalization and delivery path;
+form names and the model's guesses never choose the funnel. Graph and Zernio
+share the Meta leadgen id and its delivery ledger, rather than manufacturing a
+second Performance application or brand for the same submission. The website
+continues to own its separate application receipt. HubSpot remains the contact
+projection, with Jenny explicitly assigned; no duplicate lifecycle/rota is added.
+No database identity or schema change is needed.
+
 ## Newsletter forwarding identity (2026-10-19)
 
 The brand owns its opaque, case-sensitive ID. The newsletter recipient embeds

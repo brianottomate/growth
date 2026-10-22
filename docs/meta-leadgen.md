@@ -11,6 +11,52 @@ The browser + server Purchase side of pixel 340 (the CAPI PR train across
 wander, wander.com, tracking and sites) is tracked in
 [`meta-capi-handoff.md`](./meta-capi-handoff.md).
 
+## Performance beta acquisition (2026-10-22)
+
+Wander's Performance beta forms are a separate funnel from WanderOS software
+leads. The exact form ids are registered in `src/lib/performance-lead.ts`:
+`1919237109459929` (Direct Booking Verified v2) and `2427062551398806`
+(the earlier version), on Wander Page `101399685529192`. Register a replacement
+form there before running it; a form's name never selects the funnel.
+
+Both the direct Page webhook and Zernio `lead.received` for Wander's connected
+profile use the existing Meta lead ledger and delivery stamps. A client brand's
+forms keep their existing path. Zernio resolves option keys to form labels and
+can deliver Performance leads without the direct Graph read credential. CAPI
+still uses `META_LEADS_ACCESS_TOKEN`; restore that credential for qualification
+feedback and the existing direct-webhook/backfill path. Keep the Zernio account's
+Page `leadgen` subscription and Growth webhook's `lead.received` event enabled.
+
+AI structured output extracts contact, portfolio, booking site, current marketing,
+spend, interest and a short qualification reason. Initial beta fit is an operator
+with at least one managed rental, a live direct-booking site and a supplied
+company/direct-booking URL. Unknown facts do not qualify. This is deliberately
+independent of WanderOS's 10-property threshold.
+
+Every usable email goes to HubSpot, whether qualified or not, assigned to active
+owner Jenny Gale Howe (`101168977`). Names/phone backfill blank fields; the latest
+submitted portfolio/site/PMS, Performance summary in the existing `message` textarea and owner are written explicitly.
+The WanderOS `intent_inbound_form` enum is not used for Performance text.
+No WanderOS lifecycle stages, deals, companies, round robin or meeting waits are
+triggered. Alerts reuse `#team-performance`, tagging Jenny and Kyle and linking
+the contact. Only a successfully routed, qualified Meta lead sends the existing
+`Marketing Qualified Lead` CRM CAPI event with its original Meta lead id. A
+retry after CAPI failure does not reroute the contact or repost the alert.
+
+The website `/api/performance/apply` also projects new saved applications to
+HubSpot with Jenny as owner. Its existing Slack alert still runs if AI/CRM fails,
+showing the failure and retaining the Growth application id in logs for follow-up.
+Explicit website/Zernio tests skip HubSpot writes and qualification events and
+send only to the testing Slack channel. Website applications do not synthesize
+Meta lead ids or qualification events. No historical submissions are replayed by
+deployment; the existing Meta backfill is an explicit operator action. Existing
+web applications are not replayed.
+
+Rollout: restore the direct Meta leads token, verify the two existing webhook
+subscriptions, deploy through the usual release flow, and use an explicit test
+submission before monitoring a new real lead. Do not run the full historical
+backfill as part of this rollout. No schema migration or new secret is needed.
+
 ## Moving parts
 
 | Piece | Where |
