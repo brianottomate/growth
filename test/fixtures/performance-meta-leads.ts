@@ -173,12 +173,18 @@ const deliver = async (id: string, form = formId) => {
 assert.equal(isPerformanceMetaForm(formId), true);
 assert.equal(isPerformanceMetaForm("1087046654230215"), false);
 assert.equal(isQualifiedPerformanceLead(facts), true);
+const uncertainApplicant = {
+  ...facts,
+  audience: "unknown" as const,
+  minimumUnits: null,
+  directBookingStatus: "building" as const,
+  bookingSite: null,
+};
+assert.equal(isQualifiedPerformanceLead(uncertainApplicant), true);
+const newOperator = { ...facts, minimumUnits: 0 };
+assert.equal(isQualifiedPerformanceLead(newOperator), true);
 assert.equal(
-  isQualifiedPerformanceLead({ ...facts, directBookingStatus: "building" }),
-  false,
-);
-assert.equal(
-  isQualifiedPerformanceLead({ ...facts, minimumUnits: null }),
+  isQualifiedPerformanceLead({ ...facts, audience: "guest" }),
   false,
 );
 await deliver("10001");

@@ -28,10 +28,11 @@ feedback and the existing direct-webhook/backfill path. Keep the Zernio account'
 Page `leadgen` subscription and Growth webhook's `lead.received` event enabled.
 
 AI structured output extracts contact, portfolio, booking site, current marketing,
-spend, interest and a short qualification reason. Initial beta fit is an operator
-with at least one managed rental, a live direct-booking site and a supplied
-company/direct-booking URL. Unknown facts do not qualify. This is deliberately
-independent of WanderOS's 10-property threshold.
+spend, interest and a short qualification reason. Beta qualification is deliberately
+broad: only explicit guest/booking inquiries are excluded. Operators and uncertain
+applicants qualify even with zero or unknown managed properties, no website, or a
+site still being built. Missing details are follow-up questions, not disqualifiers.
+This is independent of WanderOS's 10-property threshold.
 
 Every usable email goes to HubSpot, whether qualified or not, assigned to active
 owner Jenny Gale Howe (`101168977`). Names/phone backfill blank fields; the latest

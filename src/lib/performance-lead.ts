@@ -10,18 +10,9 @@ export function isPerformanceMetaForm(
   return PERFORMANCE_META_FORM_IDS.some((id) => id === formId);
 }
 
-/** Initial beta fit: an operating portfolio and a live direct-booking site. */
+/** Broad beta fit: only explicit guest/booking inquiries are excluded. */
 export function isQualifiedPerformanceLead(input: {
   audience: "operator" | "guest" | "unknown";
-  minimumUnits: number | null;
-  directBookingStatus: "live" | "building" | "none" | "unknown";
-  bookingSite: { hostname: string; pathname: string } | null;
 }): boolean {
-  return (
-    input.audience === "operator" &&
-    input.minimumUnits !== null &&
-    input.minimumUnits >= 1 &&
-    input.directBookingStatus === "live" &&
-    input.bookingSite !== null
-  );
+  return input.audience !== "guest";
 }

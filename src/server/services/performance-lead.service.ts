@@ -46,7 +46,7 @@ export async function normalizePerformanceLead(input: {
 
 This is a Performance by Wander marketing-services application, not a WanderOS software lead. Extract directBookingStatus from the answers: live, building, none, or unknown. A supplied company/direct booking URL is evidence of live status unless another answer contradicts it; a portfolio/social/OTA link alone is not. Interpret option keys as their labels: managed_properties 1_9 = 1-9, 10_24 = 10-24, 25_99 = 25-99, 100_499 = 100-499, 500_plus = 500+. For direct_booking_site, yes means live, building means building, no means none. Keep marketing interest, current marketing activity, and monthly spend in their own fields; do not invent them.
 
-Write a short qualificationReason using only submitted facts. Initial beta qualification requires an operator with at least one currently managed property, a live direct-booking site, and a supplied direct-booking/company URL. Missing evidence means not qualified yet; all applicants still go to Jenny for follow-up. Do not apply the WanderOS 10-property rule.`,
+Use broad beta qualification: only classify audience as guest when submitted answers clearly indicate a traveler looking to book a stay, rather than someone interested in marketing/property services. Operators and uncertain applicants qualify for follow-up, including those with no current properties, a site being built, no website, or missing details. Do not infer guest intent from missing information. Write a short qualificationReason using only submitted facts and this permissive rule, noting missing details as follow-up questions rather than disqualifiers. All applicants still go to Jenny. Do not apply the WanderOS 10-property rule.`,
     prompt,
     maxOutputTokens: 1500,
     maxRetries: 2,
