@@ -225,6 +225,13 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
       "No photo: a charcoal-to-black card, the logo top left, a headline, supporting line and white pill set low left. Kyle's Performance dark card.",
   },
   {
+    id: "listing-proof",
+    version: 1,
+    label: "Photo · listing card",
+    description:
+      "A headline over the top of a scenic photo, a listing card for one home set into the frame below it (its own photo, name, facts, price, rating), and a white pill button at the foot. The owner-acquisition card: the place up top, the proof in the middle.",
+  },
+  {
     id: "brand-statement",
     version: 1,
     label: "Brand statement",
@@ -234,6 +241,15 @@ const COMPOSITION_TEMPLATE_DEFINITIONS = [
 ] as const;
 
 export const COMPOSITION_TEMPLATES = COMPOSITION_TEMPLATE_DEFINITIONS;
+
+/**
+ * Blueprints only the Studio offers: they read inputs the per-home catalog and
+ * ad-idea cards do not carry (a tier; a listing photo, home name and price).
+ */
+export const STUDIO_ONLY_TEMPLATES: ReadonlySet<string> = new Set([
+  "tier-badge",
+  "listing-proof",
+]);
 
 /** Blueprints that draw no source photo. */
 export const PHOTO_FREE_TEMPLATES: ReadonlySet<string> = new Set([
@@ -272,6 +288,8 @@ export type CompositionField = {
   /** What the field is called on this blueprint: "Home name", not "Headline". */
   label: string;
   hint?: string;
+  /** How many pills the form offers. */
+  max?: number;
 };
 
 const mark: CompositionField = { key: "mark", label: "Mark" };
@@ -446,7 +464,12 @@ export const COMPOSITION_FIELDS: Record<
       label: "Facts",
       hint: "8 bedrooms · 4 baths · 16 guests",
     },
-    { key: "pills", label: "Amenities", hint: "Up to three, e.g. Soaking tub" },
+    {
+      key: "pills",
+      label: "Amenities",
+      hint: "Up to three, e.g. Soaking tub",
+      max: 3,
+    },
   ],
   "catalog-amenities-place": [
     mark,
@@ -457,7 +480,12 @@ export const COMPOSITION_FIELDS: Record<
       label: "Facts",
       hint: "8 bedrooms · 4 baths · 16 guests",
     },
-    { key: "pills", label: "Amenities", hint: "Up to three, e.g. Soaking tub" },
+    {
+      key: "pills",
+      label: "Amenities",
+      hint: "Up to three, e.g. Soaking tub",
+      max: 3,
+    },
     accent("colours the location pill"),
   ],
   "catalog-destination": [
@@ -465,7 +493,12 @@ export const COMPOSITION_FIELDS: Record<
     { key: "location", label: "Destination", hint: "Hocking Hills, Ohio" },
     { key: "title", label: "Headline", hint: "Fall asleep to the waterfall" },
     { key: "subtitle", label: "Facts", hint: "2 bedrooms · 1 bath · 4 guests" },
-    { key: "pills", label: "Signature", hint: "One, e.g. Private pond" },
+    {
+      key: "pills",
+      label: "Signature",
+      hint: "One, e.g. Private pond",
+      max: 1,
+    },
   ],
   "catalog-headline": [
     mark,
@@ -524,6 +557,24 @@ export const COMPOSITION_FIELDS: Record<
     { key: "subtitle", label: "Supporting line", hint: "Optional" },
     { key: "cta", label: "Button", hint: "Optional" },
   ],
+  "listing-proof": [
+    mark,
+    { key: "title", label: "Headline", hint: "15.5% to Airbnb vs. 3% to us" },
+    {
+      key: "eyebrow",
+      label: "Supporting line",
+      hint: "Optional, under the headline",
+    },
+    {
+      key: "subtitle",
+      label: "Home name · facts",
+      hint: "Granby Mountain · 4 bedrooms · 3 baths · 10 guests",
+    },
+    { key: "rating", label: "Guest rating", hint: "4.9" },
+    { key: "pills", label: "Price", hint: "$420/night", max: 1 },
+    { key: "cta", label: "Button", hint: "Try WanderOS for free" },
+    accent("colours the price chip"),
+  ],
   "brand-statement": [mark, ...message, accent("warms the ground")],
   "email-header": [
     { key: "eyebrow", label: "Eyebrow", hint: "Christmas & New Year's" },
@@ -575,6 +626,11 @@ const compositionShape = {
   templateId: compositionTemplateIdSchema.catch("photo-only"),
   formatId: z.enum(formatIds),
   sourceMediaAssetId: z.string().min(1).optional(),
+  /**
+   * The listing card's own photo on the listing-proof card, from the
+   * library. Without it the card repeats the source photo.
+   */
+  insetMediaAssetId: z.string().min(1).optional(),
   title: z.string().trim().max(120),
   subtitle: z.string().trim().max(220).optional(),
   eyebrow: z.string().trim().max(40).optional(),
@@ -732,6 +788,10 @@ export function getCompositionIdentity(spec: FreezeCompositionInput) {
     templateVersion: template.version,
     formatId: format.id,
     sourceMediaAssetId: spec.sourceMediaAssetId ?? null,
+    // Only the listing card carries a second photo; other identities stay.
+    ...(spec.insetMediaAssetId
+      ? { insetMediaAssetId: spec.insetMediaAssetId }
+      : {}),
     title: spec.title,
     subtitle: spec.subtitle ?? null,
     eyebrow: spec.eyebrow ?? null,
@@ -745,6 +805,11 @@ export function getCompositionIdentity(spec: FreezeCompositionInput) {
     // Only blueprints that draw it carry it, so every other card's identity
     // (and every render cached under it) is unchanged.
     ...(spec.tier ? { tier: spec.tier } : {}),
+    // The listing card's price is its one pill; other blueprints' pills stay
+    // outside the identity.
+    ...(spec.templateId === "listing-proof" && spec.pills?.length
+      ? { pills: spec.pills }
+      : {}),
   };
 }
 
@@ -763,11 +828,13 @@ export function getCompositionMetadata(
 export function compositionPreviewFromParams(params: URLSearchParams) {
   return {
     sourceUrl: params.get("sourceUrl") || null,
+    insetUrl: params.get("insetUrl") || null,
     parsed: compositionPreviewSchema.safeParse({
       brandId: params.get("brandId"),
       templateId: params.get("templateId"),
       formatId: params.get("formatId"),
       sourceMediaAssetId: params.get("sourceMediaAssetId") || undefined,
+      insetMediaAssetId: params.get("insetMediaAssetId") || undefined,
       title: params.get("title"),
       subtitle: params.get("subtitle") || undefined,
       eyebrow: params.get("eyebrow") || undefined,

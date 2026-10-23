@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
-  const { sourceUrl, parsed } = compositionPreviewFromParams(params);
+  const { sourceUrl, insetUrl, parsed } = compositionPreviewFromParams(params);
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid composition" },
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const context = await resolveCompositionContext(
       session.user.id,
       parsed.data,
-      { sourceUrl },
+      { sourceUrl, insetUrl },
     );
     // A draft font from the setup page's preview strip. Only Google families
     // reach the font loader; anything else renders in the brand's own font.

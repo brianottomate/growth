@@ -148,15 +148,14 @@ export async function campaignAdExport(input: {
                 : image.contentType.split("/")[1]!;
           } else {
             const url = new URL(preview, "http://local");
-            const { parsed, sourceUrl } = compositionPreviewFromParams(
-              url.searchParams,
-            );
+            const { parsed, sourceUrl, insetUrl } =
+              compositionPreviewFromParams(url.searchParams);
             if (!parsed.success)
               throw new Error(`${ad.name}: invalid artwork recipe`);
             const context = await resolveCompositionContext(
               input.userId,
               parsed.data,
-              { sourceUrl },
+              { sourceUrl, insetUrl },
             );
             const loaded = await loadCompositionSource(context);
             bytes = Buffer.from(
@@ -190,15 +189,14 @@ export async function campaignAdExport(input: {
           let bytes: Buffer;
           let extension: string;
           if (mediaUrl.pathname === "/api/compositions/preview") {
-            const { parsed, sourceUrl } = compositionPreviewFromParams(
-              mediaUrl.searchParams,
-            );
+            const { parsed, sourceUrl, insetUrl } =
+              compositionPreviewFromParams(mediaUrl.searchParams);
             if (!parsed.success)
               throw new Error(`${ad.name}: invalid artwork recipe`);
             const context = await resolveCompositionContext(
               input.userId,
               parsed.data,
-              { sourceUrl },
+              { sourceUrl, insetUrl },
             );
             bytes = Buffer.from(
               await renderComposition(

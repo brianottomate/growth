@@ -51,6 +51,8 @@ export type CompositionContext = {
   templateId: CompositionSpec["templateId"];
   /** Where the source lives. A lookup needs only this; a render loads it. */
   sourceUrl: string | null;
+  /** The listing card's own photo, when the blueprint draws one. */
+  insetUrl?: string | null;
   /** Ready, brand-owned R2 source, resolved after access checks. */
   sourceAsset?: {
     id: string;
@@ -64,6 +66,7 @@ export type CompositionContext = {
 /** A context with everything satori draws loaded: source, logo, brand font. */
 export type RenderContext = CompositionContext & {
   sourceImage: string | null;
+  insetImage?: string | null;
   logo: LogoImage | null;
   fonts: LoadedFont[] | null;
   /** The family the smaller text is set in when it differs from the heading's. */
@@ -208,6 +211,8 @@ export async function resolveCompositionContext(
   options: {
     /** A vouched-for photo URL, used when the spec names no library asset. */
     sourceUrl?: string | null;
+    /** The listing card's photo by URL, for previews from a listing feed. */
+    insetUrl?: string | null;
   } = {},
 ): Promise<CompositionContext> {
   const brand = await db.query.brandTable.findFirst({
@@ -236,12 +241,11 @@ export async function resolveCompositionContext(
     throw new CompositionAccessError("No access to this brand", 403);
   }
 
-  let sourceUrl: string | null = null;
-  let sourceAsset: CompositionContext["sourceAsset"];
-  if (spec.sourceMediaAssetId) {
-    const source = await db.query.mediaAssetTable.findFirst({
+  /** A ready, approved image from this brand's library, or a clear refusal. */
+  const libraryImage = async (assetId: string, field: string) => {
+    const asset = await db.query.mediaAssetTable.findFirst({
       where: and(
-        eq(mediaAssetTable.id, spec.sourceMediaAssetId),
+        eq(mediaAssetTable.id, assetId),
         eq(mediaAssetTable.brandId, brand.id),
         eq(mediaAssetTable.provider, "r2"),
         eq(mediaAssetTable.kind, "image"),
@@ -257,16 +261,26 @@ export async function resolveCompositionContext(
         mimeType: true,
       },
     });
-    if (!source?.url || !R2.isPublicUrl(source.url)) {
+    if (!asset?.url || !R2.isPublicUrl(asset.url)) {
       throw new CompositionAccessError(
-        /^https?:\/\//.test(spec.sourceMediaAssetId)
-          ? "sourceMediaAssetId takes a library asset id (media_…), not a URL. Import the photo into the brand's library first and pass its id."
+        /^https?:\/\//.test(assetId)
+          ? `${field} takes a library asset id (media_…), not a URL. Import the photo into the brand's library first and pass its id.`
           : "Choose a ready image from this brand's library",
         422,
       );
     }
+    return { ...asset, url: asset.url };
+  };
+
+  let sourceUrl: string | null = null;
+  let sourceAsset: CompositionContext["sourceAsset"];
+  if (spec.sourceMediaAssetId) {
+    const source = await libraryImage(
+      spec.sourceMediaAssetId,
+      "sourceMediaAssetId",
+    );
     sourceUrl = source.url;
-    sourceAsset = { ...source, url: source.url };
+    sourceAsset = source;
   } else if (options.sourceUrl) {
     if (!isAllowedPreviewSource(options.sourceUrl)) {
       throw new CompositionAccessError(
@@ -284,6 +298,23 @@ export async function resolveCompositionContext(
     );
   }
 
+  let insetUrl: string | null = null;
+  if (spec.templateId === "listing-proof") {
+    if (spec.insetMediaAssetId) {
+      insetUrl = (
+        await libraryImage(spec.insetMediaAssetId, "insetMediaAssetId")
+      ).url;
+    } else if (options.insetUrl) {
+      if (!isAllowedPreviewSource(options.insetUrl)) {
+        throw new CompositionAccessError(
+          "Previews draw only from the brand's own listing photos or the library",
+          422,
+        );
+      }
+      insetUrl = options.insetUrl;
+    }
+  }
+
   return {
     brand: {
       ...brand,
@@ -294,6 +325,7 @@ export async function resolveCompositionContext(
     templateId: spec.templateId,
     sourceUrl,
     sourceAsset,
+    insetUrl,
   };
 }
 
@@ -357,23 +389,25 @@ export async function loadCompositionSource(
   const body = options.bodyFontFamily ?? brandBodyFontFamily(identity);
   // The logo and the font are best effort: a card without them is still the
   // card. The source is not; its failure is the render's failure.
-  const [sourceImage, logo, headingFonts, bodyFonts] = await Promise.all([
-    context.sourceUrl ? fetchSatoriImageSource(context.sourceUrl) : null,
-    (context.brand.brandMark
-      ? loadChosenMark(context.brand.brandMark)
-      : Promise.resolve(null)
-    ).catch((error: unknown) => {
-      console.error("brand mark unavailable", context.brand.id, error);
-      return null;
-    }),
-    family
-      ? loadGoogleFont(
-          family,
-          headingWeight ? [400, headingWeight, 700] : undefined,
-        )
-      : null,
-    body ? loadGoogleFont(body, [400, 500, 600]) : null,
-  ]);
+  const [sourceImage, insetImage, logo, headingFonts, bodyFonts] =
+    await Promise.all([
+      context.sourceUrl ? fetchSatoriImageSource(context.sourceUrl) : null,
+      context.insetUrl ? fetchSatoriImageSource(context.insetUrl) : null,
+      (context.brand.brandMark
+        ? loadChosenMark(context.brand.brandMark)
+        : Promise.resolve(null)
+      ).catch((error: unknown) => {
+        console.error("brand mark unavailable", context.brand.id, error);
+        return null;
+      }),
+      family
+        ? loadGoogleFont(
+            family,
+            headingWeight ? [400, headingWeight, 700] : undefined,
+          )
+        : null,
+      body ? loadGoogleFont(body, [400, 500, 600]) : null,
+    ]);
   // The heading's faces stay first: the card's wrapper takes the first name.
   const fonts = headingFonts ? [...headingFonts, ...(bodyFonts ?? [])] : null;
   const faces = {
@@ -394,7 +428,7 @@ export async function loadCompositionSource(
       badge: { backdrop, fonts: badgeFonts },
     };
   }
-  return { ...context, sourceImage, logo, ...faces };
+  return { ...context, sourceImage, insetImage, logo, ...faces };
 }
 
 // ---- The wander.com tier pill ---------------------------------------------
@@ -1025,6 +1059,331 @@ export function renderComposition(
             <div style={{ display: "flex" }} />
           )}
         </div>
+      </div>
+    );
+  } else if (spec.templateId === "listing-proof") {
+    // The owner-acquisition card (Wander's own, 2026-10): the pitch on the
+    // sky, a listing card as the proof, the button at the foot. Wide
+    // canvases set the copy left and the card right; tall ones stack them.
+    const story = spec.formatId === "story";
+    const wide = format.width > format.height;
+    const proofPadding = portrait ? 68 : 64;
+    // A long headline steps down rather than crowding the card below it.
+    const headlineScale =
+      spec.title.length > 60 ? 0.72 : spec.title.length > 40 ? 0.86 : 1;
+    const headlineSize = Math.round(
+      headlineScale *
+        (story ? 84 : wide ? (video ? 92 : 50) : square ? 66 : 74),
+    );
+    const lineSize = story ? 34 : wide ? (video ? 40 : 24) : square ? 28 : 30;
+    const cardWidth = wide ? (video ? 840 : 480) : square ? 820 : 900;
+    // The Story's card fits between Meta's header and call-to-action bands.
+    const photoHeight = story
+      ? 300
+      : wide
+        ? video
+          ? 420
+          : 236
+        : square
+          ? 300
+          : 430;
+    const cardPad = wide && !video ? 22 : 30;
+    const nameSize = wide && !video ? 26 : 34;
+    const factsSize = wide && !video ? 20 : 26;
+    const chipSize = wide && !video ? 20 : 26;
+    const button = spec.cta?.trim();
+    // "Home name · facts": the first segment is the name, the rest the facts.
+    const [homeName, ...factParts] = (spec.subtitle ?? "")
+      .split("·")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const facts = factParts.join(" · ");
+    // The price chip is the blueprint's one pill.
+    const price = spec.pills?.[0]?.trim();
+    const card = (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          width: cardWidth,
+          maxWidth: "100%",
+          overflow: "hidden",
+          borderRadius: 24,
+          background: "#ffffff",
+          boxShadow: "0 30px 80px rgba(0,0,0,0.35)",
+        }}
+      >
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
+        <img
+          src={context.insetImage ?? context.sourceImage!}
+          alt=""
+          width={cardWidth}
+          height={photoHeight}
+          style={{
+            width: "100%",
+            height: photoHeight,
+            objectFit: "cover",
+            objectPosition: "center center",
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 18,
+            padding: cardPad,
+            color: "#17171b",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flexGrow: 1,
+              flexShrink: 1,
+              minWidth: 0,
+            }}
+          >
+            {homeName ? (
+              <div
+                style={{
+                  display: "flex",
+                  fontSize: nameSize,
+                  fontWeight: 700,
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.15,
+                }}
+              >
+                {clamp(homeName, 40)}
+              </div>
+            ) : null}
+            {facts ? (
+              <div
+                style={{
+                  display: "flex",
+                  marginTop: 8,
+                  color: "#5f6066",
+                  fontSize: factsSize,
+                  lineHeight: 1.3,
+                }}
+              >
+                {clamp(facts, 80)}
+              </div>
+            ) : null}
+            {spec.rating ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 10,
+                  color: "#17171b",
+                  fontSize: factsSize,
+                  fontWeight: 600,
+                }}
+              >
+                <svg
+                  width={factsSize}
+                  height={factsSize}
+                  viewBox="0 0 24 24"
+                  fill="#17171b"
+                >
+                  <path d="M12 2.5l2.9 6.2 6.8.8-5 4.7 1.3 6.7L12 17.6l-6 3.3 1.3-6.7-5-4.7 6.8-.8z" />
+                </svg>
+                {spec.rating.toFixed(1)}
+              </div>
+            ) : null}
+          </div>
+          {price ? (
+            <div
+              style={{
+                display: "flex",
+                flexShrink: 0,
+                padding: `${Math.round(chipSize * 0.5)}px ${Math.round(chipSize * 0.8)}px`,
+                borderRadius: 14,
+                background: accent,
+                color: "#ffffff",
+                fontSize: chipSize,
+                fontWeight: 700,
+              }}
+            >
+              {clamp(price, 24)}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+    const copy = (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: story ? "center" : "flex-start",
+          color: "#ffffff",
+          textAlign: story ? "center" : "left",
+        }}
+      >
+        <div style={{ display: "flex", marginBottom: 26 }}>
+          <BrandMark
+            brandName={context.brand.name}
+            logo={context.logo}
+            tone={spec.mark}
+            inverse
+            {...(video ? { markSize: 52, textSize: 36 } : {})}
+          />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: headlineSize,
+            fontWeight: 700,
+            lineHeight: 1.06,
+            letterSpacing: "-0.025em",
+            textWrap: "balance",
+          }}
+        >
+          {clamp(spec.title, 90)}
+        </div>
+        {spec.eyebrow ? (
+          <div
+            style={{
+              display: "flex",
+              marginTop: 16,
+              color: "rgba(255,255,255,0.9)",
+              fontSize: lineSize,
+              fontWeight: 500,
+              lineHeight: 1.3,
+            }}
+          >
+            {clamp(spec.eyebrow, 40)}
+          </div>
+        ) : null}
+      </div>
+    );
+    const pill = button ? (
+      story ? (
+        <div
+          style={{
+            display: "flex",
+            color: "#ffffff",
+            fontSize: 34,
+            fontWeight: 600,
+          }}
+        >
+          {button}
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: video ? "30px 58px" : wide ? "16px 32px" : "22px 42px",
+            borderRadius: 999,
+            background: "#ffffff",
+            color: "#111111",
+            fontSize: video ? 46 : wide ? 26 : 32,
+            fontWeight: 600,
+          }}
+        >
+          {button}
+        </div>
+      )
+    ) : null;
+    content = (
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          background: "#111111",
+        }}
+      >
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: wide
+              ? `linear-gradient(90deg, ${scrim(0.62)} 0%, ${scrim(0.42)} 40%, ${scrim(0.1)} 70%, ${scrim(0.1)} 100%)`
+              : `linear-gradient(180deg, ${scrim(0.6)} 0%, ${scrim(0.42)} 24%, ${scrim(0.12)} 44%, ${scrim(0.08)} 76%, ${scrim(0.3)} 100%)`,
+          }}
+        />
+        {wide ? (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: format.width,
+              height: format.height,
+              padding: proofPadding,
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 40,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                alignSelf: "stretch",
+                width: format.width - proofPadding * 2 - cardWidth - 40,
+              }}
+            >
+              {copy}
+              {pill ?? <div style={{ display: "flex" }} />}
+            </div>
+            <div style={{ display: "flex", flexShrink: 0 }}>{card}</div>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: story ? "center" : "flex-start",
+              justifyContent: "space-between",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: format.width,
+              height: format.height,
+              ...(story ? overlayInsets : { padding: proofPadding }),
+            }}
+          >
+            {copy}
+            <div
+              style={{
+                display: "flex",
+                width: "100%",
+                justifyContent: "center",
+              }}
+            >
+              {card}
+            </div>
+            {pill ?? <div style={{ display: "flex" }} />}
+          </div>
+        )}
       </div>
     );
   } else if (spec.templateId === "email-header") {
@@ -2668,6 +3027,7 @@ export async function openComposition(input: {
     templateId: stored.templateId,
     formatId: stored.formatId,
     sourceMediaAssetId: stored.sourceMediaAssetId ?? undefined,
+    insetMediaAssetId: stored.insetMediaAssetId ?? undefined,
     title: stored.title ?? "",
     subtitle: stored.subtitle ?? undefined,
     eyebrow: stored.eyebrow ?? undefined,
@@ -2677,6 +3037,7 @@ export async function openComposition(input: {
     focal: stored.focal ?? undefined,
     scrim: stored.scrim ?? undefined,
     rating: stored.rating ?? undefined,
+    pills: stored.pills ?? undefined,
     mark: stored.mark ?? "auto",
     tier: stored.tier ?? undefined,
   });
@@ -2704,13 +3065,14 @@ export async function openComposition(input: {
  * that need to see drafted cards whose only image is their recipe URL.
  */
 export async function renderCompositionUrl(userId: string, url: string) {
-  const { sourceUrl, parsed } = compositionPreviewFromParams(
+  const { sourceUrl, insetUrl, parsed } = compositionPreviewFromParams(
     new URL(url, "http://local").searchParams,
   );
   if (!parsed.success)
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid composition");
   const context = await resolveCompositionContext(userId, parsed.data, {
     sourceUrl,
+    insetUrl,
   });
   const response = renderComposition(
     parsed.data,

@@ -20,6 +20,7 @@ import {
 import {
   COMPOSITION_IMAGE_POSITIONS,
   COMPOSITION_TEMPLATES,
+  STUDIO_ONLY_TEMPLATES,
   getCompositionFields,
   getCompositionFormat,
 } from "@/lib/compositions";
@@ -365,7 +366,7 @@ export function AdIdeaSlideRow({
                     options={COMPOSITION_TEMPLATES.filter(
                       (template) =>
                         template.id !== "photo-only" &&
-                        template.id !== "tier-badge",
+                        !STUDIO_ONLY_TEMPLATES.has(template.id),
                     ).map((template) => ({
                       id: template.id,
                       label: template.label,

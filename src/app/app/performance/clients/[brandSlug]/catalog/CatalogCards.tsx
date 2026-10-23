@@ -69,6 +69,7 @@ import {
   COMPOSITION_FORMATS,
   COMPOSITION_IMAGE_POSITIONS,
   COMPOSITION_TEMPLATES,
+  STUDIO_ONLY_TEMPLATES,
   previewAtWidth,
 } from "@/lib/compositions";
 import {
@@ -1599,7 +1600,7 @@ export function CardEditor({
             disabled={saving}
             onChange={(templateId) => onChange({ ...card, templateId })}
             options={COMPOSITION_TEMPLATES.filter(
-              (template) => template.id !== "tier-badge",
+              (template) => !STUDIO_ONLY_TEMPLATES.has(template.id),
             ).map((template) => ({
               id: template.id,
               label: template.label,

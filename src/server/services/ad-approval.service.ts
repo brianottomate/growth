@@ -77,6 +77,7 @@ async function renderApprovalExports(input: {
       );
       const resolved = await resolveCompositionContext(input.userId, spec, {
         sourceUrl: url.searchParams.get("sourceUrl"),
+        insetUrl: url.searchParams.get("insetUrl"),
       });
       const reusable = reusableApprovalAsset(card, shape, resolved.sourceAsset);
       if (reusable) {

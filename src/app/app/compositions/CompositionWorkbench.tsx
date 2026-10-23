@@ -80,6 +80,48 @@ type Direction = {
 };
 
 /** Where the crop leans, as the focal point the renderer keeps in frame. */
+/** A library image to pick, ticked when chosen. */
+function LibraryTile({
+  asset,
+  selected,
+  onClick,
+}: {
+  asset: {
+    url: string | null;
+    thumbnailUrl?: string | null;
+    title?: string | null;
+    filename?: string | null;
+    alt?: string | null;
+  };
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "relative aspect-square overflow-hidden rounded-lg border bg-muted",
+        selected && "border-primary ring-2 ring-primary/30 ring-offset-1",
+      )}
+      title={asset.title ?? asset.filename ?? "Library image"}
+    >
+      {/* oxlint-disable-next-line nextjs/no-img-element */}
+      <img
+        src={asset.thumbnailUrl ?? asset.url!}
+        alt={asset.alt ?? asset.title ?? ""}
+        loading="lazy"
+        className="absolute inset-0 size-full object-cover"
+      />
+      {selected && (
+        <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <Check className="size-3" />
+        </span>
+      )}
+    </button>
+  );
+}
+
 const CROP_PRESETS = {
   center: null,
   left: { x: 0, y: 50 },
@@ -138,6 +180,8 @@ export function CompositionWorkbench({
   const [sourceMediaAssetId, setSourceMediaAssetId] = useState(
     initialSourceId ?? "",
   );
+  // The listing card's own photo on the listing-proof blueprint.
+  const [insetMediaAssetId, setInsetMediaAssetId] = useState("");
   // Copy lives outside the blueprint: switching layouts keeps it, and a field
   // reappears with its text when a layout uses it again. The standard
   // placeholder copy stands until the operator types or asks for copy.
@@ -151,6 +195,7 @@ export function CompositionWorkbench({
   const [eyebrow, setEyebrow] = useState(initialEyebrow ?? "Stay with Wander");
   const [cta, setCta] = useState(initialCta ?? "Explore the stay");
   const [rating, setRating] = useState<number | undefined>(initialRating ?? 5);
+  const [pills, setPills] = useState<string[]>([]);
   const [assetTitle, setAssetTitle] = useState(
     adPreviewTarget ? "Ad preview" : "Wander social composition",
   );
@@ -191,12 +236,14 @@ export function CompositionWorkbench({
     setTemplateId(saved.templateId);
     setFormatId(saved.formatId);
     setSourceMediaAssetId(saved.sourceMediaAssetId ?? "");
+    setInsetMediaAssetId(saved.insetMediaAssetId ?? "");
     setTitle(saved.title);
     setSubtitle(saved.subtitle ?? "");
     setEyebrow(saved.eyebrow ?? "");
     setCta(saved.cta ?? "");
     if (saved.accent) setAccent(saved.accent);
     setRating(saved.rating);
+    setPills(saved.pills ?? []);
     setMark(saved.mark);
     setFocal(saved.focal ?? null);
     setScrim(saved.scrim ?? null);
@@ -241,6 +288,7 @@ export function CompositionWorkbench({
   const fields = getCompositionFields(templateId);
   const has = (key: CompositionFieldKey) =>
     fields.some((field) => field.key === key);
+  const pillsField = fields.find((field) => field.key === "pills");
 
   const sourceListOptions = orpc.media.list.queryOptions({
     input: {
@@ -276,6 +324,11 @@ export function CompositionWorkbench({
     : (hostedAssets[0]?.id ?? "");
   const requiresImage = !PHOTO_FREE_TEMPLATES.has(templateId);
   const renderSourceId = requiresImage ? effectiveSourceId : "";
+  const takesInset = templateId === "listing-proof";
+  const renderInsetId =
+    takesInset && hostedAssets.some((asset) => asset.id === insetMediaAssetId)
+      ? insetMediaAssetId
+      : "";
   const source = hostedAssets.find((asset) => asset.id === renderSourceId);
   const sourceMetadata = source?.metadata as {
     listingUrl?: unknown;
@@ -317,6 +370,7 @@ export function CompositionWorkbench({
       templateId,
       formatId,
       sourceMediaAssetId: renderSourceId || undefined,
+      insetMediaAssetId: renderInsetId || undefined,
       title: needsTitle ? title.trim() : "",
       subtitle:
         has("subtitle") && subtitle.trim() ? subtitle.trim() : undefined,
@@ -324,6 +378,12 @@ export function CompositionWorkbench({
       cta: has("cta") && cta.trim() ? cta.trim() : undefined,
       accent: has("accent") ? accent : undefined,
       rating: has("rating") ? rating : undefined,
+      pills: pillsField
+        ? pills
+            .slice(0, pillsField.max)
+            .map((pill) => pill.trim())
+            .filter(Boolean)
+        : undefined,
       mark: has("mark") ? mark : ("auto" as const),
       imagePosition,
       focal: focal ?? undefined,
@@ -335,12 +395,14 @@ export function CompositionWorkbench({
       templateId,
       formatId,
       renderSourceId,
+      renderInsetId,
       title,
       subtitle,
       eyebrow,
       cta,
       accent,
       rating,
+      pills,
       mark,
       imagePosition,
       focal,
@@ -361,11 +423,14 @@ export function CompositionWorkbench({
     });
     if (spec.sourceMediaAssetId)
       params.set("sourceMediaAssetId", spec.sourceMediaAssetId);
+    if (spec.insetMediaAssetId)
+      params.set("insetMediaAssetId", spec.insetMediaAssetId);
     if (spec.subtitle) params.set("subtitle", spec.subtitle);
     if (spec.eyebrow) params.set("eyebrow", spec.eyebrow);
     if (spec.cta) params.set("cta", spec.cta);
     if (spec.accent) params.set("accent", spec.accent);
     if (spec.rating) params.set("rating", String(spec.rating));
+    for (const pill of spec.pills ?? []) params.append("pill", pill);
     if (spec.focal) {
       params.set("focalX", String(spec.focal.x));
       params.set("focalY", String(spec.focal.y));
@@ -768,7 +833,30 @@ export function CompositionWorkbench({
                   maxLength={60}
                   placeholder={field.hint}
                 />
-              ) : field.key === "rating" && templateId === "catalog-place" ? (
+              ) : field.key === "pills" ? (
+                <div
+                  className={cn(
+                    "grid grid-cols-1 gap-2",
+                    (field.max ?? 1) > 1 && "@md:grid-cols-3",
+                  )}
+                >
+                  {Array.from({ length: field.max ?? 1 }, (_, index) => (
+                    <Input
+                      key={index}
+                      value={pills[index] ?? ""}
+                      onChange={(event) => {
+                        const next = [...pills];
+                        next[index] = event.target.value;
+                        setPills(next);
+                      }}
+                      maxLength={24}
+                      placeholder={index === 0 ? field.hint : undefined}
+                    />
+                  ))}
+                </div>
+              ) : field.key === "rating" &&
+                (templateId === "catalog-place" ||
+                  templateId === "listing-proof") ? (
                 <Input
                   type="number"
                   min={1}
@@ -960,37 +1048,42 @@ export function CompositionWorkbench({
             </div>
           ) : (
             <div className="grid max-h-72 grid-cols-4 gap-2 overflow-y-auto pr-1 @xl:grid-cols-6">
-              {hostedAssets.slice(0, 30).map((asset) => {
-                const selected = renderSourceId === asset.id;
-                return (
-                  <button
-                    type="button"
-                    key={asset.id}
-                    onClick={() => chooseSource(asset.id)}
-                    className={cn(
-                      "relative aspect-square overflow-hidden rounded-lg border bg-muted",
-                      selected &&
-                        "border-primary ring-2 ring-primary/30 ring-offset-1",
-                    )}
-                    title={asset.title ?? asset.filename ?? "Library image"}
-                  >
-                    {/* oxlint-disable-next-line nextjs/no-img-element */}
-                    <img
-                      src={asset.thumbnailUrl ?? asset.url!}
-                      alt={asset.alt ?? asset.title ?? ""}
-                      loading="lazy"
-                      className="absolute inset-0 size-full object-cover"
-                    />
-                    {selected && (
-                      <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <Check className="size-3" />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+              {hostedAssets.slice(0, 30).map((asset) => (
+                <LibraryTile
+                  key={asset.id}
+                  asset={asset}
+                  selected={renderSourceId === asset.id}
+                  onClick={() => chooseSource(asset.id)}
+                />
+              ))}
             </div>
           )}
+          {takesInset && hostedAssets.length > 0 ? (
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-sm">
+                <span className="font-semibold">Listing photo</span>{" "}
+                <span className="text-xs text-muted-foreground">
+                  the home in the card; the source photo stays behind it. None
+                  repeats the source.
+                </span>
+              </p>
+              <div className="grid max-h-40 grid-cols-6 gap-2 overflow-y-auto pr-1 @xl:grid-cols-8">
+                {hostedAssets.slice(0, 40).map((asset) => {
+                  const selected = renderInsetId === asset.id;
+                  return (
+                    <LibraryTile
+                      key={asset.id}
+                      asset={asset}
+                      selected={selected}
+                      onClick={() =>
+                        setInsetMediaAssetId(selected ? "" : asset.id)
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="overflow-hidden rounded-xl border">
