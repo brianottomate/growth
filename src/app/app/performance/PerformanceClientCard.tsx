@@ -250,8 +250,9 @@ export function PerformanceClientCard({
           </DropdownMenu>
         </div>
         <CardBilling
+          id={context === "client" ? "payments" : undefined}
           card={card}
-          className={`${context === "client" ? "col-start-1" : "col-start-2"} col-span-2 row-start-2`}
+          className={`${context === "client" ? "col-start-1" : "col-start-2"} col-span-2 row-start-2 scroll-mt-4`}
         />
       </header>
       {context === "board" && !compact && (
@@ -271,10 +272,7 @@ export function PerformanceClientCard({
       )}
       {context === "client" ? (
         card.effectiveDate || card.terms || card.endDate ? (
-          <div
-            id="payments"
-            className="mt-3 flex scroll-mt-4 flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-xs"
-          >
+          <div className="mt-3 flex scroll-mt-4 flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-xs">
             {card.effectiveDate ? (
               <span className="text-muted-foreground">
                 Effective · {trackerDate(card.effectiveDate)}

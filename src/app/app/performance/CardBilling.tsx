@@ -18,16 +18,19 @@ const money = (value: number | null) =>
 /** Contract amounts and month-specific receipts are separate facts. */
 export function CardBilling({
   card,
+  id,
   className,
   dense = false,
 }: {
   card: PerformancePipelineCard;
+  id?: string;
   className?: string;
   dense?: boolean;
 }) {
   if (dense) {
     return (
       <div
+        id={id}
         className={cn(
           "grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] items-start gap-x-2 gap-y-1 text-[10px]",
           className,
@@ -52,7 +55,7 @@ export function CardBilling({
     );
   }
   return (
-    <div className={cn("space-y-1 text-[11px]", className)}>
+    <div id={id} className={cn("space-y-1 text-[11px]", className)}>
       <div className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
         <span>
           <span className="text-muted-foreground">Management </span>

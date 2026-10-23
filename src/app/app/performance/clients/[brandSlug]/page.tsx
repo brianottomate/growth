@@ -11,6 +11,7 @@ import {
 } from "@/server/db/schema";
 import { Button } from "@/components/ui/button";
 import { loadBrandContacts } from "@/server/services/brand-contacts.service";
+import { loadPerformanceConnections } from "@/server/services/performance-connections.service";
 import { listMedia } from "@/server/services/media.service";
 import {
   loadBrandReadiness,
@@ -21,7 +22,6 @@ import { BrandTasks } from "@/components/brand-tasks";
 
 import { ReadinessChecklist } from "../../ReadinessChecklist";
 import { PerformanceClientCard } from "../../PerformanceClientCard";
-import { loadPerformanceConnections } from "@/server/services/performance-connections.service";
 import { performanceCardFromBrand } from "@/lib/performance-card";
 
 import { MediaStrip } from "./MediaStrip";
