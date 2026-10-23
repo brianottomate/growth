@@ -7,6 +7,13 @@ in Postmark and stores `emailSender.marketingDomain` in the existing brand JSONB
 It preserves the sender, reply-to, footer, transactional domain and other settings.
 No migration is needed. No DNS changes or sends happen during preparation.
 
+The same native path is available to authenticated operators through Growth's
+existing MCP domains. `brandRead.emailDns` reads the current link and live
+Postmark status, `brandWrite.prepareEmailDns` prepares or retrieves the link,
+and `brandWrite.recheckEmailDns` asks Postmark to recheck the installed records.
+These actions call the same services as the Email tab; they do not create a
+second DNS workflow or change records themselves.
+
 The client page shows live Postmark authentication status, offers Entri Connect,
 and displays copyable manual records. Its configuration includes only DKIM TXT
 and return-path CNAME records under the selected marketing subdomain. No website

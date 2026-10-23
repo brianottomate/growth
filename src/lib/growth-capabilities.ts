@@ -59,6 +59,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "suggestMarkets",
     "identity",
     "recommendMark",
+    "emailDns",
   ],
   brandWrite: [
     "create",
@@ -71,6 +72,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "update",
     "updateStory",
     "setMarkets",
+    "prepareEmailDns",
+    "recheckEmailDns",
   ],
   productAtlasRead: ["list", "get"],
   productAtlasWrite: ["create", "update"],
