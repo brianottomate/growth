@@ -180,6 +180,7 @@ export async function importMetaCampaign(
     "Source targeting, attribution, optimization and creative enhancements are retained as reference; this copy is not an exact live-campaign replica.",
   ];
   const created = await createDraftCampaign({
+    userId: ctx.userId,
     organizationId: ctx.orgId,
     brandId: brand.id,
     name: args.name,

@@ -792,6 +792,7 @@ export async function setAdHome(input: {
  * something the push can send.
  */
 export async function attachAdSet(input: {
+  userId: string;
   brandId: string;
   orgId: string;
   campaignId?: string;
@@ -868,6 +869,7 @@ export async function attachAdSet(input: {
     if (!input.campaignId)
       await tx.insert(campaignTable).values({
         id: campaign.id,
+        createdBy: input.userId,
         brandId: brand.id,
         name: campaign.name,
         status: "planned",

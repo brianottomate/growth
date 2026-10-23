@@ -34,6 +34,7 @@ export type DeskCampaign = {
   name: string;
   brandId: string;
   createdAt: Date;
+  creator: { id: string; name: string | null; image: string | null } | null;
   state: DeskCampaignState;
   platforms: { id: string; platform: string; status: string }[];
   /** Whole dollars spent, as the platforms report it. */
@@ -216,6 +217,7 @@ export async function loadPerformanceDesk(
         performanceCycleId: true,
       },
       with: {
+        creator: { columns: { id: true, name: true, image: true } },
         ads: {
           columns: { id: true, status: true },
           // Only the first card's image, not the whole ad document.
@@ -331,6 +333,7 @@ export async function loadPerformanceDesk(
       name: campaign.name,
       brandId: campaign.brandId,
       createdAt: campaign.createdAt,
+      creator: campaign.creator,
       state: stateOf(rows),
       platforms: rows.map((row) => ({
         id: row.id,

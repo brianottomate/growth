@@ -379,6 +379,7 @@ export const draftCampaignAction = growthAction({
   execute: async (input, ctx) => {
     const result = await createDraftCampaign({
       ...input,
+      userId: ctx.userId,
       organizationId: ctx.orgId,
     });
     return {
@@ -569,6 +570,7 @@ export const duplicateCampaignAction = growthAction({
   execute: async (input, ctx) => {
     const result = await duplicateCampaign({
       ...input,
+      userId: ctx.userId,
       organizationId: ctx.orgId,
     });
     const path = campaignPath(
@@ -1517,6 +1519,7 @@ export const attachCampaignAction = growthAction({
   execute: async (input, ctx) =>
     attachPlatformCampaign({
       ...input,
+      userId: ctx.userId,
       campaignId: input.campaignId ?? null,
       newCampaignName: input.newCampaignName ?? null,
       organizationId: ctx.orgId,
@@ -1982,7 +1985,8 @@ export const attachAdSetAction = growthAction({
       adIds: ["ad_01", "ad_02"],
     },
   ],
-  execute: (input, ctx) => attachAdSet({ ...input, orgId: ctx.orgId }),
+  execute: (input, ctx) =>
+    attachAdSet({ ...input, orgId: ctx.orgId, userId: ctx.userId }),
 });
 
 export const setAdStatusAction = growthAction({

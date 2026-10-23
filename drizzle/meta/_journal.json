@@ -379,6 +379,20 @@
       "when": 1792773628748,
       "tag": "0052_archived_ad_delivery_history",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792787241487,
+      "tag": "0053_campaign_creator",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1792787452038,
+      "tag": "0054_recover_campaign_creators",
+      "breakpoints": true
     }
   ]
 }

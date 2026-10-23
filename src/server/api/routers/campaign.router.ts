@@ -149,7 +149,7 @@ export const campaignRouter = {
       const { brandId, ...rest } = input;
       const [campaign] = await ctx.db
         .insert(campaignTable)
-        .values({ brandId, ...rest })
+        .values({ brandId, ...rest, createdBy: ctx.session.user.id })
         .returning();
       return campaign;
     }),

@@ -417,6 +417,11 @@ export const campaignTable = pgTable(
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
+    /** The operator who created this Growth campaign; unknown for legacy rows. */
+    createdBy: t
+      .text()
+      .references(() => userTable.id, { onDelete: "set null" }),
+
     name: t.text().notNull(),
     slug: t.text(),
 
@@ -1023,6 +1028,10 @@ export type PlatformAudienceInsert = typeof platformAudienceTable.$inferInsert;
 // ---- RELATIONS -----------------------------------------------------
 
 export const campaignRelations = relations(campaignTable, ({ one, many }) => ({
+  creator: one(userTable, {
+    fields: [campaignTable.createdBy],
+    references: [userTable.id],
+  }),
   brand: one(brandTable, {
     fields: [campaignTable.brandId],
     references: [brandTable.id],

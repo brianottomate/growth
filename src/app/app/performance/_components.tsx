@@ -1,3 +1,4 @@
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ClientPreviewLink } from "./clients/[brandSlug]/ads/ClientPreviewLink";
 import {
   CampaignPlatforms,
@@ -201,15 +202,41 @@ export function CampaignRow({
         name={campaign.name}
         href={campaignHref(brand, campaign)}
         status={<StateChip state={campaign.state} />}
-        detail={[
-          showBrand ? client : null,
-          `Created ${createdOn(campaign.createdAt)}`,
-          campaign.adCount
-            ? `${campaign.adCount} ad${campaign.adCount === 1 ? "" : "s"}${campaign.approvedCount ? ` · ${campaign.approvedCount} approved` : ""}`
-            : "No ads yet",
-        ]
-          .filter(Boolean)
-          .join(" · ")}
+        detail={
+          <span className="flex flex-wrap items-center gap-x-1 gap-y-1">
+            {showBrand && <span>{client} · </span>}
+            <span>Created {createdOn(campaign.createdAt)}</span>
+            <span>·</span>
+            {campaign.creator ? (
+              <span
+                className="inline-flex items-center gap-1.5"
+                title={`Created by ${campaign.creator.name ?? "Unnamed teammate"}`}
+              >
+                <Avatar className="size-5" aria-hidden="true">
+                  {campaign.creator.image && (
+                    <AvatarImage src={campaign.creator.image} alt="" />
+                  )}
+                  <AvatarFallback textSize="xs">
+                    {(campaign.creator.name ?? "?")
+                      .split(" ")
+                      .map((part) => part[0])
+                      .slice(0, 2)
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <span>{campaign.creator.name ?? "Unnamed teammate"}</span>
+              </span>
+            ) : (
+              <span>Creator not recorded</span>
+            )}
+            <span>·</span>
+            <span>
+              {campaign.adCount
+                ? `${campaign.adCount} ad${campaign.adCount === 1 ? "" : "s"}${campaign.approvedCount ? ` · ${campaign.approvedCount} approved` : ""}`
+                : "No ads yet"}
+            </span>
+          </span>
+        }
         thumbnails={
           <CampaignThumbnailStrip
             urls={campaign.thumbs}

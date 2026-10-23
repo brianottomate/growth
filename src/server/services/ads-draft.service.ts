@@ -229,6 +229,7 @@ async function ensureAdsChannel(brandId: string, platform: DraftAdPlatform) {
  * settings live; they are not on any provider yet.
  */
 export async function createDraftCampaign(input: {
+  userId: string;
   organizationId: string;
   brandId?: string;
   brandSlug?: string;
@@ -258,6 +259,7 @@ export async function createDraftCampaign(input: {
     .values({
       id: createId("camp"),
       brandId: brand.id,
+      createdBy: input.userId,
       name: codename
         ? `${houseName} · ${codename
             .split("_")
@@ -1323,6 +1325,7 @@ export async function setCampaignCreativePool(input: {
  * instead of an id.
  */
 export async function attachPlatformCampaign(input: {
+  userId: string;
   organizationId: string;
   platformCampaignId: string;
   campaignId?: string | null;
@@ -1371,6 +1374,7 @@ export async function attachPlatformCampaign(input: {
       .values({
         id: createId("camp"),
         brandId: brand.id,
+        createdBy: input.userId,
         name,
         // Adopting something that already ran means the push is underway.
         status: "active",

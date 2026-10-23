@@ -23,6 +23,7 @@ import { adCopy, campaignCopyPlan } from "@/lib/campaign-copy";
  * Copied ads carry no push record, which is what makes them editable again.
  */
 export async function duplicateCampaign(input: {
+  userId: string;
   organizationId: string;
   campaignId: string;
   name?: string;
@@ -65,7 +66,9 @@ export async function duplicateCampaign(input: {
   );
 
   await withTransaction(async (tx) => {
-    await tx.insert(campaignTable).values(plan.campaign);
+    await tx
+      .insert(campaignTable)
+      .values({ ...plan.campaign, createdBy: input.userId });
     if (plan.ads.length) await tx.insert(adTable).values(plan.ads);
     if (plan.audiences.length)
       await tx.insert(audienceTable).values(plan.audiences);

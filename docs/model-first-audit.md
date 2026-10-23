@@ -640,3 +640,7 @@ An archived provider copy is history, not the current plan/ad-set occurrence.
 Migration 0052 and the shared status classifier agree on this distinction. A
 reviewed paused replacement can occupy the current slot while preserving the
 archived row and its provider ID. Active and paused duplicates remain prohibited.
+
+## Campaign creator (2026-10-23)
+
+Campaigns stored a creation date without authorship. Added a nullable `campaign.created_by` user relationship, set from authenticated execution context on every campaign creation path (including adoption, import, duplication and Studio export). Performance campaign rows read that relationship for the avatar and name beside the date. Historical creators are recovered only from completed campaign creation receipts for the same campaign and organization within its creation window, with one unambiguous user. Other historical rows remain unknown rather than inferring authorship from ad approval, brand ownership or the last editor. User deletion clears the reference.

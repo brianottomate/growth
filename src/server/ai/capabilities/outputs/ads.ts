@@ -60,6 +60,7 @@ const homesRunSchema = z.strictObject({
 });
 
 const campaignSchema = z.strictObject({
+  createdBy: z.string().nullable(),
   bookingTargetId: z.string().nullable(),
   brandId: z.string(),
   budget: z.number().nullable(),

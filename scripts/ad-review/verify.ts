@@ -101,6 +101,7 @@ try {
   );
   await assert.rejects(() =>
     attachAdSet({
+      userId: ctx.userId,
       orgId: ctx.orgId,
       brandId: brand.id,
       campaignId,
@@ -174,6 +175,7 @@ try {
     }),
   );
   await attachAdSet({
+    userId: ctx.userId,
     orgId: ctx.orgId,
     brandId: brand.id,
     campaignId,
@@ -187,6 +189,7 @@ try {
   assert.equal(assigned.campaignId, campaignId);
   await assert.rejects(() =>
     attachAdSet({
+      userId: ctx.userId,
       orgId: ctx.orgId,
       brandId: brand.id,
       campaignId,
