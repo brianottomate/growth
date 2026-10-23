@@ -5,6 +5,7 @@ import { cn } from "@/components/ui/lib/utils";
 import type { PerformancePipelineCard } from "@/lib/performance-card";
 import { BrandLogo } from "./_components";
 import { StatusChips } from "./AccountStatus";
+import { ConnectionDots } from "./CardConnections";
 import { PipelineStageChip } from "./StageChip";
 import type { CardView } from "./PerformanceClientCard";
 
@@ -98,6 +99,9 @@ function AccountRow({
             <PipelineStageChip stage={card.stage} />
           </span>
           <p className="truncate text-[11.5px] text-muted-foreground">{meta}</p>
+          {!prospect ? (
+            <ConnectionDots connections={card.connections} href={card.href} />
+          ) : null}
         </div>
       </div>
       <StatusChips state={card.state} view={view} />

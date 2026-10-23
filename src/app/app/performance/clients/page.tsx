@@ -56,7 +56,7 @@ export default async function PerformanceClientsPage() {
       <PipelineBoard
         cards={cards}
         defaultLayout="board"
-        details={clientDetails(desk.brands, readiness)}
+        details={clientDetails(desk.brands, readiness, connections)}
       />
     </div>
   );

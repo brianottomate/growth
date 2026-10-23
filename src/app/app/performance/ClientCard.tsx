@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import type { PerformanceConnectionSummary } from "@/lib/performance-connections";
 import { performanceCardFromBrand } from "@/lib/performance-card";
 import { CardBilling } from "./CardBilling";
+import { ConnectionDots } from "./CardConnections";
 import { cn } from "@/components/ui/lib/utils";
 import type { DeskBrand } from "@/server/services/performance-desk.service";
 import {
@@ -35,6 +37,7 @@ const fmtDate = (d: Date) =>
 export function clientDetails(
   brands: DeskBrand[],
   readiness: Map<string, BrandReadiness>,
+  connections: Map<string, PerformanceConnectionSummary>,
 ): Record<string, ReactNode> {
   return Object.fromEntries(
     brands
@@ -45,6 +48,7 @@ export function clientDetails(
           key={brand.id}
           brand={brand}
           readiness={readiness.get(brand.id) ?? null}
+          connections={connections.get(brand.id)}
         />,
       ]),
   );
@@ -57,9 +61,11 @@ export function clientDetails(
 export function ClientCard({
   brand,
   readiness,
+  connections,
 }: {
   brand: DeskBrand;
   readiness: BrandReadiness | null;
+  connections?: PerformanceConnectionSummary;
 }) {
   const intake = readiness?.intake ?? null;
   const slug = brand.slug ?? brand.id;
@@ -103,6 +109,10 @@ export function ClientCard({
             {brand.website ? " · " : ""}
             {meta}
           </p>
+          <ConnectionDots
+            connections={connections}
+            href={`/app/performance/clients/${slug}`}
+          />
           <CardBilling
             card={performanceCardFromBrand(brand)}
             className="mt-2"

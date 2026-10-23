@@ -35,3 +35,42 @@ export function CardConnections({
     </Link>
   );
 }
+
+/**
+ * The same four connections as one row of dots: green ready, amber not,
+ * each labelled, the detail on hover. For the list rows, where the card's
+ * four lines would not fit.
+ */
+export function ConnectionDots({
+  connections,
+  href,
+}: {
+  connections?: PerformanceConnectionSummary;
+  href: string;
+}) {
+  if (!connections) return null;
+  return (
+    <Link
+      href={`${href}/settings`}
+      className="relative z-10 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground"
+      title="Review account connections and tracking"
+    >
+      {performanceConnectionLines(connections).map((line) => (
+        <span
+          key={line.label}
+          className="flex items-center gap-1.5"
+          title={`${line.label}: ${line.value}`}
+        >
+          <span
+            aria-hidden="true"
+            className={`size-1.5 shrink-0 rounded-full ${line.ready ? "bg-emerald-500" : "bg-amber-500"}`}
+          />
+          <span className="sr-only">
+            {line.ready ? "Ready" : "Needs attention"}:
+          </span>
+          {line.label}
+        </span>
+      ))}
+    </Link>
+  );
+}
