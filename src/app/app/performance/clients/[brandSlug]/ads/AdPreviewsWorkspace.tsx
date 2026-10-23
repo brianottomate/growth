@@ -79,7 +79,7 @@ export function AdPreviewsWorkspace({
     "all",
   );
   const [kind, setKind] = useState<AdFormat | null>(null);
-  const [assignment, setAssignment] = useState("unassigned");
+  const [assignment, setAssignment] = useState("all");
   const campaigns = [
     ...new Map(
       ideas.flatMap((idea) =>
