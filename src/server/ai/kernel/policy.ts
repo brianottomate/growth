@@ -448,6 +448,8 @@ export const growthActionPolicies = {
     listPixels: read("provider-read"),
     listLeadForms: read("provider-read"),
     openCampaign: read(),
+    previewAdditions: read("provider-read"),
+    refreshMeta: read("provider-read"),
     listCampaigns: read(),
     ideaHomePhotos: read(),
     ideaContext: read(),
@@ -523,6 +525,13 @@ export const growthActionPolicies = {
     setCreativePool: write({ idempotent: true }),
     setPlatformDraft: write({ idempotent: true }),
     setDeliveryGroup: write({ idempotent: true }),
+    addDeliveryGroup: write(),
+    publishAdditions: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      surfaces: CONFIRMED,
+    }),
     deleteDeliveryGroup: write({ reversible: false }),
     attachCampaign: write({ idempotent: true }),
     importMetaCampaign: write({ idempotent: true }),
@@ -593,6 +602,22 @@ export const growthActionPolicies = {
       reversible: true,
       undoWith: "adsWrite.deletePlatformCampaign",
     }),
+    // One ad into ad sets that already exist, created PAUSED like the push;
+    // its send key replays a retry instead of making a second ad.
+    pushAd: write({
+      consequence: "provider-write",
+      idempotent: true,
+      reversible: true,
+      undoWith: "adsWrite.removePlatformAd",
+    }),
+    // Deletes one ad on the platform, as deleteAdDraft does, so a person
+    // says yes. pushAd sends it again as a new ad; the record of what ran stays.
+    removePlatformAd: write({
+      consequence: "provider-write",
+      approval: "user",
+      reversible: false,
+      surfaces: CONFIRMED,
+    }),
     // The one action that starts money moving. Pausing is the same action
     // with the opposite status, which is why it is reversible.
     setDelivery: write({
@@ -644,6 +669,7 @@ export const growthActionPolicies = {
     }),
     // Local rows only: a draft copy the push takes to the platform later.
     duplicateCampaign: write(),
+    duplicateAd: write(),
   },
   publishingRead: {
     connections: read(),

@@ -1,3 +1,12 @@
+import {
+  refreshMetaCampaignAction,
+  previewMetaAdditionsAction,
+  publishMetaAdditionsAction,
+  addDeliveryGroupAction,
+  pushAdAction,
+  duplicateAdAction,
+  removePlatformAdAction,
+} from "@/server/ai/capabilities/ads";
 import { adsFromCarouselsSchema } from "@/lib/ads-from-carousels";
 import {
   approvedCarouselOptions,
@@ -344,6 +353,13 @@ export const adsRouter = {
 
   setPlatformDraft: actionProcedure(setPlatformDraftAction),
   setDeliveryGroup: actionProcedure(setDeliveryGroupAction),
+  addDeliveryGroup: actionProcedure(addDeliveryGroupAction),
+  previewAdditions: actionProcedure(previewMetaAdditionsAction),
+  refreshMeta: actionProcedure(refreshMetaCampaignAction),
+  publishAdditions: actionProcedure(publishMetaAdditionsAction),
+  pushAd: actionProcedure(pushAdAction),
+  duplicateAd: actionProcedure(duplicateAdAction),
+  removePlatformAd: actionProcedure(removePlatformAdAction),
   deleteDeliveryGroup: actionProcedure(deleteDeliveryGroupAction),
 
   setCampaignCreativePool: actionProcedure(setCreativePoolAction),

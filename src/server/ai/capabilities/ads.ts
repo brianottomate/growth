@@ -1,3 +1,13 @@
+import {
+  previewMetaAdditions,
+  publishMetaAdditions,
+  refreshMetaCampaign,
+} from "@/server/services/ads-reconcile.service";
+import { addDeliveryGroup } from "@/server/services/ads-draft.service";
+import {
+  previewMetaAdditionsOutputSchema,
+  publishMetaAdditionsOutputSchema,
+} from "./outputs/ads";
 import { audienceAgeSchema } from "@/lib/audience-age";
 import { deliveryGroupConfigurationSchema } from "@/lib/platform-delivery";
 import { deliveryGeographySchema } from "@/lib/platform-delivery";
@@ -23,7 +33,10 @@ import {
   draftCampaignActionOutputSchema,
   createSpecializedMetaDraftActionOutputSchema,
   boostMetaPostActionOutputSchema,
+  duplicateAdActionOutputSchema,
   duplicateCampaignActionOutputSchema,
+  pushAdActionOutputSchema,
+  removePlatformAdActionOutputSchema,
   createAudienceActionOutputSchema,
   addAudienceUsersActionOutputSchema,
   draftAdActionOutputSchema,
@@ -126,13 +139,18 @@ import {
   listAdsWriteDestinations,
   createAdAudience,
   addAdAudienceUsers,
+  pushAdToPlatformCampaign,
   pushDraftToPlatform,
   previewDraftAd,
   setCampaignDelivery,
   syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
 import { ensureBrandGoogleAdsAccount } from "@/server/services/google-ads-accounts.service";
-import { duplicateCampaign } from "@/server/services/ads-duplicate.service";
+import {
+  duplicateAd,
+  duplicateCampaign,
+} from "@/server/services/ads-duplicate.service";
+import { removePlatformAd } from "@/server/services/platform-ad.service";
 import {
   createBrandLeadForm,
   listBrandLeadForms,
@@ -572,6 +590,22 @@ export const duplicateCampaignAction = growthAction({
       },
     };
   },
+});
+
+export const duplicateAdAction = growthAction({
+  outputSchema: duplicateAdActionOutputSchema,
+  description:
+    "Copy ONE ad into another campaign of the same brand, inside Growth: same creative, copy and media (shared, not re-uploaded), approval kept, nothing pushed. Use it to run an ad in a second campaign. When the target campaign is already on a platform, the result lists those platform campaigns; send the copy into each with adsWrite.pushAd. Nothing touches any ad platform.",
+  inputSchema: z.object({
+    adId: z.string().trim().min(1).describe("The ad_ id of the ad to copy."),
+    targetCampaignId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The camp_ id of the campaign the copy belongs to."),
+  }),
+  execute: async (input, ctx) =>
+    duplicateAd({ ...input, organizationId: ctx.orgId }),
 });
 
 export const createAudienceAction = growthAction({
@@ -1192,6 +1226,7 @@ export const addAudienceAction = growthAction({
   inputSchema: z.object({
     campaignId: z.string().min(1),
     name: z.string().trim().min(1).max(300),
+    type: z.enum(["segment", "lookalike", "custom"]).optional(),
     description: z.string().max(4000).nullish(),
     personaId: z.string().min(1).nullish(),
     geography: audienceGeographyInput,
@@ -1564,6 +1599,44 @@ export const pushDraftAction = growthAction({
     }),
 });
 
+export const pushAdAction = growthAction({
+  outputSchema: pushAdActionOutputSchema,
+  description:
+    "Send ONE approved ad into a platform campaign that is ALREADY pushed: it is created PAUSED inside each of that campaign's existing ad sets (or only deliveryGroupId), with the same names, link, placements and creative the full push builds. The ad must already belong to the campaign (adsWrite.duplicateAd or adsWrite.attachAdSet first). An ad set that already runs the ad is skipped. Nothing is created at campaign or ad set level and nothing starts spending; adsWrite.setDelivery does that. Meta only. For a campaign not on the platform yet, use adsWrite.push. Undo one with adsWrite.removePlatformAd.",
+  inputSchema: z.object({
+    adId: z.string().trim().min(1).describe("The ad_ id to send."),
+    platformCampaignId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The pcamp_ id of the pushed platform campaign."),
+    deliveryGroupId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "One pdg_ ad set to send into. Omit for every ad set of the campaign.",
+      ),
+  }),
+  execute: async (input, ctx) =>
+    pushAdToPlatformCampaign(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const removePlatformAdAction = growthAction({
+  outputSchema: removePlatformAdActionOutputSchema,
+  description:
+    "Take ONE ad out of a platform campaign by its platform_ad id (pad_, from adsRead.openCampaign or adsWrite.pushAd): the ad is cancelled on the platform and its record here is marked deleted, keeping what it ran. The plan ad, its ad set and the campaign stay. The inverse of adsWrite.pushAd; to delete the plan ad everywhere use adsWrite.deleteAdDraft. Meta only. Requires explicit operator approval.",
+  inputSchema: z.object({
+    platformAdId: z.string().trim().min(1).describe("The pad_ id."),
+  }),
+  execute: async (input, ctx) =>
+    removePlatformAd({ ...input, organizationId: ctx.orgId }),
+});
+
 export const setDeliveryAction = growthAction({
   nativeOutputSchema: setDeliveryActionNativeResultSchema,
   outputSchema: setDeliveryActionOutputSchema,
@@ -1886,7 +1959,7 @@ export const setAdHomeAction = growthAction({
 export const attachAdSetAction = growthAction({
   outputSchema: attachAdSetActionOutputSchema,
   description:
-    "Send selected approved Studio ads to a campaign (export), or add them from the campaign (import). Both render the approved recipes into fixed media and assign the existing ad IDs. Supply exactly one of campaignId or newCampaignName; a new campaign requires explicit adIds. Refuses cross-brand, unapproved, assigned selections and pushed campaigns. Nothing reaches a platform until adsWrite.push.",
+    "Send selected approved Studio ads to a campaign (export), or add them from the campaign (import). Both render the approved recipes into fixed media and assign the existing ad IDs. Supply exactly one of campaignId or newCampaignName; a new campaign requires explicit adIds. Refuses cross-brand, unapproved and assigned selections. Nothing reaches a platform until adsWrite.push, or adsWrite.pushAd per ad when the campaign is already pushed.",
   inputSchema: z
     .object({
       brandId: z.string().min(1),
@@ -2146,6 +2219,8 @@ export const setDeliveryGroupAction = growthAction({
     deliveryGroupId: z.string().min(1),
     name: z.string().trim().min(1).max(300).optional(),
     audienceId: z.string().min(1).nullable().optional(),
+    budget: z.number().int().positive().nullish(),
+    budgetType: z.enum(["daily", "lifetime"]).nullish(),
     configuration: deliveryGroupConfigurationSchema,
   }),
   outputSchema: z.strictObject({ id: z.string() }),
@@ -2160,4 +2235,55 @@ export const deleteDeliveryGroupAction = growthAction({
   outputSchema: z.strictObject({ deleted: z.boolean() }),
   execute: (input, ctx) =>
     deleteDeliveryGroup({ ...input, organizationId: ctx.orgId }),
+});
+
+export const previewMetaAdditionsAction = growthAction({
+  outputSchema: previewMetaAdditionsOutputSchema,
+  description:
+    "Review additions to one ad set within an existing Meta campaign. Reads live ownership/status and lists missing approved ads, a possible new ad set, and launch blockers. Changes nothing on Meta. Use its reviewToken with publishAdditions.",
+  inputSchema: z.object({ deliveryGroupId: z.string().min(1) }),
+  execute: (input, ctx) =>
+    previewMetaAdditions({ ...input, organizationId: ctx.orgId }),
+});
+export const publishMetaAdditionsAction = growthAction({
+  outputSchema: publishMetaAdditionsOutputSchema,
+  description:
+    "Publish the reviewed missing ads and, if needed, one new ad set inside an existing Meta campaign, all PAUSED. Requires reviewToken from adsRead.previewAdditions. Preserves existing delivery and campaign budget. Refuses missing audience links and locations. Records partial progress for resume.",
+  inputSchema: z.object({
+    deliveryGroupId: z.string().min(1),
+    reviewToken: z.string().length(64),
+  }),
+  execute: (input, ctx) =>
+    publishMetaAdditions(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+export const addDeliveryGroupAction = growthAction({
+  outputSchema: z.strictObject({ id: z.string() }),
+  description:
+    "Plan a new ad set in a draft or existing Meta campaign. Local only. Set explicit targeting and link its audience before publishing additions; creates nothing on Meta.",
+  inputSchema: z.object({
+    platformCampaignId: z.string().min(1),
+    name: z.string().trim().min(1).max(300),
+    audienceId: z.string().min(1).nullish(),
+    budget: z.number().int().positive().nullish(),
+    budgetType: z.enum(["daily", "lifetime"]).nullish(),
+    configuration: deliveryGroupConfigurationSchema,
+  }),
+  execute: (input, ctx) =>
+    addDeliveryGroup({ ...input, organizationId: ctx.orgId }),
+});
+
+export const refreshMetaCampaignAction = growthAction({
+  outputSchema: z.strictObject({
+    updated: z.number(),
+    adsWritten: z.number(),
+    errors: z.array(z.string()),
+  }),
+  description:
+    "Refresh Meta campaigns, ad sets, ads and performance in the selected campaign's allowlisted account. Provider read; writes only Growth mirror rows and preserves Studio creative and unpublished ad sets.",
+  inputSchema: z.object({ platformCampaignId: z.string().min(1) }),
+  execute: (input, ctx) =>
+    refreshMetaCampaign({ ...input, organizationId: ctx.orgId }),
 });

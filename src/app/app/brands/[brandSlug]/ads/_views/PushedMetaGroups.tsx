@@ -1,3 +1,10 @@
+import { META_PLACEMENTS } from "@/lib/meta-placement-plan";
+import { RefreshMeta } from "./RefreshMeta";
+import { AddMetaDeliveryGroup } from "./AddMetaDeliveryGroup";
+import { db } from "@/server/db";
+import { audienceTable } from "@/server/db/ads-schema";
+import { eq } from "drizzle-orm";
+import { MetaAdditions } from "./MetaAdditions";
 import { ChevronDown } from "lucide-react";
 import type {
   PlatformAd,
@@ -13,7 +20,7 @@ import { SeedLookalikeStep } from "./SeedLookalikeStep";
 import type { NewSeedListContext } from "@/app/app/performance/clients/[brandSlug]/NewSeedList";
 
 /** Native delivery relationships and observed creative, independent of the editable plan. */
-export function PushedMetaGroups({
+export async function PushedMetaGroups({
   groups,
   ads,
   pc,
@@ -29,6 +36,12 @@ export function PushedMetaGroups({
   /** Shows each ad set's seed line; omitted where seeds do not apply. */
   seed?: { brandId: string; brandName: string; context?: NewSeedListContext };
 }) {
+  const audiences = pc.campaignId
+    ? await db.query.audienceTable.findMany({
+        where: eq(audienceTable.campaignId, pc.campaignId),
+        columns: { id: true, name: true, type: true },
+      })
+    : [];
   const account =
     pc.settings?.meta?.destination?.adAccountId ??
     (pc.manageUrl ? new URL(pc.manageUrl).searchParams.get("act") : null);
@@ -61,7 +74,16 @@ export function PushedMetaGroups({
   );
   return (
     <section className="space-y-3">
-      <h4 className="text-sm font-semibold">Ad sets · {groups.length}</h4>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <RefreshMeta platformCampaignId={pc.id} />
+        <h4 className="text-sm font-semibold">Ad sets · {groups.length}</h4>
+        {pc.campaignId && pc.status !== "ended" && (
+          <AddMetaDeliveryGroup
+            platformCampaignId={pc.id}
+            audiences={audiences}
+          />
+        )}
+      </div>
       {groups.map((group) => {
         const groupAds = ads.filter(
           (ad) => ad.platformDeliveryGroupId === group.id,
@@ -98,6 +120,25 @@ export function PushedMetaGroups({
                 )}
               </summary>
               <div className="space-y-4 px-4 pb-4">
+                <MetaAdditions group={group} />
+                {group.configuration?.platform === "meta_ads" &&
+                  group.configuration.placements && (
+                    <p className="text-xs text-muted-foreground">
+                      Placements:{" "}
+                      {group.configuration.placements
+                        .map(
+                          (id) =>
+                            META_PLACEMENTS.find((p) => p.id === id)?.label ??
+                            id,
+                        )
+                        .join(" · ")}
+                    </p>
+                  )}
+                {!group.externalId && (
+                  <p className="text-xs text-muted-foreground">
+                    Internal draft · not yet created on Meta
+                  </p>
+                )}
                 {!targeting && (
                   <p className="text-xs text-muted-foreground">
                     Targeting details unavailable.
@@ -127,7 +168,12 @@ export function PushedMetaGroups({
                   brandId={seed.brandId}
                   brandName={seed.brandName}
                   campaignAudienceId={group.audienceId}
-                  display="row"
+                  display={group.externalId ? "row" : "section"}
+                  seedContext={seed.context}
+                  required={
+                    audiences.find((a) => a.id === group.audienceId)?.type ===
+                    "lookalike"
+                  }
                 />
               </div>
             )}

@@ -1,3 +1,5 @@
+import { metaGoalMatchesObjective } from "@/lib/meta-additions";
+import { platformCampaignAdAccount } from "@/lib/platform-campaign-account";
 export type CompiledDeliveryAudience = {
   type: string;
   id: string;
@@ -15,7 +17,11 @@ import {
   hasDeliveryLocations,
   deliveryGroupConfigurationSchema,
 } from "@/lib/platform-delivery";
-import { selectPlatformAds } from "@/lib/platform-ad-plan";
+import {
+  adGoneOnPlatform,
+  eligiblePlatformAds,
+  selectPlatformAds,
+} from "@/lib/platform-ad-plan";
 import {
   startWorkflowRun,
   claimWorkflowRun,
@@ -34,6 +40,7 @@ import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { adsConnectionProfile } from "./ads-connection-profile";
 import {
   META_DEFAULT_PLACEMENTS,
+  observedMetaPlacements,
   isFeedPlacement,
   showsSquare,
   metaPlacementPlanSchema,
@@ -123,6 +130,9 @@ import {
   type ZernioAdWriteResponse,
   type ZernioAudienceUser,
   type ZernioCarouselCard,
+  getZernioMetaCampaign,
+  getZernioMetaDeliverySet,
+  writtenAdId,
   writtenAdSetId,
   writtenCampaignId,
   type ZernioKeyword,
@@ -174,7 +184,7 @@ import {
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 
-type AdsWriteContext = {
+export type AdsWriteContext = {
   organizationId: string;
   runId: string;
   reportProgress?: (
@@ -517,7 +527,7 @@ export async function listAdsWriteDestinations(input: {
   };
 }
 
-async function requireAdDestination(input: {
+export async function requireAdDestination(input: {
   organizationId: string;
   brandSlug: string;
   platform: ZernioAdPlatform;
@@ -880,7 +890,7 @@ export function withMetaAttribution(
 }
 
 /** The only way this service creates a Meta ad. Validates, then sends. */
-async function createMetaAd(
+export async function createMetaAd(
   payload: CreateZernioStandaloneAdInput,
   options: {
     pageId: string | null;
@@ -2230,15 +2240,18 @@ export async function setCampaignDelivery(
  * the persona the plan audience derives from. Either way it must live in an
  * ad account on this platform.
  */
-async function platformAudienceExternalIdFor(
-  planAudience: { id: string; personaId: string | null },
+export async function platformAudienceExternalIdFor(
+  planAudience: { id: string; personaId: string | null; type?: string },
   brandId: string,
   platform: PushableAdPlatform,
+  expectedAdAccountId?: string,
 ): Promise<string | null> {
   const [linked] = await db
     .select({
       externalId: platformAudienceTable.externalId,
       seedMetadata: platformAudienceTable.seedMetadata,
+      type: platformAudienceTable.type,
+      adAccountId: platformAudienceTable.adAccountId,
     })
     .from(campaignAudienceAssetTable)
     .innerJoin(
@@ -2257,6 +2270,28 @@ async function platformAudienceExternalIdFor(
     )
     .limit(1);
   if (linked) {
+    if (planAudience.type === "lookalike" && linked.type !== "lookalike")
+      throw new Error("Select the lookalike, not its customer-list seed");
+    if (expectedAdAccountId) {
+      const account = linked.adAccountId
+        ? await db.query.adAccountTable.findFirst({
+            where: eq(adAccountTable.id, linked.adAccountId),
+            columns: { brandId: true, externalId: true, isAllowed: true },
+          })
+        : null;
+      if (
+        account?.brandId !== brandId ||
+        !account.isAllowed ||
+        !sameAdAccountId(
+          zernioAdPlatformKey(platform),
+          account.externalId,
+          expectedAdAccountId,
+        )
+      )
+        throw new Error(
+          "The selected audience is not in this brand's allowlisted destination account",
+        );
+    }
     if (
       !linked.externalId ||
       (linked.seedMetadata && linked.seedMetadata.status !== "ready")
@@ -2278,11 +2313,12 @@ async function platformAudienceExternalIdFor(
  * resolve is reported, never silently dropped — an unresolved region
  * silently widening to a whole country is the expensive failure mode.
  */
-async function compileAudienceTargeting(input: {
+export async function compileAudienceTargeting(input: {
   audience: CompiledDeliveryAudience;
   connectionAccountId: string;
   brandId: string;
   platform: PushableAdPlatform;
+  adAccountId?: string;
 }): Promise<{ spec: ZernioAdTargeting | undefined; warnings: string[] }> {
   const { audience } = input;
   const warnings: string[] = [];
@@ -2411,8 +2447,13 @@ async function compileAudienceTargeting(input: {
       audience,
       input.brandId,
       input.platform,
+      input.adAccountId,
     );
     if (assetId) spec.audienceInclude = [assetId];
+    else if (audience.type === "lookalike" || audience.type === "custom")
+      throw new Error(
+        `${audience.name}: link a ready platform audience before publishing. It will not be sent as broad.`,
+      );
   }
 
   const empty = Object.keys(spec).length === 0;
@@ -2846,6 +2887,7 @@ async function performPlatformPush(
         connectionAccountId,
         brandId: brand.id,
         platform,
+        adAccountId: destination.adAccount.id,
       },
     );
     warnings.push(...audienceWarnings);
@@ -3463,36 +3505,36 @@ export async function ensureBrandReportingConversion(
 // then one attach per remaining ad. Every image ad goes as a creative Growth
 // built, so Zernio only creates the campaign, the ad sets and the ads. A
 // failure keeps what was made (all paused) and records it as incomplete.
-async function pushToMeta(args: PushArgs) {
+/**
+ * What every Meta ad of a campaign is sent with, worked out once: the house
+ * names, the link or lead form, the placement plan, and each ad's words and
+ * media (an image ad as a creative Growth builds itself). The full push and
+ * a single ad sent into an existing ad set both go through here, so the ad
+ * a later send makes is the ad the push would have made.
+ */
+export async function compileMetaAds(args: {
+  goal: AdPushGoal;
+  brand: Brand;
+  campaign: Campaign;
+  draft: PlatformCampaign;
+  destination: AdDestination;
+  settings: PlatformCampaignSettings;
+  /** The ads being sent. */
+  usable: Array<{ ad: Ad; content: AdCreativeContent }>;
+  /** Whose first link URL is the default link; the sent ads by default. */
+  linkFrom?: Array<{ content: AdCreativeContent }>;
+  warnings: string[];
+}) {
   const {
-    input,
-    context,
-    campaign,
+    goal,
     brand,
+    campaign,
     draft,
     destination,
-    compiled,
-    ads,
-    budgetAmount,
-    budgetType,
     settings,
-    startDate,
-    endDate,
+    usable,
     warnings,
   } = args;
-
-  const usable = creativeAds(ads);
-  if (usable.length === 0) {
-    throw new Error(
-      "Meta needs at least one creative ad with an image — text ads compile to Google only",
-    );
-  }
-  const skippedText = textAds(ads).length;
-  if (skippedText > 0) {
-    warnings.push(
-      `${skippedText} text ad(s) were not sent to Meta — they compile to Google`,
-    );
-  }
   const meta = applyMetaTrackingDefaults(
     settings.meta ?? {},
     await metaTrackingDefaults(brand.id, destination.adAccount.id),
@@ -3500,15 +3542,15 @@ async function pushToMeta(args: PushArgs) {
   // A lead ad's destination is its instant form on the Page: no landing URL,
   // no pixel event, and every ad carries the form id.
   const leadGenFormId =
-    input.goal === "lead_generation" ? meta.leadFormId : undefined;
-  if (input.goal === "lead_generation" && !leadGenFormId)
+    goal === "lead_generation" ? meta.leadFormId : undefined;
+  if (goal === "lead_generation" && !leadGenFormId)
     throw new Error(
       "Pick or create a lead form in Meta setup before pushing a lead generation campaign.",
     );
   const linkUrl = leadGenFormId
     ? META_LEAD_AD_LINK
-    : (usable.find(({ content }) => content.linkUrl)?.content.linkUrl ??
-      campaign.landingUrl);
+    : ((args.linkFrom ?? usable).find(({ content }) => content.linkUrl)?.content
+        .linkUrl ?? campaign.landingUrl);
   if (!linkUrl) {
     throw new Error(
       "Set a landing URL on the campaign, or a link URL on at least one ad",
@@ -3559,7 +3601,7 @@ async function pushToMeta(args: PushArgs) {
     name: campaign.name,
     customer: brand.name,
     isClient,
-    goal: input.goal,
+    goal: goal,
     period: (draft.startAt ?? campaign.startAt ?? campaign.createdAt)
       .toISOString()
       .slice(0, 7)
@@ -3709,11 +3751,6 @@ async function pushToMeta(args: PushArgs) {
   const pageId =
     destination.brand.metaPageId ??
     metaPageIdFromConnection(destination.connection.platformUserId);
-  // Keyed on the plan, not the request: a retried push replays what it
-  // already made instead of making it twice. Recording a failed push touches
-  // the draft, so a push after deleting it starts on fresh keys.
-  const planKey = (...parts: string[]) =>
-    `push:${draft.id}:${draft.updatedAt.getTime()}:${parts.join(":")}`;
 
   /** One ad's words and media, as both the opening and an attach send them. */
   const adFields = async (ad: Ad, content: AdCreativeContent) => ({
@@ -3727,6 +3764,75 @@ async function pushToMeta(args: PushArgs) {
     callToAction: metaCallToAction(content),
     ...(await mediaFor(ad, content)),
   });
+
+  return {
+    linkUrl,
+    placementPlan,
+    useCbo,
+    promotedObject,
+    pageId,
+    metaCampaignName,
+    adSetNameFor,
+    adNameFor,
+    adFields,
+  };
+}
+
+async function pushToMeta(args: PushArgs) {
+  const {
+    input,
+    context,
+    campaign,
+    brand,
+    draft,
+    destination,
+    compiled,
+    ads,
+    budgetAmount,
+    budgetType,
+    settings,
+    startDate,
+    endDate,
+    warnings,
+  } = args;
+
+  const usable = creativeAds(ads);
+  if (usable.length === 0) {
+    throw new Error(
+      "Meta needs at least one creative ad with an image — text ads compile to Google only",
+    );
+  }
+  const skippedText = textAds(ads).length;
+  if (skippedText > 0) {
+    warnings.push(
+      `${skippedText} text ad(s) were not sent to Meta — they compile to Google`,
+    );
+  }
+  const {
+    linkUrl,
+    placementPlan,
+    useCbo,
+    promotedObject,
+    pageId,
+    metaCampaignName,
+    adSetNameFor,
+    adNameFor,
+    adFields,
+  } = await compileMetaAds({
+    goal: input.goal,
+    brand,
+    campaign,
+    draft,
+    destination,
+    settings,
+    usable,
+    warnings,
+  });
+  // Keyed on the plan, not the request: a retried push replays what it
+  // already made instead of making it twice. Recording a failed push touches
+  // the draft, so a push after deleting it starts on fresh keys.
+  const planKey = (...parts: string[]) =>
+    `push:${draft.id}:${draft.updatedAt.getTime()}:${parts.join(":")}`;
 
   type CreatedSet = {
     result: ZernioAdWriteResponse;
@@ -3834,15 +3940,6 @@ async function pushToMeta(args: PushArgs) {
     }
   };
 
-  const externalAdId = (result: ZernioAdWriteResponse) => {
-    const row = result.ad ?? result.ads?.[0];
-    return (
-      (typeof row?.platformAdId === "string" ? row.platformAdId : null) ??
-      row?.id ??
-      row?._id ??
-      null
-    );
-  };
   /** Plan lineage: the opening made the first ad, each attach one more. */
   const setAdsFor = (set: CreatedSet) =>
     [{ planAd: usable[0]!.ad, result: set.result }, ...set.attached].map(
@@ -3850,7 +3947,7 @@ async function pushToMeta(args: PushArgs) {
         const content = planAd.content as AdCreativeContent;
         return {
           planAd,
-          externalId: externalAdId(result),
+          externalId: writtenAdId(result),
           headline: content.headline,
           body: content.body,
           linkUrl: content.linkUrl ?? linkUrl,
@@ -3980,6 +4077,353 @@ async function pushToMeta(args: PushArgs) {
     platformCampaignRowId: draft.id,
     adSetsCreated: perSet.length,
     adsCreated: perSet.length * usable.length,
+    path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
+    warnings,
+  };
+}
+
+/**
+ * Send one ad into a campaign that is already on the platform: PAUSED, into
+ * each of its ad sets (or the one named), compiled exactly as the full push
+ * compiles it. The campaign and its ad sets are never created here; that is
+ * the push's one-time job, and its guard stands. An ad set that already runs
+ * this ad is left alone rather than given a second copy. Meta only.
+ */
+/** Serialize individual sends with full pushes and reviewed ad-set additions. */
+export async function pushAdToPlatformCampaign(
+  input: { adId: string; platformCampaignId: string; deliveryGroupId?: string },
+  context: AdsWriteContext,
+) {
+  const plan = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
+    with: { brand: true },
+  });
+  if (!plan?.campaignId || plan.brand.organizationId !== context.organizationId)
+    throw new Error("No access to this campaign");
+  const started = await startWorkflowRun({
+    organizationId: context.organizationId,
+    brandId: plan.brandId,
+    campaignId: plan.campaignId,
+    workflowType: "platform-push",
+    lockKey: `platform-push:${plan.campaignId}:meta_ads`,
+    input,
+    progress: { message: "Sending one paused Meta ad" },
+  });
+  if (!started.started)
+    throw new Error("A Meta publish is already running for this campaign");
+  const run = await claimWorkflowRun(started.run.id, "platform-push");
+  if (!run) throw new Error("Could not start Meta ad publish");
+  try {
+    const result = await sendAdToExistingMetaSet(input, context);
+    await updateWorkflowRun(run, {
+      status: "succeeded",
+      progress: { message: "Ad additions recorded paused" },
+    }).catch((error) =>
+      console.error("Meta publish activity update failed", error),
+    );
+    return result;
+  } catch (error) {
+    await failWorkflowRun(run, error);
+    throw error;
+  }
+}
+
+export async function sendAdToExistingMetaSet(
+  input: { adId: string; platformCampaignId: string; deliveryGroupId?: string },
+  context: AdsWriteContext,
+) {
+  const draft = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
+  });
+  if (!draft) throw new Error("Platform campaign not found");
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, draft.brandId),
+  });
+  if (brand?.organizationId !== context.organizationId)
+    throw new Error("No access to this campaign");
+  if (!brand.slug) throw new Error("Brand has no slug");
+  if (draft.platform !== "meta_ads")
+    throw new Error(
+      `Sending one ad into a pushed campaign works on Meta only. ${adPlatformSpec(draft.platform)?.shortLabel ?? draft.platform} campaigns take their ads in the full push.`,
+    );
+  if (!draft.externalId)
+    throw new Error(
+      "This campaign is not on Meta yet. Push it with adsWrite.push, which sends all its ads at once.",
+    );
+  if (!draft.campaignId) throw new Error("This platform campaign has no plan");
+  const campaign = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, draft.campaignId),
+  });
+  if (!campaign || campaign.deletedAt) throw new Error("Campaign not found");
+  if (draft.status === "ended")
+    throw new Error(
+      "This campaign has ended on Meta. Send the ad into a running campaign.",
+    );
+
+  const found = await db.query.adTable.findFirst({
+    where: and(eq(adTable.id, input.adId), eq(adTable.brandId, brand.id)),
+  });
+  if (!found) throw new Error("Ad not found on this brand");
+  if (found.campaignId !== campaign.id)
+    throw new Error(
+      `${found.name} is not in campaign ${campaign.id}. Copy it in with adsWrite.duplicateAd, or attach an unassigned ad with adsWrite.attachAdSet, then send it.`,
+    );
+  const settings = draft.settings ?? {};
+  if (!eligiblePlatformAds([found], "meta_ads", settings).length)
+    throw new Error(
+      `${found.name} is not set to run on Meta. Add Meta to its platforms first.`,
+    );
+  if (found.status !== "approved")
+    throw new Error(`Approve ${found.name} before sending it`);
+  if (
+    "media" in found.content &&
+    found.content.ideaStudio &&
+    ideaAwaitingArtwork(found.content.ideaStudio.document)
+  )
+    throw new Error(
+      `Artwork is still missing for an included size of ${found.name}. Add artwork, use the base image, or exclude that size before sending.`,
+    );
+  await context.reportProgress?.("Checking approved artwork");
+  await freezeApprovedAd(found.id);
+  const ad = await db.query.adTable.findFirst({
+    where: eq(adTable.id, found.id),
+  });
+  if (ad?.status !== "approved" || !ad.approvedBy)
+    throw new Error(`Approve ${found.name} before sending it`);
+  const usable = creativeAds([ad]);
+  if (!usable.length)
+    throw new Error(
+      `${ad.name} has no image or video yet. Add its creative before sending.`,
+    );
+
+  const groups = (
+    await db.query.platformDeliveryGroupTable.findMany({
+      where: eq(platformDeliveryGroupTable.platformCampaignId, draft.id),
+    })
+  ).filter(
+    (group) =>
+      group.externalId &&
+      (!input.deliveryGroupId || group.id === input.deliveryGroupId),
+  );
+  if (!groups.length)
+    throw new Error(
+      input.deliveryGroupId
+        ? `Delivery group ${input.deliveryGroupId} is not an ad set of this campaign on Meta`
+        : "This campaign has no ad sets on Meta to send the ad into",
+    );
+  const sent = await db.query.platformAdTable.findMany({
+    where: and(
+      eq(platformAdTable.adId, ad.id),
+      eq(platformAdTable.platformCampaignId, draft.id),
+    ),
+    columns: { platformDeliveryGroupId: true, status: true },
+  });
+  const running = new Set(
+    sent.flatMap((row) =>
+      row.platformDeliveryGroupId && !adGoneOnPlatform(row.status)
+        ? [row.platformDeliveryGroupId]
+        : [],
+    ),
+  );
+
+  const pinned = configuredMetaDestination(brand.performanceSettings);
+  await context.reportProgress?.("Checking platform account and Page access");
+  const destination = await requireAdDestination({
+    organizationId: context.organizationId,
+    brandSlug: brand.slug,
+    platform: zernioAdPlatformKey("meta_ads"),
+    connectionAccountId: pinned.connectionAccountId,
+    adAccountId: pinned.adAccountId,
+  });
+  const account = platformCampaignAdAccount(draft);
+  const { campaign: live } = await getZernioMetaCampaign({
+    accountId: pinned.connectionAccountId,
+    campaignId: draft.externalId,
+  });
+  if (
+    !account ||
+    !sameAdAccountId("meta", account, destination.adAccount.id) ||
+    live?.id !== draft.externalId ||
+    !sameAdAccountId("meta", live.account_id, destination.adAccount.id) ||
+    !["ACTIVE", "PAUSED"].includes(live.status)
+  )
+    throw new Error(
+      "The live Meta campaign is not an active or paused campaign in the configured ad account",
+    );
+  const placementsByGroup = new Map<string, MetaPlacement[]>();
+  for (const group of groups) {
+    const { adSet: liveSet } = await getZernioMetaDeliverySet({
+      accountId: pinned.connectionAccountId,
+      adSetId: group.externalId!,
+    });
+    if (
+      group.brandId !== brand.id ||
+      liveSet?.campaign_id !== draft.externalId ||
+      !sameAdAccountId("meta", liveSet.account_id, destination.adAccount.id) ||
+      !["ACTIVE", "PAUSED"].includes(liveSet.status)
+    )
+      throw new Error(
+        "The live Meta ad set does not belong to this campaign or cannot accept ads",
+      );
+    const observed = liveSet.targeting
+      ? observedMetaPlacements(liveSet.targeting)
+      : null;
+    if (observed) placementsByGroup.set(group.id, observed);
+  }
+  const goal = settings.meta?.goal ?? "conversions";
+  if (!metaGoalMatchesObjective(goal, live.objective))
+    throw new Error(
+      "The saved goal differs from the live Meta campaign objective. Review delivery setup before sending ads.",
+    );
+  const warnings: string[] = [];
+  // The full push takes its default link from the campaign's ads; so does this.
+  const siblings = creativeAds(
+    selectPlatformAds(
+      await db.query.adTable.findMany({
+        where: eq(adTable.campaignId, campaign.id),
+      }),
+      "meta_ads",
+      settings,
+    ).filter((row) => row.status === "approved"),
+  );
+  const { pageId, adNameFor, adFields, linkUrl } = await compileMetaAds({
+    goal,
+    brand,
+    campaign,
+    draft,
+    destination,
+    settings: {
+      ...settings,
+      meta: {
+        ...settings.meta,
+        placements:
+          placementsByGroup.get(groups[0]!.id) ?? settings.meta?.placements,
+      },
+    },
+    usable,
+    linkFrom: [...usable, ...siblings],
+    warnings,
+  });
+  const { content } = usable[0]!;
+
+  const created: Array<{
+    deliveryGroupId: string;
+    platformAdId: string;
+    externalAdId: string;
+  }> = [];
+  try {
+    for (const group of groups) {
+      if (running.has(group.id)) continue;
+      await context.reportProgress?.(`Creating ${ad.name} in ${group.name}`);
+      const groupPlacements = placementsByGroup.get(group.id);
+      const groupCreative = groupPlacements
+        ? await compileMetaAds({
+            goal,
+            brand,
+            campaign,
+            draft,
+            destination,
+            settings: {
+              ...settings,
+              meta: { ...settings.meta, placements: groupPlacements },
+            },
+            usable,
+            linkFrom: [...usable, ...siblings],
+            warnings,
+          })
+        : { adNameFor, adFields };
+      const attach: CreateZernioStandaloneAdInput = {
+        accountId: pinned.connectionAccountId,
+        adAccountId: destination.adAccount.id,
+        adSetId: group.externalId!,
+        name: groupCreative.adNameFor(ad, content),
+        goal,
+        ...(await groupCreative.adFields(ad, content)),
+        ...metaDraftProviderControls(),
+      };
+      // One key per send of this ad into this set: a retry replays it, and a
+      // send after removing it (its row stays, marked deleted) is a new one.
+      const sends = sent.filter(
+        (row) => row.platformDeliveryGroupId === group.id,
+      ).length;
+      const result = await createMetaAd(attach, {
+        pageId,
+        idempotencyKey: idempotencyKey(
+          context,
+          "push-ad",
+          attach,
+          `push-ad:${ad.id}:${group.id}:${sends}`,
+        ),
+        adAccount: destination.adAccount,
+      });
+      const externalAdId = writtenAdId(result);
+      if (!externalAdId)
+        throw new Error(
+          `Meta returned no ad id for ${ad.name} in ${group.name}; check the ad set in Ads Manager before sending again`,
+        );
+      const [row] = await db
+        .insert(platformAdTable)
+        .values(
+          platformAdValues({
+            draft,
+            deliveryGroupId: group.id,
+            externalAdSetId: group.externalId,
+            adSetName: group.name,
+            status: "paused",
+            ad: {
+              planAd: ad,
+              externalId: externalAdId,
+              headline: content.headline,
+              body: content.body,
+              linkUrl: content.linkUrl ?? linkUrl,
+              media: content.media,
+            },
+          }),
+        )
+        .returning({ id: platformAdTable.id });
+      created.push({
+        deliveryGroupId: group.id,
+        platformAdId: row!.id,
+        externalAdId,
+      });
+    }
+    if (created.length) {
+      await db
+        .update(platformCampaignTable)
+        .set({
+          adCount: sql`${platformCampaignTable.adCount} + ${created.length}`,
+          // A campaign that lists its ads now lists this one too.
+          ...(settings.selectedAdIds && !settings.selectedAdIds.includes(ad.id)
+            ? {
+                settings: {
+                  ...settings,
+                  selectedAdIds: [...settings.selectedAdIds, ad.id],
+                },
+              }
+            : {}),
+        })
+        .where(eq(platformCampaignTable.id, draft.id));
+      await context.reportProgress?.("Verifying the new ads are paused");
+      await ensureMetaAdsPaused(created.map((row) => row.externalAdId));
+    }
+  } catch (error) {
+    // What was made is paused; say so, or say to check, alongside the cause.
+    const made = created.map((row) => row.externalAdId);
+    const paused = await ensureMetaAdsPaused(made).then(
+      () => true,
+      () => false,
+    );
+    throw new Error(
+      `Sending ${ad.name} stopped: ${errorText(error)}.${made.length ? ` Created ${made.length} ad${made.length === 1 ? "" : "s"} first (${made.join(", ")}), recorded in Growth${paused ? ", paused" : "; confirm they are paused in Ads Manager now"}.` : ""}`,
+    );
+  }
+  return {
+    adId: ad.id,
+    platformCampaignId: draft.id,
+    created,
+    alreadyRunningIn: groups
+      .filter((group) => running.has(group.id))
+      .map((group) => group.id),
     path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
     warnings,
   };
@@ -4746,37 +5190,61 @@ async function recordCompiledCampaign(input: CompiledCampaignRecord) {
           .returning({ id: platformDeliveryGroupTable.id });
     if (!setRow) throw new Error("Planned delivery group disappeared");
     for (const ad of set.ads) {
-      await db.insert(platformAdTable).values({
-        id: createId("pad"),
-        platformCampaignId: input.draft.id,
-        platformDeliveryGroupId: setRow.id,
-        brandId: input.draft.brandId,
-        channelId: input.draft.channelId,
-        platform: input.draft.platform,
-        adId: ad.planAd.id,
-        pushedCreative: {
-          name: ad.planAd.name,
-          headline: ad.headline ?? null,
-          body: ad.body ?? null,
-          linkUrl: ad.linkUrl ?? null,
-          media: ad.media ?? null,
-          copy: ad.copy ?? null,
-        },
-        name: ad.planAd.name,
-        headline: ad.headline,
-        body: ad.body,
-        linkUrl: ad.linkUrl,
-        media: ad.media,
-        copy: ad.copy ?? null,
-        thumbnailUrl: ad.media?.[0]?.url ?? null,
-        status: input.status,
-        externalAdSetId: set.externalId,
-        adSetName: set.name,
-        externalId: ad.externalId,
-        businessKey: ad.planAd.businessKey,
-      });
+      await db.insert(platformAdTable).values(
+        platformAdValues({
+          draft: input.draft,
+          deliveryGroupId: setRow.id,
+          externalAdSetId: set.externalId,
+          adSetName: set.name,
+          status: input.status,
+          ad,
+        }),
+      );
     }
   }
+}
+
+type SentAd = CompiledCampaignRecord["sets"][number]["ads"][number];
+
+/** The mirror row for one ad Growth sent: what was sent, and where. */
+export function platformAdValues(input: {
+  draft: PlatformCampaign;
+  deliveryGroupId: string;
+  externalAdSetId: string | null;
+  adSetName: string;
+  status: PlatformCampaignStatus;
+  ad: SentAd;
+}) {
+  const { ad } = input;
+  return {
+    id: createId("pad"),
+    platformCampaignId: input.draft.id,
+    platformDeliveryGroupId: input.deliveryGroupId,
+    brandId: input.draft.brandId,
+    channelId: input.draft.channelId,
+    platform: input.draft.platform,
+    adId: ad.planAd.id,
+    pushedCreative: {
+      name: ad.planAd.name,
+      headline: ad.headline ?? null,
+      body: ad.body ?? null,
+      linkUrl: ad.linkUrl ?? null,
+      media: ad.media ?? null,
+      copy: ad.copy ?? null,
+    },
+    name: ad.planAd.name,
+    headline: ad.headline,
+    body: ad.body,
+    linkUrl: ad.linkUrl,
+    media: ad.media,
+    copy: ad.copy ?? null,
+    thumbnailUrl: ad.media?.[0]?.url ?? null,
+    status: input.status,
+    externalAdSetId: input.externalAdSetId,
+    adSetName: input.adSetName,
+    externalId: ad.externalId,
+    businessKey: ad.planAd.businessKey,
+  };
 }
 
 // ---- DELETE ------------------------------------------------------------

@@ -1,4 +1,10 @@
 import {
+  refreshMetaCampaignAction,
+  previewMetaAdditionsAction,
+  publishMetaAdditionsAction,
+  addDeliveryGroupAction,
+} from "./ads";
+import {
   prepareBroadcast,
   previewBroadcasts,
   scheduleBroadcastsAction,
@@ -146,7 +152,10 @@ import {
   deletePlatformCampaignAction,
   draftAdAction,
   draftCampaignAction,
+  duplicateAdAction,
   duplicateCampaignAction,
+  pushAdAction,
+  removePlatformAdAction,
   listAdsDestinations,
   listPixelsAction,
   setupMetaPixelAction,
@@ -743,6 +752,8 @@ export const adsRead = growthDomainTool({
     listPixels: listPixelsAction,
     listLeadForms: listLeadFormsAction,
     openCampaign: openCampaignAction,
+    previewAdditions: previewMetaAdditionsAction,
+    refreshMeta: refreshMetaCampaignAction,
     listCampaigns: listCampaignsAction,
     ideaHomePhotos: ideaHomePhotosAction,
     ideaContext: ideaContextAction,
@@ -797,6 +808,8 @@ export const adsWrite = growthDomainTool({
     setCreativePool: setCreativePoolAction,
     setPlatformDraft: setPlatformDraftAction,
     setDeliveryGroup: setDeliveryGroupAction,
+    addDeliveryGroup: addDeliveryGroupAction,
+    publishAdditions: publishMetaAdditionsAction,
     deleteDeliveryGroup: deleteDeliveryGroupAction,
     attachCampaign: attachCampaignAction,
     importMetaCampaign: importMetaCampaignAction,
@@ -813,6 +826,8 @@ export const adsWrite = growthDomainTool({
     deleteAudience: deleteAudienceAction,
     deleteAdDraft: deleteAdDraftAction,
     push: pushDraftAction,
+    pushAd: pushAdAction,
+    removePlatformAd: removePlatformAdAction,
     setDelivery: setDeliveryAction,
     deletePlatformCampaign: deletePlatformCampaignAction,
     createSpecializedMetaDraft: createSpecializedMetaDraftAction,
@@ -821,6 +836,7 @@ export const adsWrite = growthDomainTool({
     assignPersonaAudience: assignPersonaAudienceAction,
     boostMetaPost: boostMetaPostAction,
     duplicateCampaign: duplicateCampaignAction,
+    duplicateAd: duplicateAdAction,
   },
 });
 

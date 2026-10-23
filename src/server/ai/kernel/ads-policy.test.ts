@@ -7,10 +7,12 @@ import { growthActionPolicies } from "@/server/ai/kernel/policy";
 const adsWrite = growthActionPolicies.adsWrite;
 const NEEDS_A_YES = [
   "setDelivery",
+  "publishAdditions",
   "boostMetaPost",
   "deletePlatformCampaign",
   "deleteCampaignLeavingPlatform",
   "deleteAdDraft",
+  "removePlatformAd",
 ] as const satisfies readonly (keyof typeof adsWrite)[];
 
 describe("ads action policy", () => {

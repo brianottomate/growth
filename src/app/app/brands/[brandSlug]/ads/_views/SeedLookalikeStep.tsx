@@ -69,10 +69,12 @@ export function SeedLookalikeStep({
   campaignAudienceId,
   seedContext,
   display = "section",
+  required = false,
 }: {
   brandId: string;
   brandName: string;
   campaignAudienceId: string;
+  required?: boolean;
   seedContext?: NewSeedListContext;
   /** "row": a read-only line, shown only once a lookalike is in use. */
   display?: "row" | "section";
@@ -220,7 +222,9 @@ export function SeedLookalikeStep({
       <div>
         <h4 className="text-sm font-medium">Seed lookalike</h4>
         <p className="text-xs text-muted-foreground">
-          Optional. A seed list becomes a lookalike this ad set targets.
+          {required
+            ? "Required for this lookalike ad set. Link a ready lookalike before publishing."
+            : "Optional. A seed list becomes a lookalike this ad set targets."}
           {d?.wanderData
             ? ` Wander travelers go to Wander's ad account; ${brandName} only receives the shared lookalike.`
             : ""}

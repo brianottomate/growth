@@ -13,7 +13,7 @@ import {
 } from "@/server/db/ads-schema";
 import { createId } from "@/server/db/utils";
 import { requireOwnedCampaign } from "./ads-draft.service";
-import { campaignCopyPlan } from "@/lib/campaign-copy";
+import { adCopy, campaignCopyPlan } from "@/lib/campaign-copy";
 
 /**
  * A local copy of a campaign: the campaign row, its ads, its audiences with
@@ -90,5 +90,55 @@ export async function duplicateCampaign(input: {
       audiences: plan.audiences.length,
       platforms: plan.platformCampaigns.length,
     },
+  };
+}
+
+/**
+ * A local copy of one ad in another campaign of the same brand, under the
+ * campaign copy's ad rules: same creative and media, approval kept, nothing
+ * pushed. The copy is the target campaign's own ad; adsWrite.pushAd sends it
+ * when that campaign is already on a platform.
+ */
+export async function duplicateAd(input: {
+  organizationId: string;
+  adId: string;
+  targetCampaignId: string;
+}) {
+  const { campaign, brand } = await requireOwnedCampaign(
+    input.targetCampaignId,
+    input.organizationId,
+  );
+  if (campaign.deletedAt) throw new Error(`Campaign ${campaign.id} is deleted`);
+  const ad = await db.query.adTable.findFirst({
+    where: eq(adTable.id, input.adId),
+  });
+  // Another brand's ad reads as missing, the same as another organization's.
+  if (ad?.brandId !== brand.id)
+    throw new Error(
+      `Ad ${input.adId} not found on ${brand.name}, the brand of campaign ${campaign.id}`,
+    );
+  const [copy] = await db
+    .insert(adTable)
+    .values(adCopy(ad, { id: createId("ad"), campaignId: campaign.id }))
+    .returning({
+      id: adTable.id,
+      name: adTable.name,
+      status: adTable.status,
+    });
+  const pushed = await db.query.platformCampaignTable.findMany({
+    where: eq(platformCampaignTable.campaignId, campaign.id),
+    columns: { id: true, platform: true, externalId: true },
+  });
+  return {
+    adId: copy!.id,
+    name: copy!.name,
+    status: copy!.status,
+    sourceAdId: ad.id,
+    campaignId: campaign.id,
+    brandSlug: brand.slug,
+    /** Platform campaigns already live, which take the copy via pushAd. */
+    pushedPlatformCampaigns: pushed.flatMap((row) =>
+      row.externalId ? [{ id: row.id, platform: row.platform }] : [],
+    ),
   };
 }

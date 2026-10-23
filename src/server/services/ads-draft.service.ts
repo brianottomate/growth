@@ -685,11 +685,68 @@ async function ensureDeliveryGroups(
   }
 }
 
+/** Add an unpublished delivery group, including to a campaign already on Meta. */
+export async function addDeliveryGroup(input: {
+  organizationId: string;
+  platformCampaignId: string;
+  name: string;
+  audienceId?: string | null;
+  budget?: number | null;
+  budgetType?: "daily" | "lifetime" | null;
+  configuration: DeliveryGroupConfiguration;
+}) {
+  const plan = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
+  });
+  if (!plan?.campaignId) throw new Error("Platform campaign has no local plan");
+  const { brand } = await requireOwnedCampaign(
+    plan.campaignId,
+    input.organizationId,
+  );
+  if (plan.brandId !== brand.id || plan.status === "ended")
+    throw new Error("Campaign cannot accept a new delivery group");
+  if (plan.externalId && plan.platform !== "meta_ads")
+    throw new Error(
+      "Adding groups to published campaigns is supported on Meta only",
+    );
+  if (input.audienceId) {
+    const audience = await db.query.audienceTable.findFirst({
+      where: eq(audienceTable.id, input.audienceId),
+    });
+    if (
+      audience?.campaignId !== plan.campaignId ||
+      audience.brandId !== brand.id
+    )
+      throw new Error("Audience belongs to another campaign");
+  }
+  const configuration = deliveryGroupConfigurationSchema.parse(
+    input.configuration,
+  );
+  if (configuration.platform !== plan.platform)
+    throw new Error("Configuration platform does not match the plan");
+  const [group] = await db
+    .insert(platformDeliveryGroupTable)
+    .values({
+      platformCampaignId: plan.id,
+      brandId: brand.id,
+      name: input.name.trim(),
+      audienceId: input.audienceId ?? null,
+      budget: input.budget ?? null,
+      budgetType: input.budgetType ?? null,
+      configuration,
+      status: "draft",
+    })
+    .returning({ id: platformDeliveryGroupTable.id });
+  return group!;
+}
+
 export async function setDeliveryGroup(input: {
   organizationId: string;
   deliveryGroupId: string;
   name?: string;
   audienceId?: string | null;
+  budget?: number | null;
+  budgetType?: "daily" | "lifetime" | null;
   configuration: DeliveryGroupConfiguration;
 }) {
   const group = await db.query.platformDeliveryGroupTable.findFirst({
@@ -707,8 +764,12 @@ export async function setDeliveryGroup(input: {
   );
   if (group.brandId !== brand.id || plan.brandId !== brand.id)
     throw new Error("Delivery group belongs to another brand");
-  if (group.externalId || plan.externalId || plan.status !== "draft")
-    throw new Error("Only unpublished platform plans can be edited here");
+  if (
+    group.externalId ||
+    plan.status === "ended" ||
+    (plan.externalId && plan.platform !== "meta_ads")
+  )
+    throw new Error("Only unpublished delivery groups can be edited here");
   if (input.audienceId) {
     const audience = await db.query.audienceTable.findFirst({
       where: eq(audienceTable.id, input.audienceId),
@@ -725,6 +786,10 @@ export async function setDeliveryGroup(input: {
     .update(platformDeliveryGroupTable)
     .set({
       configuration,
+      ...(input.budget !== undefined ? { budget: input.budget } : {}),
+      ...(input.budgetType !== undefined
+        ? { budgetType: input.budgetType }
+        : {}),
       ...(input.name ? { name: input.name.trim() } : {}),
       ...(input.audienceId !== undefined
         ? { audienceId: input.audienceId }
@@ -752,8 +817,12 @@ export async function deleteDeliveryGroup(input: {
   );
   if (group.brandId !== brand.id || plan.brandId !== brand.id)
     throw new Error("Delivery group belongs to another brand");
-  if (group.externalId || plan.externalId || plan.status !== "draft")
-    throw new Error("Only unpublished platform plans can be edited here");
+  if (
+    group.externalId ||
+    plan.status === "ended" ||
+    (plan.externalId && plan.platform !== "meta_ads")
+  )
+    throw new Error("Only unpublished delivery groups can be edited here");
   const siblings = await db.query.platformDeliveryGroupTable.findMany({
     where: eq(platformDeliveryGroupTable.platformCampaignId, plan.id),
   });
@@ -1282,6 +1351,18 @@ export async function attachPlatformCampaign(input: {
     }
   }
 
+  if (campaignId) {
+    const existingPlan = await db.query.platformCampaignTable.findFirst({
+      where: and(
+        eq(platformCampaignTable.campaignId, campaignId),
+        eq(platformCampaignTable.platform, platformCampaign.platform),
+      ),
+    });
+    if (existingPlan && existingPlan.id !== platformCampaign.id)
+      throw new Error(
+        "This campaign already has a plan for that platform. Choose a different campaign or explicitly unplan its unpublished platform first.",
+      );
+  }
   if (!campaignId) {
     const name = input.newCampaignName?.trim() ?? platformCampaign.name;
     if (!name) throw new Error("Give the campaign a name");

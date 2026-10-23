@@ -37,6 +37,37 @@ export type CampaignCopyPlan = {
 };
 
 /**
+ * One ad copied into a campaign: a fresh id, unpushed (`replacesAdId` null,
+ * no push record), keeping its approval, since the creative is byte-identical
+ * to what a person already signed off. `businessKey` is unique per ad, so it
+ * is dropped. Media stays shared by reference through content and placements.
+ */
+export function adCopy(
+  ad: Ad,
+  target: { id: string; campaignId: string },
+): typeof adTable.$inferInsert {
+  return {
+    id: target.id,
+    campaignId: target.campaignId,
+    brandId: ad.brandId,
+    homeId: ad.homeId,
+    bookingTargetId: ad.bookingTargetId,
+    name: ad.name,
+    type: ad.type,
+    status: ad.status,
+    content: ad.content,
+    placements: ad.placements,
+    platforms: ad.platforms,
+    businessKey: null,
+    readyAt: ad.readyAt,
+    readyBy: ad.readyBy,
+    approvedAt: ad.approvedAt,
+    approvedBy: ad.approvedBy,
+    replacesAdId: null,
+  };
+}
+
+/**
  * Everything a campaign copy inserts, computed from the source rows. Pure:
  * ids come from the caller, so the plan can be checked without a database.
  *
@@ -68,28 +99,9 @@ export function campaignCopyPlan(
     list?.map((id) => ids.get(id) ?? id);
 
   const campaignId = copyId("camp", source.campaign.id);
-  const ads = source.ads.map((ad) => {
-    const id = copyId("ad", ad.id);
-    return {
-      id,
-      campaignId,
-      brandId: ad.brandId,
-      homeId: ad.homeId,
-      bookingTargetId: ad.bookingTargetId,
-      name: ad.name,
-      type: ad.type,
-      status: ad.status,
-      content: ad.content,
-      placements: ad.placements,
-      platforms: ad.platforms,
-      businessKey: null,
-      readyAt: ad.readyAt,
-      readyBy: ad.readyBy,
-      approvedAt: ad.approvedAt,
-      approvedBy: ad.approvedBy,
-      replacesAdId: null,
-    };
-  });
+  const ads = source.ads.map((ad) =>
+    adCopy(ad, { id: copyId("ad", ad.id), campaignId }),
+  );
 
   const audiences = source.audiences.map((audience) => ({
     id: copyId("aud", audience.id),

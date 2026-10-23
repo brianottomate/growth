@@ -752,6 +752,39 @@ export const duplicateCampaignActionOutputSchema = z.strictObject({
   path: z.string(),
 });
 
+export const duplicateAdActionOutputSchema = z.strictObject({
+  adId: z.string(),
+  name: z.string(),
+  status: z.string(),
+  sourceAdId: z.string(),
+  campaignId: z.string(),
+  brandSlug: z.string().nullable(),
+  pushedPlatformCampaigns: z.array(
+    z.strictObject({ id: z.string(), platform: z.string() }),
+  ),
+});
+
+export const pushAdActionOutputSchema = z.strictObject({
+  adId: z.string(),
+  platformCampaignId: z.string(),
+  created: z.array(
+    z.strictObject({
+      deliveryGroupId: z.string(),
+      platformAdId: z.string(),
+      externalAdId: z.string(),
+    }),
+  ),
+  alreadyRunningIn: z.array(z.string()),
+  path: z.string(),
+  warnings: z.array(z.string()),
+});
+
+export const removePlatformAdActionOutputSchema = z.strictObject({
+  platformAdId: z.string(),
+  externalAdId: z.string(),
+  removed: z.boolean(),
+});
+
 export const createAudienceActionOutputSchema = z.strictObject({
   adAccount: adAccountSchema,
   brand: brandSchema,
@@ -1819,3 +1852,19 @@ export const deletePlatformCampaignActionNativeResultSchema =
       )
       .nullable(),
   });
+
+export const previewMetaAdditionsOutputSchema = z.strictObject({
+  deliveryGroupId: z.string(),
+  platformCampaignId: z.string(),
+  campaignName: z.string(),
+  groupName: z.string(),
+  createsAdSet: z.boolean(),
+  ads: z.array(z.strictObject({ id: z.string(), name: z.string() })),
+  blockers: z.array(z.string()),
+  reviewToken: z.string(),
+});
+export const publishMetaAdditionsOutputSchema = z.strictObject({
+  deliveryGroupId: z.string(),
+  createdAdIds: z.array(z.string()),
+  warnings: z.array(z.string()),
+});

@@ -274,3 +274,32 @@ export function metaPlacementFits(
     fit: fitFor(kind, ad),
   }));
 }
+
+/** Normalize an explicitly configured native Meta placement list without widening it. */
+export function observedMetaPlacements(
+  targeting: Record<string, unknown>,
+): MetaPlacement[] | null {
+  const publishers = targeting.publisher_platforms;
+  if (!Array.isArray(publishers)) return null;
+  const result: MetaPlacement[] = [];
+  for (const publisher of publishers) {
+    if (publisher !== "facebook" && publisher !== "instagram")
+      throw new Error(
+        `Unsupported Meta placement publisher: ${String(publisher)}`,
+      );
+    const positions = targeting[`${publisher}_positions`];
+    if (!Array.isArray(positions))
+      throw new Error(`Meta did not return explicit ${publisher} placements`);
+    for (const position of positions) {
+      const placement = META_PLACEMENTS.find(
+        (p) => p.publisher === publisher && p.position === position,
+      );
+      if (!placement)
+        throw new Error(
+          `Unsupported Meta placement: ${publisher}/${String(position)}`,
+        );
+      result.push(placement.id);
+    }
+  }
+  return metaPlacementPlanSchema.parse(result);
+}

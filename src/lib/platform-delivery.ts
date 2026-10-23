@@ -1,3 +1,4 @@
+import { metaPlacementPlanSchema } from "./meta-placement-plan";
 import { z } from "zod";
 
 /** Where people are located. Destination interests belong in persona/audience prose. */
@@ -30,6 +31,7 @@ export const deliveryGroupConfigurationSchema = z.discriminatedUnion(
     z.strictObject({
       platform: z.literal("meta_ads"),
       targeting: targetingSchema.optional(),
+      placements: metaPlacementPlanSchema.optional(),
     }),
     z.strictObject({
       platform: z.literal("google_ads"),

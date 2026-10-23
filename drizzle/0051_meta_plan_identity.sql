@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "platform_ad_plan_ad_set_idx" ON "platform_ad" USING btree ("ad_id","platform_delivery_group_id") WHERE "platform_ad"."ad_id" IS NOT NULL AND "platform_ad"."platform_delivery_group_id" IS NOT NULL AND lower(coalesce("platform_ad"."status", '')) NOT IN ('deleted', 'removed', 'cancelled', 'canceled');--> statement-breakpoint
+CREATE UNIQUE INDEX "platform_campaign_plan_platform_idx" ON "platform_campaign" USING btree ("campaign_id","platform") WHERE "platform_campaign"."campaign_id" IS NOT NULL;

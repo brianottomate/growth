@@ -5,7 +5,6 @@ import { and, eq, inArray, isNotNull, ne, notInArray, sql } from "drizzle-orm";
 import { adPlatformFromZernioString, adPlatformSpec } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import {
-  adTable,
   platformDeliveryGroupTable,
   platformAdTable,
   type AdStats,
@@ -301,11 +300,15 @@ async function syncCampaignChildren(input: {
             name: adSet.name ?? setExternalId,
             targetingSpec: setObj,
             status: adSet.status ?? null,
-            budget:
-              num(
+            // Whole currency units: Google reports 206.25/day where the
+            // column is an integer; the exact figure stays in targetingSpec.
+            budget: (() => {
+              const amount = num(
                 (setObj.budget as { amount?: unknown } | undefined)?.amount ??
                   setObj.budget,
-              ) ?? null,
+              );
+              return amount === undefined ? null : Math.round(amount);
+            })(),
             budgetType:
               str((setObj.budget as { type?: unknown } | undefined)?.type) ??
               null,
@@ -367,112 +370,88 @@ async function syncCampaignChildren(input: {
     }
   }
 
-  // Ad sets first: the ads reference them by row id.
+  // Ad sets first: the ads reference them by row id. Bulk upserts keyed on
+  // the platform id: the Wander Google account alone mirrors as 11k rows,
+  // and one round trip per row kept a sync running for nine minutes. Plan
+  // lineage the push stamped (a set's audienceId, an ad's adId and
+  // pushedCreative) is left out of every update set, so re-syncs never
+  // erase what the plan meant.
+  const chunk = <T>(items: T[], size: number) =>
+    Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
+      items.slice(i * size, (i + 1) * size),
+    );
   const setRowIdByExternalId = new Map<string, string>();
-  if (sets.length) {
-    const existing = await db
-      .select({
+  const uniqueSets = [
+    ...new Map(sets.map((set) => [set.externalId, set])).values(),
+  ];
+  for (const batch of chunk(uniqueSets, 100)) {
+    const rows = await db
+      .insert(platformDeliveryGroupTable)
+      .values(batch.map((set) => set.values))
+      .onConflictDoUpdate({
+        target: platformDeliveryGroupTable.externalId,
+        targetWhere: sql`${platformDeliveryGroupTable.externalId} is not null`,
+        set: {
+          platformCampaignId: sql`excluded.platform_campaign_id`,
+          name: sql`excluded.name`,
+          status: sql`excluded.status`,
+          targetingSpec: sql`excluded.targeting_spec`,
+          budget: sql`excluded.budget`,
+          budgetType: sql`excluded.budget_type`,
+          stats: sql`excluded.stats`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({
         id: platformDeliveryGroupTable.id,
         externalId: platformDeliveryGroupTable.externalId,
-      })
-      .from(platformDeliveryGroupTable)
-      .where(
-        inArray(
-          platformDeliveryGroupTable.externalId,
-          sets.map((row) => row.externalId),
-        ),
-      );
-    for (const row of existing) {
+      });
+    for (const row of rows) {
       if (row.externalId) setRowIdByExternalId.set(row.externalId, row.id);
     }
-    for (const pending of sets) {
-      const known = setRowIdByExternalId.get(pending.externalId);
-      if (known) {
-        // Never null out plan lineage the push stamped: sync updates what the
-        // platform reports, not what the plan meant.
-        const { audienceId: _audienceId, ...values } = pending.values;
-        await db
-          .update(platformDeliveryGroupTable)
-          .set(values)
-          .where(eq(platformDeliveryGroupTable.id, known));
-      } else {
-        const [inserted] = await db
-          .insert(platformDeliveryGroupTable)
-          .values(pending.values)
-          .returning({ id: platformDeliveryGroupTable.id });
-        if (inserted) setRowIdByExternalId.set(pending.externalId, inserted.id);
-      }
-    }
   }
-
   let adsWritten = 0;
-  if (ads.length) {
-    const existing = await db
-      .select({
-        id: platformAdTable.id,
-        externalId: platformAdTable.externalId,
-      })
-      .from(platformAdTable)
-      .where(
-        and(
-          eq(platformAdTable.brandId, input.brandId),
-          inArray(
-            platformAdTable.externalId,
-            ads.map((row) => row.externalId),
-          ),
-        ),
-      );
-    const adRowIdByExternalId = new Map(
-      existing.flatMap((row) =>
-        row.externalId ? [[row.externalId, row.id]] : [],
-      ),
-    );
-    for (const pending of ads) {
-      const values = {
-        ...pending.values,
-        platformDeliveryGroupId: pending.adSetExternalId
-          ? (setRowIdByExternalId.get(pending.adSetExternalId) ?? null)
-          : null,
-      };
-      const known = adRowIdByExternalId.get(pending.externalId);
-      if (known) {
-        // Same rule as ad sets: the push's adId lineage survives re-syncs.
-        const { adId: _adId, ...update } = values;
-        await db
-          .update(platformAdTable)
-          .set(update)
-          .where(eq(platformAdTable.id, known));
-      } else {
-        await db.insert(platformAdTable).values(values);
-      }
-      adsWritten++;
-    }
+  const uniqueAds = [...new Map(ads.map((ad) => [ad.externalId, ad])).values()];
+  for (const batch of chunk(uniqueAds, 100)) {
+    await db
+      .insert(platformAdTable)
+      .values(
+        batch.map((ad) => ({
+          ...ad.values,
+          platformDeliveryGroupId: ad.adSetExternalId
+            ? (setRowIdByExternalId.get(ad.adSetExternalId) ?? null)
+            : null,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: platformAdTable.externalId,
+        targetWhere: sql`${platformAdTable.externalId} is not null`,
+        set: {
+          platformCampaignId: sql`excluded.platform_campaign_id`,
+          platformDeliveryGroupId: sql`excluded.platform_delivery_group_id`,
+          channelId: sql`excluded.channel_id`,
+          name: sql`excluded.name`,
+          status: sql`excluded.status`,
+          externalAdSetId: sql`excluded.external_ad_set_id`,
+          adSetName: sql`excluded.ad_set_name`,
+          media: sql`excluded.media`,
+          body: sql`excluded.body`,
+          linkUrl: sql`excluded.link_url`,
+          thumbnailUrl: sql`excluded.thumbnail_url`,
+          platformObjective: sql`excluded.platform_objective`,
+          optimizationGoal: sql`excluded.optimization_goal`,
+          bidStrategy: sql`excluded.bid_strategy`,
+          stats: sql`excluded.stats`,
+          updatedAt: new Date(),
+        },
+      });
+    adsWritten += batch.length;
   }
 
-  // An ad deleted on the platform, here or in Ads Manager, is deleted here
-  // too, unless it still runs somewhere else. Its platform_ad rows stay as
-  // the record of what ran.
-  const goneAdIds = await db
-    .selectDistinct({ adId: platformAdTable.adId })
-    .from(platformAdTable)
-    .where(
-      and(
-        eq(platformAdTable.brandId, input.brandId),
-        isNotNull(platformAdTable.adId),
-        sql`lower(${platformAdTable.status}) in ('deleted', 'removed', 'cancelled', 'canceled')`,
-      ),
-    );
-  for (const { adId } of goneAdIds) {
-    if (!adId) continue;
-    const stillRuns = await db.query.platformAdTable.findFirst({
-      where: and(
-        eq(platformAdTable.adId, adId),
-        sql`lower(coalesce(${platformAdTable.status}, '')) not in ('deleted', 'removed', 'cancelled', 'canceled')`,
-      ),
-      columns: { id: true },
-    });
-    if (!stillRuns) await db.delete(adTable).where(eq(adTable.id, adId));
-  }
+  // An ad deleted on the platform keeps its Studio record. The platform_ad
+  // rows carry the removed status, so the operator sees what happened on
+  // Meta instead of losing the approved creative that was moved or copied
+  // there by hand.
 
   return { adSets: setRowIdByExternalId.size, ads: adsWritten };
 }

@@ -1488,6 +1488,17 @@ export function writtenAdSetId(result: ZernioAdWriteResponse): string | null {
   );
 }
 
+/** The created ad's platform id (Meta's ad id), else Zernio's own. */
+export function writtenAdId(result: ZernioAdWriteResponse): string | null {
+  const row = result.ad ?? result.ads?.[0];
+  return (
+    (typeof row?.platformAdId === "string" ? row.platformAdId : null) ??
+    row?.id ??
+    row?._id ??
+    null
+  );
+}
+
 /**
  * Create one campaign tree through Zernio's normalized Meta/Google endpoint.
  * The idempotency key is mandatory here because a blind retry duplicates spend.
@@ -2367,4 +2378,52 @@ export async function scopeZernioMetaAccount(
   if (!result.alreadyConnected || !result.accountId)
     throw new Error("Meta account scope could not be saved");
   return result.accountId;
+}
+
+/** Read current Meta ownership and delivery settings before an incremental write. */
+export async function getZernioMetaCampaign(input: {
+  accountId: string;
+  campaignId: string;
+}) {
+  const params = new URLSearchParams({
+    accountId: input.accountId,
+    fields: "id,account_id,name,status,objective,daily_budget,lifetime_budget",
+  });
+  return zernioFetch<{
+    campaign: {
+      id: string;
+      account_id: string;
+      name: string;
+      status: string;
+      objective: string;
+      daily_budget?: string;
+      lifetime_budget?: string;
+    };
+  }>(`/ads/campaigns/${encodeURIComponent(input.campaignId)}?${params}`);
+}
+export async function getZernioMetaDeliverySet(input: {
+  accountId: string;
+  adSetId: string;
+}) {
+  const params = new URLSearchParams({
+    accountId: input.accountId,
+    fields:
+      "id,account_id,campaign_id,status,targeting,promoted_object,optimization_goal,billing_event,ads.limit(100){id,status}",
+  });
+  return zernioFetch<{
+    adSet: {
+      id: string;
+      account_id: string;
+      campaign_id: string;
+      status: string;
+      targeting?: Record<string, unknown>;
+      promoted_object?: Record<string, unknown>;
+      optimization_goal?: string;
+      billing_event?: string;
+      ads?: {
+        data: { id: string; status: string }[];
+        paging?: { next?: string };
+      };
+    };
+  }>(`/ads/ad-sets/${encodeURIComponent(input.adSetId)}?${params}`);
 }

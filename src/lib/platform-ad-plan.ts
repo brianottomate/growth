@@ -54,3 +54,10 @@ export function selectPlatformAds(
     (ad) => !selected || selected.has(ad.id),
   );
 }
+
+/** Platform statuses after which an ad no longer exists on the platform. */
+const GONE_ON_PLATFORM = ["deleted", "removed", "cancelled", "canceled"];
+
+export function adGoneOnPlatform(status: string | null | undefined) {
+  return GONE_ON_PLATFORM.includes((status ?? "").toLowerCase());
+}

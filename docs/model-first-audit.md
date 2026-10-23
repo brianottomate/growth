@@ -1,5 +1,16 @@
 # Model-first simplification audit
 
+## Meta delivery identity (2026-10-23)
+
+A published campaign and an unpublished ad set are separate states: an existing
+Meta campaign ID must not force a duplicate campaign to carry new intent. Pending
+groups now live under the same platform plan, with a reviewed additive publish.
+One plan/platform and one current ad/set delivery have explicit database identities;
+removed platform copies remain historical rows rather than blocking re-addition.
+Sync updates provider facts without deleting approved Studio ideas or overwriting
+plan lineage. There were no production identity conflicts before migration 0051.
+See [release audit](ads-sync-release-audit.md) for the writer/reader and branch audit.
+
 ## Performance acquisition form identity (2026-10-22)
 
 WanderOS and Performance acquisition share Wander's Facebook Page, so Page or

@@ -731,6 +731,9 @@ export const platformCampaignTable = pgTable(
     index("platform_campaign_channel_idx").on(table.channelId),
     index("platform_campaign_status_idx").on(table.status),
     index("platform_campaign_campaign_idx").on(table.campaignId),
+    uniqueIndex("platform_campaign_plan_platform_idx")
+      .on(table.campaignId, table.platform)
+      .where(sql`${table.campaignId} IS NOT NULL`),
   ],
 );
 
@@ -901,6 +904,12 @@ export const platformAdTable = pgTable(
     index("platform_ad_brand_idx").on(table.brandId),
     index("platform_ad_status_idx").on(table.status),
     index("platform_ad_plan_idx").on(table.adId),
+    // Historical removed copies remain; only a current delivery occupies the slot.
+    uniqueIndex("platform_ad_plan_ad_set_idx")
+      .on(table.adId, table.platformDeliveryGroupId)
+      .where(
+        sql`${table.adId} IS NOT NULL AND ${table.platformDeliveryGroupId} IS NOT NULL AND lower(coalesce(${table.status}, '')) NOT IN ('deleted', 'removed', 'cancelled', 'canceled')`,
+      ),
     uniqueIndex("platform_ad_external_id_idx")
       .on(table.externalId)
       .where(sql`${table.externalId} IS NOT NULL`),

@@ -76,6 +76,9 @@ kernel:
 - `adsWrite.duplicateCampaign` copies a campaign inside Growth (ads, audiences
   and platform drafts, nothing on the platform); the ordinary push then creates
   the copy paused. Zernio's campaign duplicate endpoint is not used.
+- `adsWrite.duplicateAd` copies one ad into another campaign; `adsWrite.pushAd`
+  sends one ad PAUSED into the ad sets of a campaign already on Meta (Zernio's
+  attach with `adSetId`), and `adsWrite.removePlatformAd` cancels one ad there.
 
 Create and boost calls send Zernio's `Idempotency-Key` header. The key is stable
 for one assistant run and exact payload, which makes provider retries safe for

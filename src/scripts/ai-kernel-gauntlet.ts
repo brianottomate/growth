@@ -463,8 +463,8 @@ async function main() {
     where: eq(assistantToolReceiptTable.runId, deniedRunId),
   });
   assert(
-    deniedReceipts.length === 1 && deniedReceipts[0]?.status === "failed",
-    "Permission denial did not leave a failed receipt",
+    deniedReceipts.length === 0,
+    "Denied access must not read or create tool execution receipts",
   );
 
   console.log(

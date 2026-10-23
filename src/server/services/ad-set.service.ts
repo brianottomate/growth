@@ -66,7 +66,8 @@ import {
   type AdFormat,
 } from "@/lib/performance-ads";
 
-import { deleteZernioAd } from "@/server/clients/zernio.client";
+import { cancelPlatformAd } from "./platform-ad.service";
+import { adGoneOnPlatform } from "@/lib/platform-ad-plan";
 import { extendToCanvas } from "./card-director.service";
 import { freezeComposition } from "./composition.service";
 
@@ -181,8 +182,8 @@ function creativeContent(ad: { content: unknown }): AdCreativeContent {
 }
 
 /**
- * The campaign shells land in, when one is named: this brand's, and not yet
- * on a platform, since an ad added to a pushed campaign would never be sent.
+ * The campaign ads land in, when one is named: this brand's. One already on
+ * a platform takes them too; adsWrite.pushAd sends each one there.
  */
 async function campaignFor(brandId: string, campaignId: string) {
   const campaign = await db.query.campaignTable.findFirst({
@@ -192,15 +193,8 @@ async function campaignFor(brandId: string, campaignId: string) {
       isNull(campaignTable.deletedAt),
     ),
     columns: { id: true, name: true },
-    with: { platformCampaigns: { columns: { externalId: true } } },
   });
   if (!campaign) throw new AdSetError(404, "Campaign not found on this brand");
-  if (campaign.platformCampaigns.some((row) => row.externalId)) {
-    throw new AdSetError(
-      422,
-      "That campaign is already on a platform; add ads to a new one",
-    );
-  }
   return campaign;
 }
 
@@ -907,9 +901,6 @@ export async function attachAdSet(input: {
 }
 
 /** Remove one ad: a draft outright, a campaign ad through its own guard. */
-/** Platform statuses after which an ad no longer exists on the platform. */
-const GONE_ON_PLATFORM = ["deleted", "removed", "cancelled", "canceled"];
-
 /**
  * Delete an ad, wherever it is. One that is live on a platform is deleted
  * there first, so the two never disagree; its `platform_ad` rows stay as the
@@ -923,20 +914,16 @@ export async function deleteAd(input: { adId: string; orgId: string }) {
       eq(platformAdTable.adId, ad.id),
       isNotNull(platformAdTable.externalId),
     ),
-    columns: { id: true, externalId: true, status: true },
+    columns: {
+      id: true,
+      externalId: true,
+      status: true,
+      platformCampaignId: true,
+    },
   });
   for (const row of ran) {
-    if (GONE_ON_PLATFORM.includes((row.status ?? "").toLowerCase())) continue;
-    // Zernio takes the platform's own ad id here and deletes it on Meta.
-    await deleteZernioAd(row.externalId!).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      // Already gone on the platform is the outcome we wanted.
-      if (!/\b404\b|not found/i.test(message)) throw error;
-    });
-    await db
-      .update(platformAdTable)
-      .set({ status: "deleted" })
-      .where(eq(platformAdTable.id, row.id));
+    if (adGoneOnPlatform(row.status)) continue;
+    await cancelPlatformAd({ ...row, externalId: row.externalId! });
   }
   await db.delete(adTable).where(eq(adTable.id, ad.id));
   const mediaCleanup = await purgeAdExports({

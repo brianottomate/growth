@@ -306,6 +306,19 @@ and its ads carry no push record, which makes them editable again. Budget copies
 is; pause the source before switching the copy on. This replaced the Zernio campaign
 duplicate endpoint, which cloned a live Meta campaign and left nothing in Growth.
 
+## One ad at a time into a pushed campaign (2026-10-20)
+
+The push creates a platform campaign once. After that, ads go in one at a time,
+by id. `adsWrite.duplicateAd` copies one ad into another campaign of the same
+brand under the campaign copy's ad rules (`adCopy` in `lib/campaign-copy.ts`),
+and `attachAdSet` now accepts a pushed campaign. `adsWrite.pushAd` (adId,
+platformCampaignId, optional deliveryGroupId) creates that ad PAUSED in each
+existing ad set through `compileMetaAds`, the same names, link, placements and
+creative the full push builds, records a `platform_ad` row per set and verifies
+the ads are paused. An ad set already running the ad is skipped. Meta only.
+`adsWrite.removePlatformAd` (platformAdId) cancels one ad on the platform and
+marks its row deleted, the inverse of pushAd.
+
 ## OpenAI Ads: one chat card per campaign (2026-10-20)
 
 ChatGPT ads through Zernio are chat cards: a 3–50 character title, a body of at
