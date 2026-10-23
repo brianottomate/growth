@@ -1,4 +1,5 @@
 /** Read-only provider checks and local CRUD on an isolated production-derived DB. */
+import { GrowthActionError } from "@/server/ai/kernel/errors";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, platformDeliveryGroupTable } from "@/server/db/schema";
@@ -109,6 +110,19 @@ try {
 } finally {
   await deleteDeliveryGroup({ ...scope, deliveryGroupId: group.id });
 }
+const readsBeforeMissingDraft = providerReads;
+const removed = await publishMetaAdditions(
+  { deliveryGroupId: group.id, reviewToken: "previously-reviewed-draft" },
+  { ...scope, runId: "validation-removed-draft" },
+).catch((error) => error as Error);
+assert(
+  removed instanceof GrowthActionError && removed.code === "not_found",
+  "Removed draft must report not_found before publishing",
+);
+assert(
+  providerReads === readsBeforeMissingDraft,
+  "Removed draft reached a provider",
+);
 const control = await db.query.platformDeliveryGroupTable.findFirst({
   where: eq(
     platformDeliveryGroupTable.id,
@@ -143,6 +157,7 @@ console.log(
     missingLookalikeBlocked: true,
     liveTargetingLocked: true,
     localPendingGroupCrud: true,
+    removedDraftBlockedBeforeProvider: true,
     providerWrites,
     reviewedAds: review.ads.length,
   }),

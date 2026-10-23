@@ -1,3 +1,4 @@
+import { GrowthActionError } from "@/server/ai/kernel/errors";
 import { metaTrackingDefaults } from "./meta-tracking-defaults";
 import {
   metaAdSetAdditionControls,
@@ -64,13 +65,19 @@ async function prepare(input: {
   const group = await db.query.platformDeliveryGroupTable.findFirst({
     where: eq(platformDeliveryGroupTable.id, input.deliveryGroupId),
   });
-  const plan =
-    group &&
-    (await db.query.platformCampaignTable.findFirst({
-      where: eq(platformCampaignTable.id, group.platformCampaignId),
-    }));
-  if (!group || !plan?.campaignId)
-    throw new Error("Delivery group has no campaign plan");
+  if (!group)
+    throw new GrowthActionError(
+      "not_found",
+      "This ad set draft no longer exists. Refresh the campaign to see its current ad sets.",
+    );
+  const plan = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, group.platformCampaignId),
+  });
+  if (!plan?.campaignId)
+    throw new GrowthActionError(
+      "not_found",
+      "Campaign plan not found for this ad set",
+    );
   const { campaign } = await requireOwnedCampaign(
     plan.campaignId,
     input.organizationId,

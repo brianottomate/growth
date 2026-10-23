@@ -4,14 +4,6 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { orpc } from "@/orpc/client";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { DeliveryGroupEditor } from "./DeliveryGroupEditor";
 import type { DeliveryGroupConfiguration } from "@/lib/platform-delivery";
 
@@ -25,64 +17,81 @@ export function MetaAdditions({
     configuration: DeliveryGroupConfiguration | null;
   };
 }) {
-  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const router = useRouter();
-  const review = useMutation(orpc.ads.previewAdditions.mutationOptions());
+  const review = useMutation(
+    orpc.ads.previewAdditions.mutationOptions({
+      onError: () => router.refresh(),
+    }),
+  );
   const publish = useMutation(
     orpc.ads.publishAdditions.mutationOptions({
       onSuccess: () => {
-        setOpen(false);
+        review.reset();
+        setExpanded(false);
+        router.refresh();
+      },
+      onError: () => {
+        // A failed attempt may have created some paused objects. Require a fresh
+        // provider review before another attempt, including when a draft vanished.
+        review.reset();
         router.refresh();
       },
     }),
   );
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {!group.externalId && <DeliveryGroupEditor group={group} />}
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          review.reset();
-          publish.reset();
-          setOpen(true);
-          review.mutate({ deliveryGroupId: group.id });
-        }}
-      >
-        Review additions
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add to {group.name}</DialogTitle>
-            <DialogDescription>
-              New ads and ad sets are created paused in the existing campaign.
-              Current delivery and the campaign budget stay unchanged.
-            </DialogDescription>
-          </DialogHeader>
+    <div className="w-full space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {!group.externalId && <DeliveryGroupEditor group={group} />}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={review.isPending || publish.isPending}
+          onClick={() => {
+            review.reset();
+            publish.reset();
+            setExpanded(true);
+            review.mutate({ deliveryGroupId: group.id });
+          }}
+        >
+          {review.isPending ? "Checking Meta…" : "Review additions"}
+        </Button>
+      </div>
+      {expanded && (
+        <div
+          className="space-y-3 rounded-lg border p-3 text-sm"
+          aria-live="polite"
+        >
+          <p className="text-muted-foreground">
+            Additions are created paused in this campaign. Current delivery and
+            the campaign budget stay unchanged.
+          </p>
           {review.isPending && (
-            <p className="text-sm text-muted-foreground">
-              Checking Meta and the campaign’s approved ads…
-            </p>
+            <p>Checking Meta and the campaign’s approved ads…</p>
           )}
           {review.error && (
-            <p className="text-sm text-destructive">{review.error.message}</p>
+            <p className="text-destructive">{review.error.message}</p>
           )}
           {review.data && (
-            <div className="space-y-3">
-              <p className="text-sm">
+            <>
+              <p className="font-medium">
                 {review.data.createsAdSet
                   ? "Create one paused ad set and add"
                   : "Add"}{" "}
-                {review.data.ads.length} paused ads:
+                {review.data.ads.length} paused ads.
               </p>
-              <ul className="list-disc space-y-1 pl-5 text-sm">
-                {review.data.ads.map((ad) => (
-                  <li key={ad.id}>{ad.name}</li>
-                ))}
-              </ul>
-              {review.data.blockers.length > 0 && (
-                <div className="rounded-lg border border-destructive/30 p-3 text-sm">
+              {review.data.ads.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer">View ads</summary>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {review.data.ads.map((ad) => (
+                      <li key={ad.id}>{ad.name}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {review.data.blockers.length > 0 ? (
+                <div className="space-y-1 text-destructive">
                   <p className="font-medium">Needs attention</p>
                   <ul className="list-disc space-y-1 pl-5">
                     {review.data.blockers.map((blocker) => (
@@ -90,39 +99,43 @@ export function MetaAdditions({
                     ))}
                   </ul>
                 </div>
+              ) : review.data.ads.length > 0 ? (
+                <Button
+                  size="sm"
+                  disabled={publish.isPending}
+                  onClick={() =>
+                    review.data &&
+                    publish.mutate({
+                      deliveryGroupId: group.id,
+                      reviewToken: review.data.reviewToken,
+                    })
+                  }
+                >
+                  {publish.isPending
+                    ? "Publishing…"
+                    : "Publish additions paused"}
+                </Button>
+              ) : (
+                <p>No additions to publish.</p>
               )}
-            </div>
+            </>
           )}
           {publish.error && (
-            <p className="text-sm text-destructive">{publish.error.message}</p>
+            <div className="space-y-1" role="alert">
+              <p className="text-destructive">{publish.error.message}</p>
+              <p>Review additions again before publishing.</p>
+            </div>
           )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={publish.isPending}
-            >
-              Close
-            </Button>
-            <Button
-              disabled={
-                !review.data ||
-                review.data.blockers.length > 0 ||
-                publish.isPending
-              }
-              onClick={() =>
-                review.data &&
-                publish.mutate({
-                  deliveryGroupId: group.id,
-                  reviewToken: review.data.reviewToken,
-                })
-              }
-            >
-              {publish.isPending ? "Publishing…" : "Publish additions paused"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={publish.isPending}
+            onClick={() => setExpanded(false)}
+          >
+            Hide review
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

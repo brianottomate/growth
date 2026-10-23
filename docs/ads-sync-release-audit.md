@@ -78,3 +78,8 @@ own placement plan; individual ad additions normalize the destination set's actu
 placements instead of rebuilding creative against a different default. These facts
 can be applied to the internal comparison draft without editing the live control.
 The existing $83/day budget and live Broad delivery remain unchanged.
+
+The addition review is inline in the ad set, with an expandable ad list. Failed
+publishes discard the reviewed snapshot and refresh the campaign before another
+attempt. Removed drafts report `not_found` before any provider access; this case
+is exercised in the isolated verification script.
