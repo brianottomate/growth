@@ -30,6 +30,7 @@ import type { AdContent, ChannelPlatform } from "@/server/db/schema";
 import { AdIdeaPreview } from "./AdIdeaPreview";
 import { AdPlatformRouting } from "./AdPlatformRouting";
 import { SearchCopyPreview } from "./SearchCopyPreview";
+import { VideoAdPreview } from "./VideoAdPreview";
 
 /** Campaigns inspect delivery creatives; Studio owns their authoring and review. */
 export function CampaignAdCard({
@@ -82,7 +83,10 @@ export function CampaignAdCard({
       creative?.media.map((media, index) => {
         const render = studio?.approval?.renders.square?.[index];
         return {
-          url: render?.url ?? media.url,
+          url:
+            media.type === "video"
+              ? media.thumbnail
+              : (render?.url ?? media.url),
         };
       }) ?? [],
     [creative?.media, studio?.approval?.renders.square],
@@ -96,7 +100,8 @@ export function CampaignAdCard({
       (currentSlide + images.length - 1) % images.length,
     ]) {
       const preload = new window.Image();
-      preload.src = images[index]!.url;
+      const url = images[index]?.url;
+      if (url) preload.src = url;
     }
   }, [currentSlide, format, images]);
   const Icon = format === "video" ? Play : Images;
@@ -314,30 +319,13 @@ export function CampaignAdCard({
               home={home}
             />
           ) : creative ? (
-            <div className="space-y-3">
-              <p className="text-sm">{creative.headline}</p>
-              <p className="text-sm text-muted-foreground">{creative.body}</p>
-              {creative.media.map((media, index) =>
-                media.type === "video" ? (
-                  <video
-                    key={index}
-                    controls
-                    preload="none"
-                    src={media.url}
-                    poster={media.thumbnail}
-                    className="max-h-96 rounded-lg"
-                  />
-                ) : (
-                  <img
-                    key={index}
-                    src={media.url}
-                    alt=""
-                    loading="lazy"
-                    className="max-h-96 rounded-lg"
-                  />
-                ),
-              )}
-            </div>
+            <VideoAdPreview
+              content={creative}
+              brandId={brandId}
+              brandName={brandName}
+              brandLogo={brandLogo}
+              showMetaPreview={false}
+            />
           ) : "headlines" in ad.content ? (
             <SearchCopyPreview copy={ad.content} showExample={false} />
           ) : null}

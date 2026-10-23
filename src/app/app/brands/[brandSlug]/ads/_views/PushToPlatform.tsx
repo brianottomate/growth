@@ -29,11 +29,9 @@ import { money } from "./format";
 
 /**
  * Compile the plan onto one platform, PAUSED. Budget, dates and settings come
- * from the platform draft. With the setup saved (ad account, Page, goal) a
- * short confirmation says what will be created, since a pushed ad is locked;
- * spend starts only when the delivery switch is flipped afterwards. Without
- * the setup, a dialog asks for the destination and the goal. Once confirmed,
- * the dialog closes and the existing background job owns push progress.
+ * from the platform draft. Saved setup pushes directly; missing setup opens
+ * the destination and goal form. Spend starts only when delivery is launched.
+ * The shared activity rail reports progress while the push request runs.
  */
 export function PushToPlatform({
   campaignId,
@@ -132,69 +130,31 @@ export function PushToPlatform({
   if (configuration) {
     return (
       <div className="flex flex-col items-end gap-1">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              disabled={!canPush}
-              loading={push.isPending}
-              title={
-                budget == null
-                  ? `Set the budget on the ${platformName} draft first`
-                  : undefined
-              }
-            >
-              <UploadCloud className="size-3.5" />
-              {push.isPending
-                ? "Pushing…"
-                : platform === "meta_ads"
-                  ? "Push to Meta"
-                  : `Push to ${platformName}`}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Push to {platformName}?</DialogTitle>
-              <DialogDescription>
-                {`Create ${setSummary} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"} per group (${Math.max(1, audienceCount) * draftAdCount} total) on ${configuration.label} with a ${budgetSummary} ${budgetType === "lifetime" ? "" : "campaign "}budget. Everything will be paused. Review in ${platformName} before launching.`}
-              </DialogDescription>
-            </DialogHeader>
-            {platform === "google_ads" && goal === "conversions" && (
-              <p className="text-sm text-muted-foreground">
-                Bidding: Maximize Conversions, using the account&apos;s default
-                conversion goals.
-              </p>
-            )}
-            {push.error && (
-              <p
-                role="alert"
-                className="min-w-0 text-sm [overflow-wrap:anywhere] break-words text-destructive"
-              >
-                {push.error.message}
-              </p>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                loading={push.isPending}
-                disabled={!canPush}
-                onClick={() =>
-                  push.mutate({
-                    campaignId,
-                    platform,
-                    connectionAccountId: configuration.connectionAccountId,
-                    adAccountId: configuration.adAccountId,
-                    goal,
-                  })
-                }
-              >
-                {push.isPending ? "Pushing…" : `Push to ${platformName}`}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button
+          size="sm"
+          disabled={!canPush}
+          loading={push.isPending}
+          title={
+            budget == null
+              ? `Set the budget on the ${platformName} draft first`
+              : `Create paused ads on ${configuration.label}`
+          }
+          onClick={() =>
+            push.mutate({
+              campaignId,
+              platform,
+              connectionAccountId: configuration.connectionAccountId,
+              adAccountId: configuration.adAccountId,
+              goal,
+            })
+          }
+        >
+          <UploadCloud className="size-3.5" />
+          {push.isPending ? "Pushing…" : `Push to ${platformName}`}
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Creates paused ads. Launch separately.
+        </p>
         {push.error && (
           <p
             role="alert"
