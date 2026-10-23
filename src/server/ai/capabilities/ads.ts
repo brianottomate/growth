@@ -1959,7 +1959,7 @@ export const returnAdToStudioAction = growthAction({
 export const setAdCopyAction = growthAction({
   outputSchema: setAdCopyActionOutputSchema,
   description:
-    "Rewrite a drafted ad. For text-first ads supply the full text pool. For creative ads: its headline, primary text, description, call to action, and each carousel card's own Meta headline and description. `name` renames the ad itself (the card title in the studio and the ad name on Meta), which is not the headline. The images are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
+    "Rewrite a drafted ad. For text-first ads supply the full text pool. For creative ads: its headline, primary text, description, call to action, and each carousel card's own Meta headline and description. `name` renames the ad itself (the card title in the studio and the ad name on Meta), which is not the headline. The images are left alone. Use the caption style from adsRead.ideaContext consistently across the brand. Emoji belong only in primary text, never in Meta headlines, descriptions or words drawn onto a card. After a material edit, leave an internal reviewWrite.addComment with as=agent describing the change and reason.",
   inputSchema: z.object({
     adId: z.string().min(1),
     name: z.string().trim().min(1).max(200).optional(),
@@ -2104,7 +2104,7 @@ export const saveIdeaAction = growthAction({
   nativeOutputSchema: draftAdResultSchema,
   outputSchema: saveIdeaActionOutputSchema,
   description:
-    "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read adsRead.ideaContext immediately before saving for this ad's current updatedAt and complete document. After any prior save, read again; never reuse the old version. Preserves recipes and returns the ad to draft; does not publish or materialize renders.",
+    "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read adsRead.ideaContext immediately before saving for this ad's current updatedAt and complete document. After any prior save, read again; never reuse the old version. Preserves recipes and the existing Draft or Ready state; approved ads must be reopened before editing. Does not publish or materialize renders. After a material edit, leave an internal reviewWrite.addComment with as=agent describing the change and reason.",
   inputSchema: ideaSaveSchema,
   execute: (input, ctx) =>
     saveAdIdea(input, { orgId: ctx.orgId, userId: ctx.userId }),

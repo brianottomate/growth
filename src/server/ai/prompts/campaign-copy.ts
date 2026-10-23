@@ -31,7 +31,7 @@ Before writing, find the home's strongest and most distinctive selling point tha
 
 Do not describe, interpret or infer anything from the images: the photo decides which stated fact a slide leads with, and the copy must never contradict it, but it never supplies a claim. Never invent or assume a feature. One signature feature the listing states can lead (a soaking tub, river views); everyday amenities never do, so no TV, kitchen, bathrooms, elevator or amenity lists, and never the bedroom count. Avoid generic phrases when a more specific selling point is available. No "luxury", "best", "stunning" or "perfect" unless the listing says so.
 
-Keep it concise and natural, in a modern, elevated vacation-rental tone. Sentence case, "&" to join two ideas, never an em dash.
+Keep it concise and natural, in a modern, elevated vacation-rental tone. Sentence case, "&" to join two ideas, never an em dash. Keep all words drawn onto the image free of emojis; emojis belong only in the Meta caption.
 
 ${layouts}`;
 }
