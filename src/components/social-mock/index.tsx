@@ -9,6 +9,7 @@ import {
   Heart,
   MessageCircle,
   MoreHorizontal,
+  Repeat2,
   Play,
   Send,
   Share2,
@@ -17,6 +18,7 @@ import {
 
 import { cn } from "@/components/ui/lib/utils";
 import { posterForMedia } from "@/lib/media-url";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 /**
  * One post drawn the way its platform shows it. Organic previews (the brand
@@ -658,6 +660,126 @@ function StoryMock({ post, card, onCard, play }: MockProps) {
   );
 }
 
+/** X's feed is a photo grid; opening a tile shows the uncropped photograph. */
+function XMedia({ media, play }: { media: SocialMockMedia[]; play: boolean }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const photos = media.slice(0, 4);
+  const multiple = photos.length > 1;
+  const first = photos[0];
+  if (!first) return null;
+  const ratio =
+    first.width && first.height ? first.width / first.height : 16 / 9;
+  return (
+    <>
+      <div
+        className={cn(
+          "grid min-h-0 gap-0.5 overflow-hidden rounded-2xl border border-neutral-200 bg-black",
+          multiple && "aspect-video grid-cols-2",
+          photos.length >= 3 && "grid-rows-2",
+        )}
+        style={
+          multiple
+            ? undefined
+            : { aspectRatio: Math.max(0.75, Math.min(2, ratio)) }
+        }
+        aria-label={`X media grid, ${photos.length} ${photos.length === 1 ? "attachment" : "attachments"}`}
+      >
+        {photos.map((item, index) =>
+          item.type === "video" ? (
+            <Frame key={index} item={item} play={play} />
+          ) : (
+            <button
+              type="button"
+              key={index}
+              onClick={() => setSelected(index)}
+              aria-label={`Open X photo ${index + 1} of ${media.length}`}
+              className={cn(
+                "relative min-h-0 min-w-0 overflow-hidden focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-blue-500",
+                photos.length === 3 && index === 0 && "row-span-2",
+              )}
+            >
+              <Frame item={{ ...item, fit: "cover" }} play={false} />
+            </button>
+          ),
+        )}
+      </div>
+      {media.length > 4 && (
+        <p className="text-xs text-red-600">
+          X supports up to four photos per post. {media.length} attached.
+        </p>
+      )}
+      <Dialog
+        open={selected !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+      >
+        <DialogContent size="2xl" aria-describedby={undefined}>
+          <DialogTitle>
+            Photo {selected === null ? "" : selected + 1} of {media.length}
+          </DialogTitle>
+          <div className="relative h-[70vh] bg-black">
+            {selected !== null && media[selected] && (
+              <Frame
+                item={{ ...media[selected], fit: "contain" }}
+                play={false}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function XMock({ post, play, clampText, card }: MockProps) {
+  return (
+    <div className="flex gap-2.5 p-3">
+      <Avatar
+        sources={post.avatars}
+        initial={post.name.slice(0, 1).toUpperCase()}
+        className="size-8"
+      />
+      <div className="min-w-0 flex-1">
+        <header className="flex min-w-0 items-center gap-1 text-xs">
+          <span className="truncate font-semibold">{post.name}</span>
+          {post.handle && (
+            <span className="truncate text-neutral-500">
+              @{post.handle.replace(/^@/, "")}
+            </span>
+          )}
+          <MoreHorizontal className="ml-auto size-4 shrink-0 text-neutral-500" />
+        </header>
+        <Copy
+          text={post.text}
+          clamp={clampText}
+          muted="text-neutral-500"
+          className="pt-1 pb-2 text-[13px] leading-relaxed"
+        />
+        <XMedia media={post.media} play={play} />
+        {post.ad && (
+          <AdCard ad={post.ad} name={post.name} card={post.media[card ?? 0]} />
+        )}
+        {post.firstComment && (
+          <p className="mt-2 border-t pt-2 text-[11px] text-neutral-600">
+            {post.firstComment}
+          </p>
+        )}
+        <div
+          aria-hidden="true"
+          className="mt-2 flex justify-between text-neutral-500"
+        >
+          <MessageCircle className="size-3.5" />
+          <Repeat2 className="size-3.5" />
+          <Heart className="size-3.5" />
+          <Bookmark className="size-3.5" />
+          <Share2 className="size-3.5" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* Anything else: a neutral card with the platform's own order, copy then media. */
 function GenericMock({ post, crop, card, onCard, play, clampText }: MockProps) {
   const handle = post.handle ? `@${post.handle.replace(/^@/, "")}` : null;
@@ -750,6 +872,8 @@ export function SocialPostMock({
         <FacebookMock {...props} />
       ) : post.platform === "instagram" ? (
         <InstagramMock {...props} />
+      ) : post.platform === "x" ? (
+        <XMock {...props} />
       ) : (
         <GenericMock {...props} />
       )}

@@ -254,67 +254,91 @@ export function CompactPlatformPreview({
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
             </div>
           )}
-          {items.map((item, index) => (
-            <div
-              key={item.id}
-              className={cn(index > 0 && "border-t border-border")}
-            >
-              <div className="flex items-center gap-2 px-2.5 py-2">
-                {channelProfileImageUrl ? (
-                  // oxlint-disable-next-line nextjs/no-img-element -- channel images may use arbitrary provider hosts
-                  <img
-                    src={channelProfileImageUrl}
-                    alt=""
-                    className="size-6 rounded-full border bg-muted object-cover"
-                  />
-                ) : (
-                  <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[9px] font-semibold">
-                    {identity.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-                <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
-                  {identity}
-                </span>
-                {(story || isThread) && (
-                  <span className="text-[9px] text-muted-foreground">
-                    {index + 1}/{items.length}
-                  </span>
-                )}
+          {items.map((item, index) =>
+            platform === "x" ? (
+              <div
+                key={item.id}
+                className={cn(index > 0 && "border-t border-border")}
+              >
+                <SocialPostMock
+                  post={{
+                    platform,
+                    format,
+                    name: identity,
+                    handle: username,
+                    avatars: [{ url: channelProfileImageUrl }],
+                    text: item.text,
+                    media:
+                      item.media.length === 0 && index === 0 && linkCard?.image
+                        ? [{ type: "image", url: linkCard.image }]
+                        : item.media,
+                    meta: scheduled ? "Scheduled" : "Draft",
+                  }}
+                  play={play}
+                />
               </div>
+            ) : (
+              <div
+                key={item.id}
+                className={cn(index > 0 && "border-t border-border")}
+              >
+                <div className="flex items-center gap-2 px-2.5 py-2">
+                  {channelProfileImageUrl ? (
+                    // oxlint-disable-next-line nextjs/no-img-element -- channel images may use arbitrary provider hosts
+                    <img
+                      src={channelProfileImageUrl}
+                      alt=""
+                      className="size-6 rounded-full border bg-muted object-cover"
+                    />
+                  ) : (
+                    <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[9px] font-semibold">
+                      {identity.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
+                    {identity}
+                  </span>
+                  {(story || isThread) && (
+                    <span className="text-[9px] text-muted-foreground">
+                      {index + 1}/{items.length}
+                    </span>
+                  )}
+                </div>
 
-              <PreviewMedia
-                item={item}
-                platform={platform}
-                format={format}
-                contentTitle={contentTitle}
-                play={play}
-                fallbackImage={
-                  index === 0 && item.media.length === 0
-                    ? linkCard?.image
-                    : null
-                }
-              />
+                <PreviewMedia
+                  item={item}
+                  platform={platform}
+                  format={format}
+                  contentTitle={contentTitle}
+                  play={play}
+                  fallbackImage={
+                    index === 0 && item.media.length === 0
+                      ? linkCard?.image
+                      : null
+                  }
+                />
 
-              <div className="px-2.5 py-2">
-                {story ? (
-                  item.text.trim() ? (
-                    <p className="line-clamp-2 text-[9px] leading-relaxed whitespace-pre-wrap text-muted-foreground italic">
-                      Internal note: {item.text}
+                <div className="px-2.5 py-2">
+                  {story ? (
+                    item.text.trim() ? (
+                      <p className="line-clamp-2 text-[9px] leading-relaxed whitespace-pre-wrap text-muted-foreground italic">
+                        Internal note: {item.text}
+                      </p>
+                    ) : null
+                  ) : item.text.trim() ? (
+                    <p className="line-clamp-4 text-[10px] leading-relaxed whitespace-pre-wrap">
+                      {item.text}
                     </p>
-                  ) : null
-                ) : item.text.trim() ? (
-                  <p className="line-clamp-4 text-[10px] leading-relaxed whitespace-pre-wrap">
-                    {item.text}
-                  </p>
-                ) : (
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground italic">
-                    <ImageIcon className="size-3" />
-                    No post copy yet.
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground italic">
+                      <ImageIcon className="size-3" />
+                      No post copy yet.
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ),
+          )}
 
           {linkCard && (
             <div className="border-t px-2.5 py-2">
