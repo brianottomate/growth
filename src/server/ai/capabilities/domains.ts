@@ -61,6 +61,11 @@ import {
   listReviewCommentsAction,
 } from "./review";
 import {
+  prepareEmailDnsAction,
+  readEmailDnsAction,
+  recheckEmailDnsAction,
+} from "./email-dns";
+import {
   listSequences,
   getSequence,
   sequenceEmails,
@@ -458,6 +463,7 @@ export const brandRead = growthDomainTool({
     context: readBrandContext,
     suggestMarkets: suggestBrandMarketsAction,
     recommendMark: recommendBrandMarkAction,
+    emailDns: readEmailDnsAction,
   },
 });
 
@@ -475,6 +481,8 @@ export const brandWrite = growthDomainTool({
     update: updateBrandAction,
     updateStory: updateBrandStoryAction,
     setMarkets: setBrandMarketsAction,
+    prepareEmailDns: prepareEmailDnsAction,
+    recheckEmailDns: recheckEmailDnsAction,
   },
 });
 

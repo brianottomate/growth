@@ -152,6 +152,7 @@ export const growthActionPolicies = {
     context: read("local-read", ALL),
     suggestMarkets: read("model-read"),
     recommendMark: read("model-read", ALL),
+    emailDns: read("provider-read", ALL),
   },
   brandWrite: {
     create: write(),
@@ -174,6 +175,16 @@ export const growthActionPolicies = {
     // Plain brand fields; writing the old values back is the undo.
     update: write({ idempotent: true, undoWith: "brandWrite.update" }),
     setMarkets: write({ idempotent: true }),
+    prepareEmailDns: write({
+      idempotent: false,
+      consequence: "provider-write",
+      reversible: false,
+    }),
+    recheckEmailDns: write({
+      idempotent: true,
+      consequence: "provider-write",
+      reversible: false,
+    }),
     // Writes the story from one model call; undo by writing the old text back.
     updateStory: write({
       consequence: "model-write",
