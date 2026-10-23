@@ -94,3 +94,6 @@ scripts/.probe-*.json
 # Git worktrees for parallel dev servers live inside the repo, out of sight.
 .worktrees/
 .env*
+
+# Local outreach exports contain customer contact data.
+/outreach_list*.csv
