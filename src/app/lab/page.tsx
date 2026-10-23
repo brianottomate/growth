@@ -25,6 +25,11 @@ const PAGES: { name: string; href: string; note?: string }[] = [
     note: "actual MCP widgets with sample results and a simulated host",
   },
   {
+    name: "Ask WanderOS",
+    href: "/lab/os-demo",
+    note: "JEV + json-render interactive product demo",
+  },
+  {
     name: "Design contracts",
     href: "/lab/design-contracts",
     note: "shared component style review",

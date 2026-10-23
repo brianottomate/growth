@@ -46,6 +46,7 @@ export const env = createEnv({
      */
     WANDER_COM_BASE_URL: z.string().url().default("https://www.wander.com"),
     OPENAI_API_KEY: z.string().min(1), // Required for voice chat
+    TYPESAFE_API_KEY: z.string().min(1).optional(), // Internal WanderOS demo
     ANTHROPIC_API_KEY: z.string().optional(), // For Claude AI features
     FAL_AI_API_KEY: z.string().optional(), // fal.ai image/video generation
     REPLICATE_API_TOKEN: z.string().optional(), // Legacy Wander motion pipeline: Seedance, segmentation, upscaling
@@ -220,6 +221,7 @@ export const env = createEnv({
     GOOGLE_DRIVE_CLIENT_SECRET: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
     ADMIN_TOKEN: process.env.ADMIN_TOKEN,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    TYPESAFE_API_KEY: process.env.TYPESAFE_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     FAL_AI_API_KEY: process.env.FAL_AI_API_KEY,
     REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN,
