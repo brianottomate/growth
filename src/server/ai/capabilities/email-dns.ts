@@ -1,69 +1,45 @@
 import "server-only";
 
+import { getEmailDmarcStatus } from "@/server/services/email-dmarc.service";
 import { env } from "@/env";
 import { emailDnsInputSchema } from "@/lib/email-dns";
 import { emailDnsLinkActive } from "@/server/services/email-dns-link";
 import {
   getBrandEmailDns,
+  EmailDnsNotPreparedError,
   prepareBrandEmailDns,
-  recheckEmailDnsConnection,
+  recheckBrandEmailDns,
+  replaceBrandEmailDnsLink,
 } from "@/server/services/email-dns.service";
 import { z } from "zod";
 
 import { growthAction, GrowthActionError } from "./types";
-
-const emailDnsRecordSchema = z.strictObject({
-  type: z.enum(["TXT", "CNAME"]),
-  host: z.string(),
-  value: z.string(),
-  ttl: z.number().int().positive(),
-});
-
-const configuredEmailDnsSchema = z.strictObject({
-  configured: z.literal(true),
-  rootDomain: z.string(),
-  sendingDomain: z.string(),
-  records: z.array(emailDnsRecordSchema),
-  dkimVerified: z.boolean(),
-  returnPathVerified: z.boolean(),
-  verified: z.boolean(),
-  connectionUrl: z.string().url(),
-  connectionActive: z.boolean(),
-  expiresAt: z.string().datetime(),
-});
-
-const emailDnsStatusSchema = z.union([
-  z.strictObject({ configured: z.literal(false) }),
-  configuredEmailDnsSchema,
-]);
+import { configuredEmailDnsSchema } from "./outputs/email-dns";
 
 function connectionUrl(path: string) {
   return new URL(path, env.NEXT_PUBLIC_BASE_URL).href;
 }
 
-export const readEmailDnsAction = growthAction({
-  description:
-    "Read a brand's existing marketing-email DNS setup and live Postmark authentication status. Returns the current Entri/manual connection URL when setup exists. verified means both DKIM and return path are verified; it does not schedule or send email.",
-  inputSchema: z.object({ brandId: z.string().min(1) }),
-  outputSchema: emailDnsStatusSchema,
-  examples: [{ brandId: "brand_123" }],
-  execute: async (input, ctx) => {
-    const current = await getBrandEmailDns(input.brandId, ctx.orgId);
-    if (!current) return { configured: false as const };
-    return {
-      configured: true as const,
-      rootDomain: current.setup.rootDomain,
-      ...current.status,
-      connectionUrl: connectionUrl(`/connect/email/${current.setup.token}`),
-      connectionActive: emailDnsLinkActive(current.setup),
-      expiresAt: current.setup.expiresAt,
-    };
-  },
-});
+export async function emailDnsForAssistant(
+  current: NonNullable<Awaited<ReturnType<typeof getBrandEmailDns>>>,
+) {
+  return {
+    configured: true as const,
+    rootDomain: current.setup.rootDomain,
+    ...current.status,
+    dmarc: await getEmailDmarcStatus(
+      current.setup.rootDomain,
+      current.setup.sendingDomain,
+    ),
+    connectionUrl: connectionUrl(`/connect/email/${current.setup.token}`),
+    connectionActive: emailDnsLinkActive(current.setup),
+    expiresAt: current.setup.expiresAt,
+  };
+}
 
 export const prepareEmailDnsAction = growthAction({
   description:
-    "Prepare or retrieve a brand's native Growth email-DNS connection. This may create or adopt the brand's Postmark sending domain and stores the setup on the brand, but it changes no DNS records and sends no email. Return the 180-day Growth connectionUrl to the client; that page creates a short-lived Entri session only after the client clicks. Never send an Entri session URL directly. Use replaceLink only to revoke and replace the current Growth connection link.",
+    "Prepare or retrieve a brand's native Growth email-DNS connection. This may create or adopt the brand's Postmark sending domain and stores the setup on the brand, but it changes no DNS records and sends no email. Return the 180-day Growth connectionUrl to the client; that page creates a short-lived Entri session only after the client clicks. Never send an Entri session URL directly. Reuses the current active link for the same domain. Revoke an existing link only with replaceEmailDnsLink.",
   inputSchema: emailDnsInputSchema,
   outputSchema: configuredEmailDnsSchema,
   examples: [
@@ -80,6 +56,10 @@ export const prepareEmailDnsAction = growthAction({
       rootDomain: input.rootDomain,
       sendingDomain: prepared.sendingDomain,
       records: prepared.records,
+      dmarc: await getEmailDmarcStatus(
+        input.rootDomain,
+        prepared.sendingDomain,
+      ),
       dkimVerified: prepared.dkimVerified,
       returnPathVerified: prepared.returnPathVerified,
       verified: prepared.verified,
@@ -97,29 +77,35 @@ export const recheckEmailDnsAction = growthAction({
   outputSchema: configuredEmailDnsSchema,
   examples: [{ brandId: "brand_123" }],
   execute: async (input, ctx) => {
-    const current = await getBrandEmailDns(input.brandId, ctx.orgId);
+    const current = await recheckBrandEmailDns(input.brandId, ctx.orgId);
     if (!current)
       throw new GrowthActionError(
         "invalid_input",
         "Prepare this brand's email DNS connection first.",
       );
-    const checked = await recheckEmailDnsConnection(current.setup.token);
-    if (!checked)
-      throw new GrowthActionError(
-        "conflict",
-        "The email DNS connection link expired. Prepare a replacement link first.",
-      );
-    return {
-      configured: true as const,
-      rootDomain: current.setup.rootDomain,
-      sendingDomain: checked.sendingDomain,
-      records: checked.records,
-      dkimVerified: checked.dkimVerified,
-      returnPathVerified: checked.returnPathVerified,
-      verified: checked.verified,
-      connectionUrl: connectionUrl(`/connect/email/${current.setup.token}`),
-      connectionActive: true,
-      expiresAt: current.setup.expiresAt,
-    };
+    return emailDnsForAssistant(current);
+  },
+});
+
+export const replaceEmailDnsLinkAction = growthAction({
+  description:
+    "Revoke and replace a brand's client email-DNS connection link. The old link immediately stops working. Preserves the sending domain and provider configuration; changes no DNS records and sends no email.",
+  inputSchema: z.object({ brandId: z.string().min(1) }),
+  outputSchema: z.strictObject({
+    connectionUrl: z.string().url(),
+    expiresAt: z.string().datetime(),
+  }),
+  execute: async (input, ctx) => {
+    try {
+      const replaced = await replaceBrandEmailDnsLink(input.brandId, ctx.orgId);
+      return {
+        connectionUrl: connectionUrl(replaced.path),
+        expiresAt: replaced.expiresAt,
+      };
+    } catch (error) {
+      if (error instanceof EmailDnsNotPreparedError)
+        throw new GrowthActionError("invalid_input", error.message);
+      throw error;
+    }
   },
 });

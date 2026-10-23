@@ -8,7 +8,7 @@ import {
   suggestPersonas,
   updatePersona,
 } from "@/server/ai/capabilities/personas";
-import { readBrandContext } from "@/server/ai/capabilities/brand-context";
+import { getBrand } from "@/server/ai/capabilities/brands";
 if (!process.env.DB_EXPERIMENT_BRANCH?.startsWith("experiment/"))
   throw new Error("Run verification on a disposable database experiment.");
 const brand = await db.query.brandTable.findFirst({
@@ -74,12 +74,12 @@ if (existing && proposals.suggestions[0])
     ctx,
   );
 console.log("Persona profile generated", proposals.suggestions.length);
-await readBrandContext.runValidated({ brandId: brand.id }, ctx);
+await getBrand.runValidated({ brandId: brand.id }, ctx);
 console.log("Brand context output contract valid");
 // These checks cover the consequential boundaries added by structured profiles.
 let rejected = false;
 try {
-  await readBrandContext.runValidated(
+  await getBrand.runValidated(
     { brandId: brand.id },
     { ...ctx, orgId: "org_foreign_verification" },
   );

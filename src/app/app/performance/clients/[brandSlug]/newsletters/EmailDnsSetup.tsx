@@ -56,11 +56,22 @@ export function EmailDnsSetup({
     }),
   );
 
-  async function prepareLink(replaceLink = false) {
+  const replace = useMutation(
+    orpc.brand.replaceEmailDnsLink.mutationOptions({
+      onSuccess: (result) => {
+        setUrl(`${window.location.origin}${result.path}`);
+        setExpiresAt(result.expiresAt);
+        setCopied(false);
+        void dns.refetch();
+      },
+    }),
+  );
+
+  async function prepareLink() {
     setUrl(null);
     setCopyError(null);
     await prepare
-      .mutateAsync({ brandId, rootDomain: root, subdomain, replaceLink })
+      .mutateAsync({ brandId, rootDomain: root, subdomain })
       .catch(() => undefined);
   }
   async function copy() {
@@ -140,7 +151,7 @@ export function EmailDnsSetup({
                   value={root}
                   onChange={(event) => setRoot(event.target.value)}
                   placeholder="wander.com"
-                  disabled={prepare.isPending}
+                  disabled={prepare.isPending || replace.isPending}
                 />
               </div>
               <div className="space-y-2">
@@ -152,7 +163,7 @@ export function EmailDnsSetup({
                   value={subdomain}
                   onChange={(event) => setSubdomain(event.target.value)}
                   placeholder={DEFAULT_MARKETING_SUBDOMAIN}
-                  disabled={prepare.isPending}
+                  disabled={prepare.isPending || replace.isPending}
                 />
               </div>
             </div>
@@ -165,7 +176,9 @@ export function EmailDnsSetup({
             <Button
               loading={prepare.isPending}
               onClick={() => void prepareLink()}
-              disabled={prepare.isPending || !root || !subdomain}
+              disabled={
+                prepare.isPending || replace.isPending || !root || !subdomain
+              }
             >
               {prepare.isPending
                 ? "Preparing connection link…"
@@ -176,16 +189,28 @@ export function EmailDnsSetup({
                 {prepare.error.message}
               </p>
             )}
+            <p className="text-sm text-muted-foreground">
+              Replacing the current link keeps the saved domain{" "}
+              {dns.data?.setup.sendingDomain ?? sendingDomain ?? "unchanged"}.
+              Use Get connection link to apply edits to the domain above.
+            </p>
             <Button
               variant="outline"
-              disabled={prepare.isPending || !root || !subdomain}
-              loading={prepare.isPending}
-              onClick={() => void prepareLink(true)}
+              disabled={prepare.isPending || replace.isPending || !dns.data}
+              loading={replace.isPending}
+              onClick={() => {
+                setUrl(null);
+                setCopyError(null);
+                void replace.mutateAsync({ brandId }).catch(() => undefined);
+              }}
             >
-              {prepare.isPending
-                ? "Preparing connection link…"
-                : "Replace link"}
+              Revoke and replace current link
             </Button>
+            {replace.error && (
+              <p role="alert" className="text-sm text-destructive">
+                {replace.error.message}
+              </p>
+            )}
             {url && (
               <div className="space-y-3">
                 <a

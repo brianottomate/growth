@@ -1,3 +1,6 @@
+import { brandMarketsSchema } from "@/lib/markets";
+import { emailDnsStatusSchema } from "./email-dns";
+import { brandLegalIdentitySchema, brandEmailDeliverySchema } from "./shared";
 import { manualBillingResultSchema } from "@/lib/manual-billing";
 import { intakeEmailPreferencesSchema } from "@/lib/intake-email-preferences";
 import { creativeDirectionSchema } from "@/lib/brand-direction";
@@ -139,11 +142,25 @@ export const setPerformanceSettingsActionOutputSchema = z.strictObject({
 
 export const getBrandOutputSchema = z.strictObject({
   brand: listBrandsOutputSchema.shape.brands.element.extend({
+    emailSetup: z.strictObject({
+      sender: z
+        .strictObject({
+          fromName: z.string(),
+          fromEmail: z.string().nullable(),
+          replyTo: z.string().nullable(),
+        })
+        .nullable(),
+      legalIdentity: brandLegalIdentitySchema,
+      delivery: brandEmailDeliverySchema,
+      configurationBlockers: z.array(z.string()),
+      dns: emailDnsStatusSchema.nullable(),
+    }),
     website: z.string().nullable(),
     logo: z.string().nullable(),
     description: z.string().nullable(),
     story: z.string().nullable(),
     creativeDirection: creativeDirectionSchema.nullable(),
+    markets: brandMarketsSchema.nullable(),
     enrichment: z.strictObject({
       scrapedAt: z.string().nullable(),
       hasBrandIdentity: z.boolean(),

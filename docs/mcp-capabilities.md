@@ -246,3 +246,23 @@ share the editor's service and leave CMS publication separate. See
 ## Content workbooks
 
 `workbookRead` lists and reads saved workbook mappings and current brand options. `workbookWrite.import` parses CSV/TSV or base64 XLSX without a model; `save` edits the mapping; `apply` accepts the exact reviewed document into local content drafts with a durable receipt. These are the same actions used by the app. No provider delivery runs during import or apply.
+
+## Brand email setup
+
+Use `brandRead.get` with `includeEmailDns: true` to inspect the saved sender,
+Reply-To, legal footer, provider configuration blockers, live DNS authentication,
+DMARC and client connection link together. Saved email settings are always included; omit the flag for a local brand read,
+with `emailSetup.dns: null` meaning DNS was not requested. If the provider read
+fails, DNS returns `state: unavailable` and the saved brand settings still return.
+The former `brandRead.emailDns` action is removed; refresh the client tool catalog.
+An empty `configurationBlockers` result only means required settings exist; DNS
+authentication is reported separately and neither authorizes sending.
+
+`brandWrite.recheckEmailDns` refreshes provider verification using the brand's
+saved domain, independent of the client link's expiry. `prepareEmailDns` reuses an
+active link for the same domain. `replaceEmailDnsLink` explicitly revokes and
+replaces the client link, preserves the domain and requires operator approval.
+
+The general brand read also includes destinations alongside story and creative
+direction; the former `brandRead.context` action is removed. Both use the same
+brand record and workspace ownership check.

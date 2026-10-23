@@ -12,7 +12,7 @@ Shape opens a chat with the brand and resource name/ID. It does not open a hidde
 
 Supported here: brand story/direction, destinations, persona proposals (including targeted existing persona revisions), campaign audience suggestions, Google text ads, featured-home suggestions, composition copy, catalog photo/copy retries, starter-ad generation and brand mark recommendations. The mark tool's old `direction` argument remains an alias. Existing media/outreach steering and durable email briefs retain their semantics.
 
-Use `brandRead.context` for story/direction/destinations, `personaRead.list` for personas, `brandWrite.updateStory` for a regenerated story, `brandRead.suggestMarkets` followed by `brandWrite.setMarkets` for a destination regrouping, and `personaRead.suggest` with `personaId` followed by `personaWrite.update` for a regenerated existing persona. Preserve IDs and unrelated fields on precise edits.
+Use `brandRead.get` for story/direction/destinations, `personaRead.list` for personas, `brandWrite.updateStory` for a regenerated story, `brandRead.suggestMarkets` followed by `brandWrite.setMarkets` for a destination regrouping, and `personaRead.suggest` with `personaId` followed by `personaWrite.update` for a regenerated existing persona. Preserve IDs and unrelated fields on precise edits.
 
 ## Existing content
 

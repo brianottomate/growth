@@ -27,7 +27,7 @@ export const setEmailSenderIdentityOutputSchema = z.strictObject({
     legalName: z.string(),
     address: emailPostalAddressSchema,
   }),
-  sendBlockers: z.array(z.string()),
+  configurationBlockers: z.array(z.string()),
 });
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */

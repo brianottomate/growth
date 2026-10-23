@@ -145,14 +145,12 @@ export const growthActionPolicies = {
   newsletterAgent: { run: write({ consequence: "local-write" }) },
   brandRead: {
     list: read("local-read", ALL),
-    get: read("local-read", ALL),
+    get: read("provider-read", ALL),
     getMap: read("local-read", ALL),
     next: read("local-read", ALL),
     identity: read("local-read", ALL),
-    context: read("local-read", ALL),
     suggestMarkets: read("model-read"),
     recommendMark: read("model-read", ALL),
-    emailDns: read("provider-read", ALL),
   },
   brandWrite: {
     create: write(),
@@ -175,6 +173,11 @@ export const growthActionPolicies = {
     // Plain brand fields; writing the old values back is the undo.
     update: write({ idempotent: true, undoWith: "brandWrite.update" }),
     setMarkets: write({ idempotent: true }),
+    replaceEmailDnsLink: write({
+      approval: "user",
+      surfaces: CONFIRMED,
+      reversible: false,
+    }),
     prepareEmailDns: write({
       idempotent: false,
       consequence: "provider-write",

@@ -62,7 +62,7 @@ import {
 } from "./review";
 import {
   prepareEmailDnsAction,
-  readEmailDnsAction,
+  replaceEmailDnsLinkAction,
   recheckEmailDnsAction,
 } from "./email-dns";
 import {
@@ -235,7 +235,6 @@ import {
   updateBrandStoryAction,
 } from "./brands";
 import {
-  readBrandContext,
   suggestBrandMarketsAction,
   setBrandMarketsAction,
 } from "./brand-context";
@@ -460,10 +459,8 @@ export const brandRead = growthDomainTool({
     getMap: getBrandMap,
     next: nextForBrand,
     identity: readBrandIdentityAction,
-    context: readBrandContext,
     suggestMarkets: suggestBrandMarketsAction,
     recommendMark: recommendBrandMarkAction,
-    emailDns: readEmailDnsAction,
   },
 });
 
@@ -483,6 +480,7 @@ export const brandWrite = growthDomainTool({
     setMarkets: setBrandMarketsAction,
     prepareEmailDns: prepareEmailDnsAction,
     recheckEmailDns: recheckEmailDnsAction,
+    replaceEmailDnsLink: replaceEmailDnsLinkAction,
   },
 });
 

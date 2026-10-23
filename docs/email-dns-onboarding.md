@@ -8,8 +8,8 @@ It preserves the sender, reply-to, footer, transactional domain and other settin
 No migration is needed. No DNS changes or sends happen during preparation.
 
 The same native path is available to authenticated operators through Growth's
-existing MCP domains. `brandRead.emailDns` reads the current link and live
-Postmark status, `brandWrite.prepareEmailDns` prepares or retrieves the link,
+existing MCP domains. `brandRead.get` with `includeEmailDns: true` reads sender, Reply-To, legal footer,
+provider configuration blockers and the current link with live Postmark and DMARC status, `brandWrite.prepareEmailDns` prepares or retrieves the link,
 and `brandWrite.recheckEmailDns` asks Postmark to recheck the installed records.
 These actions call the same services as the Email tab; they do not create a
 second DNS workflow or change records themselves.
@@ -19,7 +19,9 @@ Entri session URL. It remains active for 180 days and creates a fresh,
 short-lived Entri session only after the client opens the page and starts the
 automatic connection. Client email must link to `connectionUrl`; never copy a
 session URL out of the browser. Read `connectionActive` and `expiresAt` before
-handoff, and use `replaceLink` only when a new Growth link is actually needed.
+handoff, and use the explicit `brandWrite.replaceEmailDnsLink` operation only to revoke and replace a link.
+Routine preparation has no link-replacement flag. Internal verification is authorized
+by brand/workspace ownership and continues to work after the public link expires.
 
 The client page shows live Postmark authentication status, offers Entri Connect,
 and displays copyable manual records. Its configuration includes only DKIM TXT

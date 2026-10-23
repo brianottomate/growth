@@ -11,9 +11,7 @@ import type {
 } from "@/server/db/brand-schema";
 import { brandTable } from "@/server/db/schema";
 
-export type BrandPostalAddress = NonNullable<
-  NonNullable<BrandLegalIdentity["address"]>
->;
+export type BrandPostalAddress = NonNullable<BrandLegalIdentity["address"]>;
 
 export type BrandEmailIdentityInput = {
   brandId: string;
@@ -166,7 +164,7 @@ export async function setBrandEmailIdentity(input: BrandEmailIdentityInput) {
           country: next.legalIdentity.address!.country ?? null,
         },
       },
-      sendBlockers: brandSendBlockers(saved),
+      configurationBlockers: brandSendBlockers(saved),
     };
   });
 }

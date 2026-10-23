@@ -1,3 +1,6 @@
+import { brandSendBlockers } from "@/lib/email-delivery";
+import { getEmailDnsForSender } from "@/server/services/email-dns.service";
+import { emailDnsForAssistant } from "./email-dns";
 import { readPaymentSettings } from "@/server/services/performance-payment-state";
 import { steerSchema } from "@/lib/generation-steer";
 import { creativeDirectionSchema } from "@/lib/brand-direction";
@@ -103,8 +106,11 @@ export const listBrands = growthAction({
 export const getBrand = growthAction({
   outputSchema: getBrandOutputSchema,
   description:
-    "Read one brand by its known id, especially the focused brand. Returns current website, identity summary, story, and Performance settings including recorded journey, card statuses and note. Read before targeted edits and again to verify them. No organization-wide list is needed when the brand id is known. Missing recorded facts do not imply unpaid or unstarted work.",
-  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+    "Read one brand by its known id, especially the focused brand. Includes saved sender, Reply-To, legal footer and provider configuration blockers. Set includeEmailDns to additionally fetch live DNS/DMARC status and the durable client link. DNS authentication is separate from configuration completeness and does not authorize sending. Returns current website, identity summary, story, creative direction, destinations, and Performance settings including recorded journey, card statuses and note. Read before targeted edits and again to verify them. No organization-wide list is needed when the brand id is known. Missing recorded facts do not imply unpaid or unstarted work.",
+  inputSchema: z.object({
+    brandId: z.string().trim().min(1),
+    includeEmailDns: z.boolean().optional(),
+  }),
   execute: async (input, ctx): Promise<GetBrandOutput> => {
     const brand = await db.query.brandTable.findFirst({
       where: and(
@@ -123,19 +129,60 @@ export const getBrand = growthAction({
         description: true,
         story: true,
         creativeDirection: true,
+        markets: true,
         websiteMeta: true,
         brandIdentity: true,
         performanceSettings: true,
+        emailSender: true,
+        emailDelivery: true,
+        legalIdentity: true,
       },
     });
     if (!brand)
       throw new Error(
         "That brand is not available in the active organization.",
       );
-    const { websiteMeta, brandIdentity, ...fields } = brand;
+    const {
+      websiteMeta,
+      brandIdentity,
+      emailSender,
+      emailDelivery,
+      legalIdentity,
+      ...fields
+    } = brand;
+    let dns: z.infer<
+      typeof getBrandOutputSchema
+    >["brand"]["emailSetup"]["dns"] = null;
+    if (input.includeEmailDns) {
+      try {
+        const current = await getEmailDnsForSender(emailSender);
+        dns = current
+          ? await emailDnsForAssistant(current)
+          : { configured: false };
+      } catch {
+        dns = {
+          state: "unavailable",
+          error:
+            "Live email DNS status could not be read. Retry includeEmailDns; saved brand settings remain available.",
+        };
+      }
+    }
     return {
       brand: {
         ...fields,
+        emailSetup: {
+          sender: emailSender
+            ? {
+                fromName: emailSender.fromName,
+                fromEmail: emailSender.fromEmail ?? null,
+                replyTo: emailSender.replyTo ?? null,
+              }
+            : null,
+          legalIdentity,
+          delivery: emailDelivery,
+          configurationBlockers: brandSendBlockers(brand),
+          dns,
+        },
         performanceSettings: await readPaymentSettings(
           brand.id,
           brand.performanceSettings,
@@ -313,7 +360,7 @@ export const updateBrandAction = growthAction({
 
 export const updateBrandStoryAction = growthAction({
   description:
-    "Generate and save the brand story and structured creative direction from its site identity, homes and guest evidence. Creates the first story when the saved story is null or empty; otherwise revises the existing story and direction. Read brandRead.context first and pass steer for the requested changes; current accepted direction is preserved unless changed. Voice comes from archetype defaults unless the brand has an explicit override, which regeneration preserves. For precise edits and voice overrides use brandWrite.update; creativeDirection.voice null restores archetype defaults.",
+    "Generate and save the brand story and structured creative direction from its site identity, homes and guest evidence. Creates the first story when the saved story is null or empty; otherwise revises the existing story and direction. Read brandRead.get first and pass steer for the requested changes; current accepted direction is preserved unless changed. Voice comes from archetype defaults unless the brand has an explicit override, which regeneration preserves. For precise edits and voice overrides use brandWrite.update; creativeDirection.voice null restores archetype defaults.",
   inputSchema: z.object({ brandId: z.string().min(1), steer: steerSchema }),
   outputSchema: z.object({
     story: z.string().nullable(),

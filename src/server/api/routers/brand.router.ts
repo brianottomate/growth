@@ -93,6 +93,7 @@ import { emailDnsInputSchema } from "@/lib/email-dns";
 import {
   getBrandEmailDns,
   prepareBrandEmailDns,
+  replaceBrandEmailDnsLink,
 } from "@/server/services/email-dns.service";
 import { workspaceProcedure } from "@/server/api/orpc";
 
@@ -220,6 +221,11 @@ export const brandRouter = {
     .input(emailDnsInputSchema)
     .handler(({ context, input }) =>
       prepareBrandEmailDns(input, context.workspace.orgId),
+    ),
+  replaceEmailDnsLink: workspaceProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(({ context, input }) =>
+      replaceBrandEmailDnsLink(input.brandId, context.workspace.orgId),
     ),
   listLite: actionProcedure(listBrands),
 

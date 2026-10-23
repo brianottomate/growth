@@ -86,7 +86,7 @@ export const getEmailDraft = growthAction({
 export const setEmailSenderIdentity = growthAction({
   outputSchema: setEmailSenderIdentityOutputSchema,
   description:
-    "Set one brand's canonical From, monitored Reply-To and legal footer after its marketing domain has been prepared. Owner/admin only. The From address must use the brand's saved sending domain. This can clear sender/footer readiness blockers, but it does not change provider configuration, audience, creative or schedule and does not send email. The DNS connection bearer token is intentionally omitted from the result.",
+    "Set one brand's canonical From, monitored Reply-To and legal footer after its marketing domain has been prepared. Owner/admin only. The From address must use the brand's saved sending domain. Returns configurationBlockers for saved settings only; DNS authentication is read through brandRead.get with includeEmailDns. This can clear sender/footer configuration blockers, but it does not change provider configuration, audience, creative or schedule and does not send email. The DNS connection bearer token is intentionally omitted from the result.",
   inputSchema: z.strictObject({
     brandId: z.string().min(1),
     fromName: z.string().trim().min(1).max(160),

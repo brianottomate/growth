@@ -60,7 +60,6 @@ export async function prepareBrandEmailDns(
     brandId: string;
     rootDomain: string;
     subdomain: string;
-    replaceLink?: boolean;
   },
   orgId: string,
 ) {
@@ -73,7 +72,6 @@ export async function prepareBrandEmailDns(
     brand.emailSender?.marketingDomain,
   );
   if (
-    !parsed.replaceLink &&
     current.success &&
     current.data.sendingDomain === sendingDomain &&
     current.data.rootDomain === parsed.rootDomain &&
@@ -124,20 +122,82 @@ export async function prepareBrandEmailDns(
   };
 }
 
-export async function getBrandEmailDns(brandId: string, orgId: string) {
+async function ownedEmailDnsSetup(brandId: string, orgId: string) {
   const brand = await ownedBrand(brandId, orgId);
   const parsed = brandMarketingDomainSchema.safeParse(
     brand.emailSender?.marketingDomain,
   );
-  return parsed.success
+  return parsed.success ? parsed.data : null;
+}
+
+/** Caller must already own the brand; inspect the loaded sender without re-reading it. */
+export async function getEmailDnsForSender(
+  sender: { marketingDomain?: unknown } | null,
+) {
+  const parsed = brandMarketingDomainSchema.safeParse(sender?.marketingDomain);
+  if (!parsed.success) return null;
+  const setup = parsed.data;
+  return {
+    setup,
+    status: statusFor(await getPostmarkDomain(setup.postmarkDomainId), setup),
+  };
+}
+
+export async function getBrandEmailDns(brandId: string, orgId: string) {
+  const brand = await ownedBrand(brandId, orgId);
+  return getEmailDnsForSender(brand.emailSender);
+}
+
+/** Workspace authorization is independent of the public link's lifetime. */
+export async function recheckBrandEmailDns(brandId: string, orgId: string) {
+  const setup = await ownedEmailDnsSetup(brandId, orgId);
+  return setup
     ? {
-        setup: parsed.data,
+        setup,
         status: statusFor(
-          await getPostmarkDomain(parsed.data.postmarkDomainId),
-          parsed.data,
+          await verifyPostmarkMarketingDomain(setup.postmarkDomainId),
+          setup,
         ),
       }
     : null;
+}
+
+export class EmailDnsNotPreparedError extends Error {
+  constructor() {
+    super("Prepare this brand's email DNS connection first.");
+  }
+}
+
+/** Rotate only the public credential; never re-provision or change its domain. */
+export async function replaceBrandEmailDnsLink(brandId: string, orgId: string) {
+  const setup = await ownedEmailDnsSetup(brandId, orgId);
+  if (!setup) throw new EmailDnsNotPreparedError();
+  const issued = {
+    token: newConnectionToken(),
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(
+      Date.now() + EMAIL_DNS_LINK_LIFETIME_SECONDS * 1000,
+    ).toISOString(),
+  };
+  const [saved] = await db
+    .update(brandTable)
+    .set({
+      emailSender: sql`jsonb_set(${brandTable.emailSender}, '{marketingDomain}', (${brandTable.emailSender}->'marketingDomain') || ${JSON.stringify(issued)}::jsonb)`,
+    })
+    .where(
+      and(
+        eq(brandTable.id, brandId),
+        eq(brandTable.organizationId, orgId),
+        isNull(brandTable.deletedAt),
+      ),
+    )
+    .returning({ id: brandTable.id });
+  if (!saved)
+    throw new Error("Brand is no longer available in this workspace.");
+  return {
+    path: `/connect/email/${issued.token}`,
+    expiresAt: issued.expiresAt,
+  };
 }
 
 export async function resolveEmailDnsLink(token: string) {
@@ -160,18 +220,20 @@ export async function resolveEmailDnsLink(token: string) {
 export async function getEmailDnsConnection(token: string) {
   const resolved = await resolveEmailDnsLink(token);
   if (!resolved) return null;
+  const [domain, dmarc] = await Promise.all([
+    getPostmarkDomain(resolved.setup.postmarkDomainId),
+    getEmailDmarcStatus(
+      resolved.setup.rootDomain,
+      resolved.setup.sendingDomain,
+    ),
+  ]);
+  const status = statusFor(domain, resolved.setup);
   return {
     brandName: resolved.brand.name,
     rootDomain: resolved.setup.rootDomain,
     automaticAvailable: isEntriConfigured(),
-    dmarc: await getEmailDmarcStatus(
-      resolved.setup.rootDomain,
-      resolved.setup.sendingDomain,
-    ),
-    status: statusFor(
-      await getPostmarkDomain(resolved.setup.postmarkDomainId),
-      resolved.setup,
-    ),
+    dmarc,
+    status,
   };
 }
 

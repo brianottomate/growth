@@ -602,3 +602,23 @@ are removed. Sends and CSV exports reference `email_audience` directly; database
 membership and existing warehouse queries resolve at read time. A forward
 migration rewrites prior send/receipt references before dropping the table.
 Verified on an isolated production-derived database; no production writes.
+
+## Email setup and DNS inspection (2026-10-23)
+
+The brand owns its saved sending domain; a public connection token authorizes a
+client visit, not an internal domain verification. Internal DNS rechecks now use
+workspace-scoped brand ownership and the saved Postmark domain directly, removing
+the public-link expiry dependency and the preliminary provider read.
+
+Removed the specialized assistant DNS read in favor of an optional email-setup
+section on `brandRead.get`. This includes sender/footer/provider settings and live
+authentication/DMARC so MCP-only operators need no database access. Configuration
+completeness remains distinct from DNS authentication and delivery approval.
+
+Removed link rotation from routine preparation; explicit rotation changes only
+the client credential and retains provider/domain identity. Keep client expiry,
+workspace scoping, consent and approved delivery snapshots.
+
+Also consolidated `brandRead.context` into `brandRead.get`: story and creative
+direction were already returned, and destinations now join them. Removed the
+duplicate read definition, catalog and policy entries, and updated model guidance.

@@ -4,9 +4,8 @@ import { z } from "zod";
 export const DEFAULT_MARKETING_SUBDOMAIN = "post";
 export const EMAIL_DNS_LINK_LIFETIME_SECONDS = 180 * 24 * 60 * 60;
 
-export const emailDnsInputSchema = z.object({
+export const emailDnsInputSchema = z.strictObject({
   brandId: z.string().min(1),
-  replaceLink: z.boolean().optional(),
   rootDomain: z
     .string()
     .trim()

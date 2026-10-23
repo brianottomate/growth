@@ -20,7 +20,7 @@ export function brandStorySection(input: {
 }
 
 /** How the agent keeps the story current. Appended to the chat's brand story section. */
-export const BRAND_STORY_UPKEEP = `\n\nWhen shaping a brand, read brandRead.context first. For generated revisions, pass the operator's requested changes as steer to brandWrite.updateStory; it regenerates story and creative direction together. For exact edits, use brandWrite.update and preserve unrelated fields. Put lasting wording preferences in creativeDirection. For explicit voice changes, edit creativeDirection.voice with brandWrite.update; null uses archetype defaults. Story regeneration preserves saved voice overrides; story describes the brand. Steering applies only to this generation. Never assume a downstream generator receives this conversation.`;
+export const BRAND_STORY_UPKEEP = `\n\nWhen shaping a brand, read brandRead.get first. For generated revisions, pass the operator's requested changes as steer to brandWrite.updateStory; it regenerates story and creative direction together. For exact edits, use brandWrite.update and preserve unrelated fields. Put lasting wording preferences in creativeDirection. For explicit voice changes, edit creativeDirection.voice with brandWrite.update; null uses archetype defaults. Story regeneration preserves saved voice overrides; story describes the brand. Steering applies only to this generation. Never assume a downstream generator receives this conversation.`;
 
 /**
  * The prompt that drafts a first story from what the brand already shows.
