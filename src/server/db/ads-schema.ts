@@ -908,7 +908,7 @@ export const platformAdTable = pgTable(
     uniqueIndex("platform_ad_plan_ad_set_idx")
       .on(table.adId, table.platformDeliveryGroupId)
       .where(
-        sql`${table.adId} IS NOT NULL AND ${table.platformDeliveryGroupId} IS NOT NULL AND lower(coalesce(${table.status}, '')) NOT IN ('deleted', 'removed', 'cancelled', 'canceled')`,
+        sql`${table.adId} IS NOT NULL AND ${table.platformDeliveryGroupId} IS NOT NULL AND lower(coalesce(${table.status}, '')) NOT IN ('deleted', 'removed', 'cancelled', 'canceled', 'archived')`,
       ),
     uniqueIndex("platform_ad_external_id_idx")
       .on(table.externalId)

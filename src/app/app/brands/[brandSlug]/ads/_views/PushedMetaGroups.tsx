@@ -75,7 +75,7 @@ export async function PushedMetaGroups({
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <RefreshMeta platformCampaignId={pc.id} />
+        {pc.campaignId && <RefreshMeta platformCampaignId={pc.id} />}
         <h4 className="text-sm font-semibold">Ad sets · {groups.length}</h4>
         {pc.campaignId && pc.status !== "ended" && (
           <AddMetaDeliveryGroup
@@ -120,7 +120,9 @@ export async function PushedMetaGroups({
                 )}
               </summary>
               <div className="space-y-4 px-4 pb-4">
-                <MetaAdditions group={group} />
+                {pc.campaignId && pc.status !== "ended" && (
+                  <MetaAdditions group={group} />
+                )}
                 {group.configuration?.platform === "meta_ads" &&
                   group.configuration.placements && (
                     <p className="text-xs text-muted-foreground">

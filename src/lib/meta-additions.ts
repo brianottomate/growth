@@ -40,3 +40,13 @@ export function metaGoalMatchesObjective(goal: string, objective: string) {
   };
   return objectives[goal]?.includes(objective) ?? false;
 }
+
+/** The live campaign owns CBO's budget period, independent of draft defaults. */
+export function metaCampaignBudgetType(live: {
+  daily_budget?: string | number;
+  lifetime_budget?: string | number;
+}): "daily" | "lifetime" | null {
+  if (Number(live.lifetime_budget) > 0) return "lifetime";
+  if (Number(live.daily_budget) > 0) return "daily";
+  return null;
+}

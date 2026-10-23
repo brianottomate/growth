@@ -55,8 +55,14 @@ export function selectPlatformAds(
   );
 }
 
-/** Platform statuses after which an ad no longer exists on the platform. */
-const GONE_ON_PLATFORM = ["deleted", "removed", "cancelled", "canceled"];
+/** Removed or archived history does not occupy a current delivery slot. */
+const GONE_ON_PLATFORM = [
+  "deleted",
+  "removed",
+  "cancelled",
+  "canceled",
+  "archived",
+];
 
 export function adGoneOnPlatform(status: string | null | undefined) {
   return GONE_ON_PLATFORM.includes((status ?? "").toLowerCase());

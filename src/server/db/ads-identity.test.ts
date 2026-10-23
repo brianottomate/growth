@@ -13,6 +13,14 @@ test("delivery identity prevents duplicate active sends while retaining removed 
       "utf8",
     );
     await db.exec(migration.replaceAll("--> statement-breakpoint", ""));
+    const archivedMigration = await readFile(
+      new URL(
+        "../../../drizzle/0052_archived_ad_delivery_history.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    await db.exec(archivedMigration.replaceAll("--> statement-breakpoint", ""));
     await db.exec(
       "insert into platform_ad values ('ad','set','deleted'),('ad','set','PAUSED');",
     );
@@ -31,6 +39,9 @@ test("delivery identity prevents duplicate active sends while retaining removed 
     );
     expect(rows.rows[0]?.count).toBe(3);
     await db.exec(
+      "update platform_ad set status='ARCHIVED'; insert into platform_ad values ('ad','set','PAUSED');",
+    );
+    await db.exec(
       "insert into platform_campaign values ('campaign','meta_ads');",
     );
     const repeatedPlan = await db
@@ -43,4 +54,4 @@ test("delivery identity prevents duplicate active sends while retaining removed 
   } finally {
     await db.close();
   }
-});
+}, 30_000);

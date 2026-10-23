@@ -3,6 +3,7 @@ import { metaTrackingDefaults } from "./meta-tracking-defaults";
 import {
   metaAdSetAdditionControls,
   metaGoalMatchesObjective,
+  metaCampaignBudgetType,
 } from "@/lib/meta-additions";
 import { syncZernioAds } from "./ads-sync.service";
 import "server-only";
@@ -27,7 +28,10 @@ import {
 } from "@/lib/platform-delivery";
 import { platformCampaignAdAccount } from "@/lib/platform-campaign-account";
 import { sameAdAccountId, metaDraftProviderControls } from "@/lib/zernio-ads";
-import { metaProviderPlacements } from "@/lib/meta-placement-plan";
+import {
+  metaProviderPlacements,
+  observedMetaPlacements,
+} from "@/lib/meta-placement-plan";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { configuredMetaDestination } from "./ads-write.service";
 import { requireOwnedCampaign } from "./ads-draft.service";
@@ -68,7 +72,7 @@ async function prepare(input: {
   if (!group)
     throw new GrowthActionError(
       "not_found",
-      "This ad set draft no longer exists. Refresh the campaign to see its current ad sets.",
+      "This ad set draft no longer exists.",
     );
   const plan = await db.query.platformCampaignTable.findFirst({
     where: eq(platformCampaignTable.id, group.platformCampaignId),
@@ -182,6 +186,7 @@ async function prepare(input: {
       .limit(1));
   const asset = link?.[0];
   if (
+    !group.externalId &&
     asset &&
     (asset.asset.brandId !== brand.id ||
       !asset.account ||
@@ -195,6 +200,7 @@ async function prepare(input: {
   )
     blockers.push("The linked audience is not ready in this ad account.");
   if (
+    !group.externalId &&
     audience?.type === "lookalike" &&
     asset &&
     asset.asset.type !== "lookalike"
@@ -213,9 +219,22 @@ async function prepare(input: {
     !hasDeliveryLocations(configuration?.targeting?.geography)
   )
     blockers.push("Set the new ad set’s locations before publishing.");
-  const cbo = Boolean(
-    Number(live.daily_budget) > 0 || Number(live.lifetime_budget) > 0,
-  );
+  const campaignBudgetType = metaCampaignBudgetType(live);
+  const cbo = campaignBudgetType !== null;
+  const schedule = resolveMetaSchedule({
+    startAt: plan.startAt,
+    endAt: plan.endAt,
+    campaignStartAt: campaign.startAt,
+    campaignEndAt: campaign.endAt,
+    ...plan.settings?.meta,
+  });
+  if (!group.externalId) {
+    const issue = metaScheduleIssue(
+      schedule,
+      campaignBudgetType ?? group.budgetType,
+    );
+    if (issue) blockers.push(issue);
+  }
   if (
     !group.externalId &&
     !cbo &&
@@ -307,12 +326,24 @@ async function prepare(input: {
         group: {
           id: group.id,
           externalId: group.externalId,
-          configuration,
+          name: group.name,
+          configuration: group.externalId ? undefined : configuration,
           audienceId: group.audienceId,
           budget: group.budget,
           budgetType: group.budgetType,
         },
-        asset: asset?.asset,
+        asset:
+          !group.externalId && asset
+            ? {
+                externalId: asset.asset.externalId,
+                type: asset.asset.type,
+                brandId: asset.asset.brandId,
+                accountId: asset.account?.externalId,
+                status: asset.asset.seedMetadata?.status,
+              }
+            : null,
+        audienceType: !group.externalId ? audience?.type : null,
+        schedule: !group.externalId ? schedule : null,
         ads: missing.map((a) => ({
           id: a.id,
           content: a.content,
@@ -320,7 +351,19 @@ async function prepare(input: {
         })),
         liveBudget: [live.daily_budget, live.lifetime_budget],
         liveStatus: live.status,
-        liveGroup,
+        liveGroup: liveGroup
+          ? {
+              id: liveGroup.id,
+              accountId: liveGroup.account_id,
+              campaignId: liveGroup.campaign_id,
+              status: liveGroup.status,
+              targeting: liveGroup.targeting,
+              promotedObject: liveGroup.promoted_object,
+              ads: liveGroup.ads?.data
+                .map((a) => ({ id: a.id, gone: adGoneOnPlatform(a.status) }))
+                .sort((a, b) => a.id.localeCompare(b.id)),
+            }
+          : null,
       }),
     )
     .digest("hex");
@@ -332,9 +375,13 @@ async function prepare(input: {
     pinned,
     destination,
     configuration,
+    placementPlan: liveGroup
+      ? observedMetaPlacements(liveGroup.targeting ?? {})
+      : configuration?.placements,
     audience,
     missing,
     cbo,
+    schedule,
     blockers,
     reviewToken,
   };
@@ -395,7 +442,7 @@ export async function publishMetaAdditions(
       where: eq(adTable.campaignId, p.campaign.id),
     });
     const usable = p.missing
-      .map((a) => freshAds.find((f) => f.id === a.id)!)
+      .map((a) => freshAds.find((f) => f.id === a.id))
       .map((ad) => {
         if (
           ad?.status !== "approved" ||
@@ -417,9 +464,7 @@ export async function publishMetaAdditions(
         ...p.plan.settings,
         meta: {
           ...p.plan.settings?.meta,
-          ...(p.configuration?.placements
-            ? { placements: p.configuration.placements }
-            : {}),
+          ...(p.placementPlan ? { placements: p.placementPlan } : {}),
         },
       },
       usable,
@@ -448,18 +493,7 @@ export async function publishMetaAdditions(
         platform: "meta_ads",
         adAccountId: p.destination.adAccount.id,
       });
-      const meta = p.plan.settings?.meta;
-      const schedule = resolveMetaSchedule({
-        startAt: p.plan.startAt,
-        endAt: p.plan.endAt,
-        campaignStartAt: p.campaign.startAt,
-        campaignEndAt: p.campaign.endAt,
-        ...meta,
-      });
-      const budgetType =
-        p.group.budgetType === "lifetime" ? "lifetime" : "daily";
-      const issue = metaScheduleIssue(schedule, p.cbo ? "daily" : budgetType);
-      if (issue) throw new Error(issue);
+      const schedule = p.schedule;
       const first = usable[0]!;
       const payload: CreateZernioStandaloneAdInput = {
         accountId: p.pinned.connectionAccountId,
@@ -471,7 +505,7 @@ export async function publishMetaAdditions(
           budgetType: p.group.budgetType,
         }),
         name: p.group.name,
-        adSetName: compiled.adSetNameFor(audience),
+        adSetName: p.group.name,
         goal,
 
         ...(await compiled.adFields(first.ad, first.content)),
@@ -537,6 +571,7 @@ export async function publishMetaAdditions(
         context,
       );
       made.push(...result.created.map((a) => a.externalAdId));
+      warnings.push(...result.warnings);
       await updateWorkflowRun(run, {
         progress: {
           message: `Recorded ${ad.name}`,
@@ -560,13 +595,20 @@ export async function publishMetaAdditions(
     return { deliveryGroupId: p.group.id, createdAdIds: made, warnings };
   } catch (error) {
     if (made.length)
-      await ensureMetaAdsPaused(made).catch((error) =>
-        console.error("Meta publish activity update failed", error),
+      await ensureMetaAdsPaused(made).catch((pauseError) =>
+        console.error("Failed to verify paused Meta additions", {
+          adIds: made,
+          error:
+            pauseError instanceof Error
+              ? pauseError.message
+              : String(pauseError),
+        }),
       );
     await failWorkflowRun(run, error);
-    throw new Error(
-      `${error instanceof Error ? error.message : String(error)}${made.length ? ` Created new ad IDs: ${made.join(", ")}. Review the partial result before retrying.` : ""}`,
-    );
+    const message = `${error instanceof Error ? error.message : String(error)}${made.length ? ` Created new ad IDs: ${made.join(", ")}. Review the partial result before retrying.` : ""}`;
+    if (error instanceof GrowthActionError)
+      throw new GrowthActionError(error.code, message);
+    throw new Error(message);
   }
 }
 

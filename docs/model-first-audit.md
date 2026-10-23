@@ -633,3 +633,10 @@ workspace scoping, consent and approved delivery snapshots.
 Also consolidated `brandRead.context` into `brandRead.get`: story and creative
 direction were already returned, and destinations now join them. Removed the
 duplicate read definition, catalog and policy entries, and updated model guidance.
+
+### Archived Meta delivery history
+
+An archived provider copy is history, not the current plan/ad-set occurrence.
+Migration 0052 and the shared status classifier agree on this distinction. A
+reviewed paused replacement can occupy the current slot while preserving the
+archived row and its provider ID. Active and paused duplicates remain prohibited.

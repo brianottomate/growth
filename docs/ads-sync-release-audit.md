@@ -83,3 +83,11 @@ The addition review is inline in the ad set, with an expandable ad list. Failed
 publishes discard the reviewed snapshot and refresh the campaign before another
 attempt. Removed drafts report `not_found` before any provider access; this case
 is exercised in the isolated verification script.
+
+Follow-up review fixes make the live CBO period authoritative for schedule checks,
+retain the operator's new-set name, hash delivery facts rather than audience sync
+timestamps or paging cursors, and leave published targeting owned by Meta. Archived
+platform copies are historical occurrences under migration 0052; a current delivery
+still has a unique plan/set identity. Imported campaigns without local plans do not
+show planning controls. UI errors retain missing-resource codes, publish warnings
+are visible, and mirror refreshes use the background-run write policy.

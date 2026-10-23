@@ -449,7 +449,7 @@ export const growthActionPolicies = {
     listLeadForms: read("provider-read"),
     openCampaign: read(),
     previewAdditions: read("provider-read"),
-    refreshMeta: read("provider-read"),
+    refreshMeta: write({ consequence: "background-run", idempotent: true }),
     listCampaigns: read(),
     ideaHomePhotos: read(),
     ideaContext: read(),

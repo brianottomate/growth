@@ -1,6 +1,10 @@
 import { observedMetaPlacements } from "./meta-placement-plan";
 import { expect, test } from "bun:test";
-import { metaAdSetAdditionControls } from "./meta-additions";
+import { metaScheduleIssue } from "./meta-schedule";
+import {
+  metaAdSetAdditionControls,
+  metaCampaignBudgetType,
+} from "./meta-additions";
 
 test("an addition into a running CBO campaign never rewrites or duplicates its budget", () => {
   const payload = metaAdSetAdditionControls({
@@ -54,4 +58,19 @@ test("incremental creative keeps explicit live placements and refuses unsupporte
       audience_network_positions: ["classic"],
     }),
   ).toThrow("Unsupported");
+});
+
+test("a live lifetime CBO budget requires an end date before adding a set", () => {
+  const budgetType = metaCampaignBudgetType({
+    daily_budget: "0",
+    lifetime_budget: "250000",
+  });
+  expect(budgetType).toBe("lifetime");
+  expect(
+    metaScheduleIssue({ startAt: null, endAt: null }, budgetType),
+  ).toContain("end date");
+  expect(
+    metaCampaignBudgetType({ daily_budget: "8300", lifetime_budget: "0" }),
+  ).toBe("daily");
+  expect(metaCampaignBudgetType({})).toBeNull();
 });

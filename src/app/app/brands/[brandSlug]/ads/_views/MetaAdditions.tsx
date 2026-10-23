@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -21,17 +22,25 @@ export function MetaAdditions({
   const router = useRouter();
   const review = useMutation(
     orpc.ads.previewAdditions.mutationOptions({
-      onError: () => router.refresh(),
+      onError: (error) => {
+        if ("code" in error && error.code === "NOT_FOUND") {
+          toast.error(error.message);
+          router.refresh();
+        }
+      },
     }),
   );
   const publish = useMutation(
     orpc.ads.publishAdditions.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (result) => {
+        for (const warning of result.warnings) toast.warning(warning);
         review.reset();
         setExpanded(false);
         router.refresh();
       },
-      onError: () => {
+      onError: (error) => {
+        if ("code" in error && error.code === "NOT_FOUND")
+          toast.error(error.message);
         // A failed attempt may have created some paused objects. Require a fresh
         // provider review before another attempt, including when a draft vanished.
         review.reset();
@@ -115,13 +124,11 @@ export function MetaAdditions({
                     ? "Publishing…"
                     : "Publish additions paused"}
                 </Button>
-              ) : (
-                <p>No additions to publish.</p>
-              )}
+              ) : null}
             </>
           )}
           {publish.error && (
-            <div className="space-y-1" role="alert">
+            <div className="space-y-1">
               <p className="text-destructive">{publish.error.message}</p>
               <p>Review additions again before publishing.</p>
             </div>

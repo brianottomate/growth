@@ -34,6 +34,9 @@ export function AddMetaDeliveryGroup({
     [countries, setCountries] = useState(""),
     [states, setStates] = useState(""),
     [budget, setBudget] = useState("");
+  const budgetInvalid =
+    Boolean(budget) &&
+    (!Number.isInteger(Number(budget)) || Number(budget) <= 0);
   const router = useRouter();
   const save = useMutation(
     orpc.ads.addDeliveryGroup.mutationOptions({
@@ -119,12 +122,17 @@ export function AddMetaDeliveryGroup({
             requires an explicit amount for the new set.
           </p>
         </div>
+        {budgetInvalid && (
+          <p className="text-sm text-destructive">
+            Enter a positive whole-number budget.
+          </p>
+        )}
         {save.error && (
           <p className="text-sm text-destructive">{save.error.message}</p>
         )}
         <DialogFooter>
           <Button
-            disabled={!name.trim() || save.isPending}
+            disabled={!name.trim() || budgetInvalid || save.isPending}
             onClick={() =>
               save.mutate({
                 platformCampaignId,
