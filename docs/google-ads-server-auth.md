@@ -1,7 +1,7 @@
 # Google Ads server access
 
 Growth can authenticate directly to Google Ads using a dedicated service account.
-Zernio continues to manage its own connection and developer token.
+Zernio continues to manage its own connection.
 
 Production secrets belong in Doppler `wander-growth/prd`, synced to the
 `wanderdev/growth` Vercel Production environment:
@@ -9,8 +9,10 @@ Production secrets belong in Doppler `wander-growth/prd`, synced to the
 | Variable | Purpose |
 | --- | --- |
 | `GOOGLE_ADS_SERVICE_ACCOUNT_JSON` | Service account JSON with its private key |
-| `GOOGLE_ADS_DEVELOPER_TOKEN` | Approved Google Ads developer token |
 | `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | Manager account ID |
+
+No developer token is sent. Google sunset developer tokens on 2026-09-09; API
+access now follows the Google Cloud project that owns the service account.
 
 The service account must be added to the manager's Google Ads access list.
 Google Cloud IAM access alone does not grant access to Google Ads.
@@ -37,8 +39,8 @@ writes need separate validation of permissions and approved API use.
 
 The spend tracker also uses this client, but remains inactive until its separate
 `GOOGLE_ADS_CUSTOMER_ID` is configured. That variable selects the reporting child
-account; it must never point at the manager. Supplying only the three server
-credentials above does not enable or change spend reporting.
+account; it must never point at the manager. Supplying only the two server
+settings above does not enable or change spend reporting.
 
 ## Rotation
 

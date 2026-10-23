@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createGoogleAdsTransport } from "./google-ads.transport";
 const oauth = {
-  developerToken: "developer-secret",
   loginCustomerId: "123-456-7890",
   clientId: "oauth-client",
   clientSecret: "oauth-secret",

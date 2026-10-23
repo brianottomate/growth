@@ -10,7 +10,6 @@ const serviceAccountSchema = z.object({
 });
 
 export interface GoogleAdsConfig {
-  developerToken?: string;
   loginCustomerId?: string;
   serviceAccountJson?: string;
   clientId?: string;
@@ -19,7 +18,6 @@ export interface GoogleAdsConfig {
 }
 
 export function googleAdsAuthMode(config: GoogleAdsConfig) {
-  if (!config.developerToken) return null;
   if (config.serviceAccountJson) return "service_account" as const;
   if (config.clientId && config.clientSecret && config.refreshToken)
     return "user_oauth" as const;
@@ -135,7 +133,6 @@ export function createGoogleAdsTransport(
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          "developer-token": config.developerToken!,
           "Content-Type": "application/json",
           ...(loginCustomerId ? { "login-customer-id": loginCustomerId } : {}),
         },

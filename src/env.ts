@@ -102,7 +102,6 @@ export const env = createEnv({
     GOOGLE_ADS_SERVICE_ACCOUNT_JSON: z.string().optional(),
     GOOGLE_ADS_CLIENT_ID: z.string().optional(),
     GOOGLE_ADS_CLIENT_SECRET: z.string().optional(),
-    GOOGLE_ADS_DEVELOPER_TOKEN: z.string().optional(),
     GOOGLE_ADS_REFRESH_TOKEN: z.string().optional(),
     GOOGLE_ADS_LOGIN_CUSTOMER_ID: z.string().optional(), // MCC
     GOOGLE_ADS_CUSTOMER_ID: z.string().optional(), // child account
@@ -270,7 +269,6 @@ export const env = createEnv({
       process.env.GOOGLE_ADS_SERVICE_ACCOUNT_JSON,
     GOOGLE_ADS_CLIENT_ID: process.env.GOOGLE_ADS_CLIENT_ID,
     GOOGLE_ADS_CLIENT_SECRET: process.env.GOOGLE_ADS_CLIENT_SECRET,
-    GOOGLE_ADS_DEVELOPER_TOKEN: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
     GOOGLE_ADS_REFRESH_TOKEN: process.env.GOOGLE_ADS_REFRESH_TOKEN,
     GOOGLE_ADS_LOGIN_CUSTOMER_ID: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
     GOOGLE_ADS_CUSTOMER_ID: process.env.GOOGLE_ADS_CUSTOMER_ID,
