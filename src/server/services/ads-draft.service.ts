@@ -656,6 +656,11 @@ async function ensureDeliveryGroups(
     plan.platform === "meta_ads" || !audiences.length
       ? [{ id: null, name: "Broad" }]
       : audiences;
+  // Meta's one Broad set reaches every audience's states, so it is never
+  // created without a location the push will refuse.
+  const states = [
+    ...new Set(audiences.flatMap((a) => a.geography?.states ?? [])),
+  ];
   for (const audience of targets) {
     if (existing.some((group) => group.audienceId === audience.id)) continue;
     await db
@@ -671,6 +676,9 @@ async function ensureDeliveryGroups(
         status: "draft",
         configuration: deliveryGroupConfigurationSchema.parse({
           platform: plan.platform,
+          ...(plan.platform === "meta_ads" && states.length
+            ? { targeting: { geography: { countries: ["US"], states } } }
+            : {}),
         }),
       })
       .onConflictDoNothing();
