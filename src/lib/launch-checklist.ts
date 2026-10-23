@@ -39,23 +39,25 @@ export const launchPatchSchema = z
     (patch) => new Set(patch.map((entry) => entry.item)).size === patch.length,
     "Each item may be updated once per request",
   );
-export type LaunchEvent = {
-  item: LaunchItem;
-  checked: boolean;
+export const launchEventSchema = z.strictObject({
+  item: launchItemSchema,
+  checked: z.boolean(),
   /** Not applicable to this client; settled without being done. */
-  skipped?: boolean;
-  by: string | null;
-  byName?: string | null;
-  source: "manual" | "assistant" | "workflow";
-  at: string;
-  evidence: string | null;
-};
-export type LaunchRecord = {
-  revision: number;
-  items: Partial<Record<LaunchItem, LaunchEvent>>;
-  history: LaunchEvent[];
-  receipts: string[];
-};
+  skipped: z.boolean().optional(),
+  by: z.string().nullable(),
+  byName: z.string().nullable().optional(),
+  source: z.enum(["manual", "assistant", "workflow"]),
+  at: z.string(),
+  evidence: z.string().nullable(),
+});
+export type LaunchEvent = z.infer<typeof launchEventSchema>;
+export const launchRecordSchema = z.strictObject({
+  revision: z.number(),
+  items: z.partialRecord(launchItemSchema, launchEventSchema),
+  history: z.array(launchEventSchema),
+  receipts: z.array(z.string()),
+});
+export type LaunchRecord = z.infer<typeof launchRecordSchema>;
 export const emptyLaunchRecord = (): LaunchRecord => ({
   revision: 0,
   items: {},

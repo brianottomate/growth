@@ -1,21 +1,11 @@
-import { creativeDirectionSchema } from "@/lib/brand-direction";
-import { performanceSettingsSchema } from "./brands";
-import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
-import {
-  brandEmailDeliverySchema,
-  brandEmailSenderSchema,
-  brandLegalIdentitySchema,
-} from "./shared";
 import { performanceCycleStatusEnum } from "@/server/db/performance-schema";
 import { performanceAccountStatusEnum } from "@/server/db/performance-schema";
 import { campaignStatusEnum } from "@/server/db/ads-schema";
 import { lifecycleRunStateEnum } from "@/server/db/lifecycle-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 import { platformCampaignStatusEnum } from "@/server/db/ads-schema";
-import { brandRelationshipEnum } from "@/server/db/brand-schema";
 import { z } from "zod";
 
-import { brandMarketsSchema } from "@/lib/markets";
 import { jsonValueSchema } from "../../kernel/output";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
@@ -346,233 +336,9 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
     billingAcknowledgedAt: z.iso.datetime().nullable(),
     brand: z
       .strictObject({
-        adPreviews: z
-          .array(
-            z.strictObject({
-              assetId: z.string(),
-              formatId: z.string(),
-              homeUrl: z.string().nullable().optional(),
-              savedAt: z.string(),
-              savedBy: z.string().nullable().optional(),
-              templateId: z.string(),
-            }),
-          )
-          .nullable(),
-        brandFingerprint: z
-          .strictObject({
-            extractedAt: z.string().optional(),
-            fingerprintText: z.string(),
-            postsAnalyzed: z.number().optional(),
-            voices: z.array(
-              z.enum([
-                "hero",
-                "challenger",
-                "sage",
-                "innocent",
-                "explorer",
-                "creator",
-                "ruler",
-                "caregiver",
-                "everyman",
-                "jester",
-                "lover",
-                "magician",
-              ]),
-            ),
-          })
-          .nullable(),
-        brandIdentity: z
-          .strictObject({
-            colors: z
-              .strictObject({
-                accent: z.string().optional(),
-                primary: z.string().optional(),
-                secondary: z.string().optional(),
-              })
-              .optional(),
-            colorScheme: z.enum(["dark", "light"]).optional(),
-            extractedAt: z.string().optional(),
-            favicon: z.string().nullable().optional(),
-            fonts: z
-              .array(
-                z.strictObject({
-                  family: z.string(),
-                  role: z.enum(["body", "heading"]).optional(),
-                  weight: z.number().optional(),
-                }),
-              )
-              .optional(),
-            logo: z.string().nullable().optional(),
-            personality: z
-              .strictObject({
-                energy: z.string(),
-                targetAudience: z.string(),
-                tone: z.string(),
-              })
-              .optional(),
-            raw: jsonValueSchema.optional(),
-          })
-          .nullable(),
-        brandListeningStory: z
-          .strictObject({
-            productBoilerplate: z.string().optional(),
-            replyGuidance: z.string(),
-            signalGuidance: z.string(),
-            updatedAt: z.string().optional(),
-            updatedBy: z.string().optional(),
-          })
-          .nullable(),
-        brandMark: z
-          .strictObject({
-            fontFamily: z.string().nullable().optional(),
-            fontWeight: z
-              .union([
-                z.literal(400),
-                z.literal(500),
-                z.literal(600),
-                z.literal(700),
-              ])
-              .nullable()
-              .optional(),
-            letterSpacing: z.number().nullable().optional(),
-            reason: z.string().nullable().optional(),
-            iconAssetId: z.string().nullable().optional(),
-            iconFrom: z
-              .enum(["logo", "favicon", "logo-icon"])
-              .nullable()
-              .optional(),
-            source: z.enum(["logo", "favicon", "lockup"]),
-            text: z.string().nullable().optional(),
-            tuning: z
-              .strictObject({
-                gapScale: z.number(),
-                iconScale: z.number(),
-                iconShift: z.number(),
-                note: z.string(),
-              })
-              .nullable()
-              .optional(),
-            updatedAt: z.string(),
-            variants: z.strictObject({
-              color: z.string(),
-              dark: z.string(),
-              white: z.string(),
-            }),
-            vector: z
-              .strictObject({
-                color: z.string().nullable().optional(),
-                dark: z.string(),
-                white: z.string(),
-              })
-              .nullable()
-              .optional(),
-          })
-          .nullable(),
-        businessStage: z
-          .enum([
-            "prospect",
-            "pitch_sent",
-            "meeting_booked",
-            "signed",
-            "paid",
-            "paused",
-            "lost",
-            "churned",
-          ])
-          .nullable(),
-        businessStageAt: z.iso.datetime().nullable(),
-        createdAt: z.iso.datetime(),
-        deletedAt: z.iso.datetime().nullable(),
-        deliveryStage: z
-          .enum([
-            "paused",
-            "not_started",
-            "intake_sent",
-            "intake_submitted",
-            "access_verified",
-            "ads_review",
-            "live",
-          ])
-          .nullable(),
-        deliveryStageAt: z.iso.datetime().nullable(),
-        description: z.string().nullable(),
-        featuredListingUrl: z.string().nullable(),
-        story: z.string().nullable(),
-        creativeDirection: creativeDirectionSchema.nullable(),
-        markets: brandMarketsSchema.nullable(),
-        followerCount: z.number().nullable(),
         id: z.string(),
-        industryResearch: z
-          .strictObject({
-            analyzedAt: z.string().optional(),
-            confidence: z.enum(["high", "medium", "low"]).optional(),
-            sources: z.array(z.string()).optional(),
-          })
-          .catchall(jsonValueSchema)
-          .nullable(),
-        isActive: z.boolean(),
-        lastAccessCheckAt: z.iso.datetime().nullable(),
-        leadDomain: z.string().nullable(),
-        links: z
-          .array(
-            z.strictObject({
-              category: z
-                .enum(["sheet", "doc", "dashboard", "design", "other"])
-                .optional(),
-              label: z.string(),
-              url: z.string().optional(),
-            }),
-          )
-          .nullable(),
-        logo: z.string().nullable(),
-        metaPageId: z.string().nullable(),
         name: z.string(),
-        organizationId: z.string().nullable(),
-        ownerId: z.string().nullable(),
-        csLeadId: z.string().nullable(),
-        performanceChecklist: z
-          .strictObject({
-            meta: z
-              .record(
-                z.string(),
-                z.strictObject({
-                  at: z.string(),
-                  by: z.string(),
-                  byName: z.string().nullable(),
-                }),
-              )
-              .optional(),
-            values: z
-              .record(z.string(), z.union([z.string(), z.number()]).nullable())
-              .optional(),
-          })
-          .nullable(),
-        performanceSettings: performanceSettingsSchema.nullable(),
-        previewSourceUrl: z.string().nullable(),
-        relationship: z.enum(brandRelationshipEnum.enumValues),
         slug: z.string().nullable(),
-        tagline: z.string().nullable(),
-        type: z.enum(["company", "personal"]),
-        updatedAt: z.iso.datetime(),
-        wanderOsCheckedAt: z.iso.datetime().nullable(),
-        wanderOsWebsiteId: z.string().nullable(),
-        wanderOsEnabled: z.boolean(),
-        emailSender: brandEmailSenderSchema,
-        legalIdentity: brandLegalIdentitySchema,
-        emailDelivery: brandEmailDeliverySchema,
-        website: z.string().nullable(),
-        websiteMeta: z
-          .strictObject({
-            description: z.string().optional(),
-            favicon: z.string().optional(),
-            ogImage: z.string().optional(),
-            scrapedAt: z.string().optional(),
-            homepage: brandPageSnapshotSchema.optional(),
-            about: brandPageSnapshotSchema.optional(),
-            title: z.string().optional(),
-          })
-          .nullable(),
-        zernioProfileId: z.string().nullable(),
       })
       .nullable(),
     brandId: z.string().nullable(),
@@ -832,32 +598,6 @@ export const previewIntakeApplyActionNativeResultSchema =
         ),
       appliedAt: z.date().nullable(),
       billingAcknowledgedAt: z.date().nullable(),
-      brand: previewIntakeApplyActionOutputSchema.shape.intake.shape.brand
-        .unwrap()
-        .extend({
-          brandIdentity:
-            previewIntakeApplyActionOutputSchema.shape.intake.shape.brand
-              .unwrap()
-              .shape.brandIdentity.unwrap()
-              .extend({
-                raw: z.unknown().optional(),
-              })
-              .nullable(),
-          businessStageAt: z.date().nullable(),
-          createdAt: z.date(),
-          deletedAt: z.date().nullable(),
-          deliveryStageAt: z.date().nullable(),
-          industryResearch:
-            previewIntakeApplyActionOutputSchema.shape.intake.shape.brand
-              .unwrap()
-              .shape.industryResearch.unwrap()
-              .catchall(z.unknown())
-              .nullable(),
-          lastAccessCheckAt: z.date().nullable(),
-          updatedAt: z.date(),
-          wanderOsCheckedAt: z.date().nullable(),
-        })
-        .nullable(),
       createdAt: z.date(),
       guestListConsentAt: z.date().nullable(),
       instagramLinkConfirmedAt: z.date().nullable(),

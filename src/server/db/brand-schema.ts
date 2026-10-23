@@ -6,6 +6,7 @@ import type { PerformanceCardState } from "@/lib/performance-card-state";
 import type { BrandEmailTheme } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import type { PerformanceChecklist } from "@/lib/performance-checklist";
+import type { BrandMark } from "@/lib/brand-mark";
 import { relations, sql } from "drizzle-orm";
 import {
   customType,
@@ -117,48 +118,7 @@ export type BrandWebsiteMeta = {
   scrapedAt?: string; // ISO 8601
 };
 
-/**
- * The mark a brand's cards carry, chosen by an operator rather than scraped.
- * `variants` are library assets rendered from the recipe: the colour version,
- * a white silhouette for photos, a near-black one for light grounds.
- */
-export type BrandMark = {
-  previewCopy?: import("@/lib/brand-preview-copy").BrandPreviewCopy | null;
-  source: "logo" | "favicon" | "lockup";
-  /** Lockup only: the icon beside the name, a library asset. */
-  iconAssetId?: string | null;
-  /** Lockup only: the icon taken from the scraped logo or favicon instead. */
-  /** "logo-icon": the logo's leading glyph, isolated from its wordmark. */
-  iconFrom?: "logo" | "favicon" | "logo-icon" | null;
-  /** Lockup only: the wordmark text. Defaults to the brand name. */
-  text?: string | null;
-  /** Lockup only: the family the text is set in; null means the house font. */
-  fontFamily?: string | null;
-  /** Lockup only: the wordmark weight; null means 700. */
-  fontWeight?: 400 | 500 | 600 | 700 | null;
-  /** Lockup only: tracking in em; null means -0.02. */
-  letterSpacing?: number | null;
-  /** Why this mark, when "Suggest a mark" chose it. */
-  reason?: string | null;
-  variants: { color: string; white: string; dark: string };
-  /**
-   * The mark traced to SVG, when the shape traces cleanly: white and dark
-   * always, colour only when the mark is drawn in a single colour.
-   */
-  vector?: { white: string; dark: string; color?: string | null } | null;
-  /**
-   * An art director's corrections to the measured lockup, in cap heights, from
-   * a vision pass over the first render. Stored so every tone and every later
-   * render agrees with what was judged.
-   */
-  tuning?: {
-    iconScale: number;
-    iconShift: number;
-    gapScale: number;
-    note: string;
-  } | null;
-  updatedAt: string;
-};
+export type { BrandMark };
 
 /**
  * One card kept as a preview of the brand's ads: what they will look like

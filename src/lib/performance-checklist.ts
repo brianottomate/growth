@@ -5,22 +5,26 @@
 // Explicit onboarding milestones live alongside tracker fields in `launch`.
 // Neither is inferred from asset or provider state. Client-safe.
 
-export type ChecklistValue = string | number | null;
+import { z } from "zod";
+import { launchRecordSchema } from "./launch-checklist";
+
+const checklistValueSchema = z.union([z.string(), z.number()]).nullable();
+export type ChecklistValue = z.infer<typeof checklistValueSchema>;
 
 /** Who last set a field, and when. Server-stamped from the session, never trusted from the client. */
-export type ChecklistItemMeta = {
-  by: string;
-  byName: string | null;
-  at: string;
-};
+const checklistItemMetaSchema = z.strictObject({
+  by: z.string(),
+  byName: z.string().nullable(),
+  at: z.string(),
+});
+export type ChecklistItemMeta = z.infer<typeof checklistItemMetaSchema>;
 
-import type { LaunchRecord } from "./launch-checklist";
-
-export type PerformanceChecklist = {
-  launch?: LaunchRecord;
-  values?: Record<string, ChecklistValue>;
-  meta?: Record<string, ChecklistItemMeta>;
-};
+export const performanceChecklistSchema = z.strictObject({
+  launch: launchRecordSchema.optional(),
+  values: z.record(z.string(), checklistValueSchema).optional(),
+  meta: z.record(z.string(), checklistItemMetaSchema).optional(),
+});
+export type PerformanceChecklist = z.infer<typeof performanceChecklistSchema>;
 
 export type ChecklistFieldKind = "text" | "money" | "number" | "date";
 

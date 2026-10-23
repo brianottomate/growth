@@ -1,3 +1,5 @@
+import { brandMarkSchema } from "@/lib/brand-mark";
+import { performanceChecklistSchema } from "@/lib/performance-checklist";
 import { creativeDirectionSchema } from "@/lib/brand-direction";
 import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
 import {
@@ -109,43 +111,6 @@ const brandListeningStorySchema = z.strictObject({
   updatedBy: z.string().optional(),
 });
 
-const brandMarkSchema = z.strictObject({
-  fontFamily: z.string().nullable().optional(),
-  fontWeight: z
-    .union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)])
-    .nullable()
-    .optional(),
-  letterSpacing: z.number().nullable().optional(),
-  reason: z.string().nullable().optional(),
-  iconAssetId: z.string().nullable().optional(),
-  iconFrom: z.enum(["logo", "favicon", "logo-icon"]).nullable().optional(),
-  source: z.enum(["logo", "favicon", "lockup"]),
-  text: z.string().nullable().optional(),
-  tuning: z
-    .strictObject({
-      gapScale: z.number(),
-      iconScale: z.number(),
-      iconShift: z.number(),
-      note: z.string(),
-    })
-    .nullable()
-    .optional(),
-  updatedAt: z.string(),
-  variants: z.strictObject({
-    color: z.string(),
-    dark: z.string(),
-    white: z.string(),
-  }),
-  vector: z
-    .strictObject({
-      color: z.string().nullable().optional(),
-      dark: z.string(),
-      white: z.string(),
-    })
-    .nullable()
-    .optional(),
-});
-
 const industryResearchSchema = z
   .strictObject({
     analyzedAt: z.string().optional(),
@@ -158,22 +123,6 @@ const linkItemSchema = z.strictObject({
   category: z.enum(["sheet", "doc", "dashboard", "design", "other"]).optional(),
   label: z.string(),
   url: z.string().optional(),
-});
-
-const performanceChecklistSchema = z.strictObject({
-  meta: z
-    .record(
-      z.string(),
-      z.strictObject({
-        at: z.string(),
-        by: z.string(),
-        byName: z.string().nullable(),
-      }),
-    )
-    .optional(),
-  values: z
-    .record(z.string(), z.union([z.string(), z.number()]).nullable())
-    .optional(),
 });
 
 const finishedArtworkSchema = z.strictObject({

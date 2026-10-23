@@ -30,8 +30,6 @@ import {
   attachToPerformanceCycleActionOutputSchema,
 } from "./outputs/performance";
 
-import { brandForAssistant } from "./brand-output";
-
 import "server-only";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 
@@ -356,9 +354,11 @@ export const previewIntakeApplyAction = growthAction({
       ...preview,
       intake: {
         ...preview.intake,
-        brand: preview.intake.brand
-          ? brandForAssistant(preview.intake.brand)
-          : null,
+        brand: preview.intake.brand && {
+          id: preview.intake.brand.id,
+          name: preview.intake.brand.name,
+          slug: preview.intake.brand.slug,
+        },
       },
     };
   },
