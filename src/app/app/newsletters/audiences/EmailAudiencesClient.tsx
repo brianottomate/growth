@@ -1,5 +1,7 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { CopyAnchorLink } from "@/components/copy-anchor-link";
+import { useScrollToHash } from "@/hooks/useScrollToHash";
 import { parse } from "csv-parse/browser/esm/sync";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -110,6 +112,35 @@ export function EmailAudiencesClient({
   const resetPreview = () => {
     preview.reset();
   };
+  type SavedAudience = NonNullable<typeof audiences.data>[number];
+  const select = (a: SavedAudience) => {
+    if (embedded) setOpen(true);
+    setSelectedId(a.id);
+    setSavedDefinition(emailAudienceDefinitionKey(a.definition));
+    setName(a.name);
+    setDays(
+      a.definition.clickedWithinDays === null
+        ? "all"
+        : String(a.definition.clickedWithinDays),
+    );
+    setKinds(a.definition.guestKinds);
+    setConsent(a.definition.consentConfirmed);
+    setListId(a.definition.listId ?? null);
+    setSample(a.definition.sampleSize ? String(a.definition.sampleSize) : "");
+    setUpload(undefined);
+    resetPreview();
+  };
+  // A link to one audience opens it, the way a link to a sequence does.
+  const linked = /^#audience-(.+)$/.exec(
+    typeof window === "undefined" ? "" : window.location.hash,
+  )?.[1];
+  useEffect(() => {
+    const a = linked && audiences.data?.find((item) => item.id === linked);
+    if (a) select(a);
+    // Once, when the list arrives.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [audiences.data]);
+  useScrollToHash(Boolean(audiences.data));
   const startNew = () => {
     setAppendTo("");
     setOpen(true);
@@ -221,36 +252,28 @@ export function EmailAudiencesClient({
           <EmptyState compact icon={Users} title="No saved audiences yet" />
         ))}
       {audiences.data?.map((a) => (
-        <button
-          disabled={save.isPending}
+        <div
           key={a.id}
-          className="block w-full rounded-md border p-3 text-left text-sm hover:bg-muted"
-          onClick={() => {
-            if (embedded) setOpen(true);
-            setSelectedId(a.id);
-            setSavedDefinition(emailAudienceDefinitionKey(a.definition));
-            setName(a.name);
-            setDays(
-              a.definition.clickedWithinDays === null
-                ? "all"
-                : String(a.definition.clickedWithinDays),
-            );
-            setKinds(a.definition.guestKinds);
-            setConsent(a.definition.consentConfirmed);
-            setListId(a.definition.listId ?? null);
-            setSample(
-              a.definition.sampleSize ? String(a.definition.sampleSize) : "",
-            );
-            setUpload(undefined);
-            resetPreview();
-          }}
+          id={`audience-${a.id}`}
+          className="flex scroll-mt-4 items-start gap-1"
         >
-          {a.name}
-          <span className="mt-1 block text-xs text-muted-foreground">
-            {a.recipientCount !== null &&
-              `${a.recipientCount.toLocaleString()} current members`}
-          </span>
-        </button>
+          <button
+            disabled={save.isPending}
+            className="block min-w-0 flex-1 rounded-md border p-3 text-left text-sm hover:bg-muted"
+            onClick={() => select(a)}
+          >
+            {a.name}
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {a.recipientCount !== null &&
+                `${a.recipientCount.toLocaleString()} current members`}
+            </span>
+          </button>
+          <CopyAnchorLink
+            anchor={`audience-${a.id}`}
+            label="Copy link to this audience"
+            size="icon-sm"
+          />
+        </div>
       ))}
       {!embedded && (
         <div className="flex flex-wrap gap-2">

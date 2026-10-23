@@ -1,5 +1,8 @@
 "use client";
 
+import { CopyAnchorLink } from "@/components/copy-anchor-link";
+import { useScrollToHash } from "@/hooks/useScrollToHash";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -156,6 +159,7 @@ export function EmailSequences({
   const query = useQuery(
     orpc.emailSequence.list.queryOptions({ input: { brandId } }),
   );
+  useScrollToHash(Boolean(query.data));
   if (sequenceId)
     return (
       <SequenceLoader
@@ -214,39 +218,50 @@ export function EmailSequences({
               Number(isWelcomeSequence(a.triggerEvent)),
           )
           .map((sequence) => (
-            <Link
+            <div
               key={sequence.id}
-              href={`${basePath}?tab=sequences&sequence=${sequence.id}`}
-              className="rounded-xl border p-5 transition-colors hover:bg-muted/30"
+              id={`sequence-${sequence.id}`}
+              className="relative scroll-mt-4"
             >
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="font-medium">{sequence.name}</h3>
-                <Badge variant={sequence.enabled ? "default" : "secondary"}>
-                  {sequence.enabled
-                    ? "Active"
-                    : sequence.triggerEvent === "test.manual"
-                      ? "Test"
-                      : !isWelcomeSequence(sequence.triggerEvent)
-                        ? "Coming later"
-                        : sequence.revisionId
-                          ? "Paused"
-                          : "Draft"}
-                </Badge>
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Starts with {sequence.triggerEvent}
-              </p>
-              {isWelcomeSequence(sequence.triggerEvent) ? (
-                <p className="mt-2 text-sm">
-                  Introduce your brand to new subscribers. Unsubscribing stops
-                  future emails.
+              <Link
+                href={`${basePath}?tab=sequences&sequence=${sequence.id}`}
+                className="block rounded-xl border p-5 transition-colors hover:bg-muted/30"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-medium">{sequence.name}</h3>
+                  <Badge variant={sequence.enabled ? "default" : "secondary"}>
+                    {sequence.enabled
+                      ? "Active"
+                      : sequence.triggerEvent === "test.manual"
+                        ? "Test"
+                        : !isWelcomeSequence(sequence.triggerEvent)
+                          ? "Coming later"
+                          : sequence.revisionId
+                            ? "Paused"
+                            : "Draft"}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Starts with {sequence.triggerEvent}
                 </p>
-              ) : sequence.description ? (
-                <p className="mt-2 line-clamp-2 text-sm">
-                  {sequence.description}
-                </p>
-              ) : null}
-            </Link>
+                {isWelcomeSequence(sequence.triggerEvent) ? (
+                  <p className="mt-2 text-sm">
+                    Introduce your brand to new subscribers. Unsubscribing stops
+                    future emails.
+                  </p>
+                ) : sequence.description ? (
+                  <p className="mt-2 line-clamp-2 text-sm">
+                    {sequence.description}
+                  </p>
+                ) : null}
+              </Link>
+              <CopyAnchorLink
+                href={`${basePath}?tab=sequences&sequence=${sequence.id}`}
+                label="Copy link to this sequence"
+                size="icon-sm"
+                className="absolute right-3 bottom-3"
+              />
+            </div>
           ))}
       </div>
     </WorkspaceCard>
@@ -427,6 +442,7 @@ function SequenceEditor({
       return { ...current, steps };
     });
   let offset = 0;
+  useScrollToHash(draft.steps.length > 0);
   const timeline = draft.steps.map((step) => ({
     ...step,
     offset: (offset += step.waitMinutes),
@@ -511,7 +527,11 @@ function SequenceEditor({
           </div>
           <div className="ml-5 space-y-5 border-l-2 pl-6">
             {timeline.map((step, index) => (
-              <div key={step.id} className="relative space-y-3">
+              <div
+                key={step.id}
+                id={`step-${step.id}`}
+                className="relative scroll-mt-4 space-y-3"
+              >
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Clock3 className="size-4 text-muted-foreground" />
                   <span>Wait</span>
@@ -535,6 +555,11 @@ function SequenceEditor({
                         : "At entry"}
                     </span>
                     <div className="flex gap-1">
+                      <CopyAnchorLink
+                        anchor={`step-${step.id}`}
+                        label={`Copy link to email ${index + 1}`}
+                        size="icon-sm"
+                      />
                       <Button
                         size="icon-sm"
                         variant="ghost"

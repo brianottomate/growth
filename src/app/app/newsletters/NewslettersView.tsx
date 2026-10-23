@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { EmailDraftsCard } from "./EmailDraftsCard";
 import { BrandEmailStyle } from "./BrandEmailStyle";
 import Link from "next/link";
+import { CopyAnchorLink } from "@/components/copy-anchor-link";
 import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
@@ -493,37 +494,47 @@ export async function NewslettersView({
                     const meta = NEWSLETTER_KIND_META[kind];
                     const s = issue.stats;
                     return (
-                      <Link
+                      <div
                         key={issue.id}
-                        href={`/app/newsletters/${issue.id}`}
-                        className="-mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0 hover:bg-accent/40"
+                        id={`email-${issue.id}`}
+                        className="-mx-2 flex scroll-mt-4 items-center gap-1 border-b last:border-0"
                       >
-                        <span className="w-12 shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {issue.publishedAt!.toLocaleDateString([], {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                        <span
-                          className="size-1.5 shrink-0 rounded-full"
-                          style={{ background: meta.color }}
-                          title={meta.label}
+                        <Link
+                          href={`/app/newsletters/${issue.id}`}
+                          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-3 text-sm transition-colors hover:bg-accent/40"
+                        >
+                          <span className="w-12 shrink-0 text-xs text-muted-foreground tabular-nums">
+                            {issue.publishedAt!.toLocaleDateString([], {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                          <span
+                            className="size-1.5 shrink-0 rounded-full"
+                            style={{ background: meta.color }}
+                            title={meta.label}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {issue.text}
+                          </span>
+                          <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums @xl:block">
+                            {s?.sent ? `${fmt(s.sent)} sent` : "—"}
+                          </span>
+                          <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                            {openRate != null
+                              ? pct(s?.opened ?? 0, s?.delivered ?? 0)
+                              : "—"}
+                          </span>
+                          <span className="w-4 shrink-0 text-right text-xs text-muted-foreground">
+                            ↗
+                          </span>
+                        </Link>
+                        <CopyAnchorLink
+                          anchor={`email-${issue.id}`}
+                          label="Copy link to this email"
+                          size="icon-sm"
                         />
-                        <span className="min-w-0 flex-1 truncate">
-                          {issue.text}
-                        </span>
-                        <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums @xl:block">
-                          {s?.sent ? `${fmt(s.sent)} sent` : "—"}
-                        </span>
-                        <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                          {openRate != null
-                            ? pct(s?.opened ?? 0, s?.delivered ?? 0)
-                            : "—"}
-                        </span>
-                        <span className="w-4 shrink-0 text-right text-xs text-muted-foreground">
-                          ↗
-                        </span>
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>

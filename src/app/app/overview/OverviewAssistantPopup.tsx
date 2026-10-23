@@ -64,10 +64,11 @@ function replaceChatParam(threadId: string | null) {
   if (threadId) params.set("chat", threadId);
   else params.delete("chat");
   const query = params.toString();
+  // Keep the hash: copy-link anchors (#ad-…, #audience-…) live there.
   window.history.replaceState(
     null,
     "",
-    query ? `${window.location.pathname}?${query}` : window.location.pathname,
+    `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
   );
 }
 

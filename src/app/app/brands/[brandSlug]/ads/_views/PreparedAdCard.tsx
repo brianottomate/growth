@@ -33,11 +33,11 @@ import type { AdReview } from "@/lib/ad-review";
 import type { AdContent, MediaItem } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
 import { VideoAdPreview } from "./VideoAdPreview";
-import { CopyAdLinkButton } from "./CopyAdLinkButton";
 import {
   AD_CALL_TO_ACTIONS,
   META_DEFAULT_CALL_TO_ACTION,
 } from "@/lib/zernio-ads";
+import { CopyAnchorLink } from "@/components/copy-anchor-link";
 
 export type PreparedAd = {
   id: string;
@@ -359,7 +359,7 @@ export function PreparedAdCard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <CopyAdLinkButton adId={ad.id} />
+          <CopyAnchorLink anchor={`ad-${ad.id}`} label="Copy link to this ad" />
           <Button
             size="sm"
             variant="outline"

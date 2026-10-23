@@ -12,7 +12,7 @@ import Image from "next/image";
 import { ideaSource } from "@/lib/ad-idea-studio";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { MessageSquare, Plus, Trash2 } from "lucide-react";
-import { CopyAdLinkButton } from "./CopyAdLinkButton";
+import { CopyAnchorLink } from "@/components/copy-anchor-link";
 import {} from "@/lib/meta-placement-plan";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -1084,7 +1084,7 @@ export function AdCard({
           </div>
         </div>
         <div className="ml-auto flex max-w-full flex-wrap items-center gap-2">
-          <CopyAdLinkButton adId={ad.id} />
+          <CopyAnchorLink anchor={`ad-${ad.id}`} label="Copy link to this ad" />
           <Button
             size="sm"
             variant="outline"
