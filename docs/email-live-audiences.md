@@ -19,8 +19,11 @@ schedule. Existing explicitly selected sample limits remain respected. Reads
 are live, not an atomic frozen membership guarantee across concurrent edits.
 
 The existing Add contacts UI and `emailWrite.addAudienceMembers` append to the
-same list identity. This is one way to maintain the table, not a required upload
-step before each send. It does not sync external signup systems.
+same list identity. `emailWrite.importList` creates a reusable database audience
+from an operator-supplied, consent-confirmed list when there is no audience to
+append to yet. Both actions use the same import service and return aggregate
+counts without recipient rows. They maintain the table; they are not required
+before every send and do not sync external signup systems.
 
 ## Delivery and receipts
 

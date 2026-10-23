@@ -10,6 +10,7 @@ import {
   saveEmailAudience,
   previewEmailAudience,
   addEmailAudienceMembers,
+  importEmailList,
 } from "@/server/services/email-audience.service";
 
 const audience = z.object({
@@ -91,4 +92,48 @@ export const addEmailAudienceMembersAction = growthAction({
     namesCleared: z.number(),
   }),
   execute: (input, ctx) => addEmailAudienceMembers(input, actor(ctx)),
+});
+
+export const importEmailListAction = growthAction({
+  description:
+    "Import an operator-supplied, consent-confirmed contact list as a reusable database audience for this brand. Use addAudienceMembers when appending to an existing audience. Rows must already be parsed from the source file. The action returns aggregate import counts, never recipient rows, and does not authorize or send email.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    name: z.string().trim().min(1).max(160),
+    fileName: z.string().max(300).nullable(),
+    consentConfirmed: z.literal(true),
+    rows: z
+      .array(
+        z.object({
+          email: z.string().max(320),
+          firstName: z.string().max(200).nullable(),
+          sourceId: z.string().max(200).nullable(),
+        }),
+      )
+      .min(1)
+      .max(200_000),
+  }),
+  outputSchema: z.strictObject({
+    audience,
+    imported: z.number(),
+    invalid: z.number(),
+    duplicates: z.number(),
+    namesCleared: z.number(),
+  }),
+  examples: [
+    {
+      brandId: "brand_example",
+      name: "October guest list",
+      fileName: "guests.csv",
+      consentConfirmed: true,
+      rows: [
+        {
+          email: "guest@example.com",
+          firstName: "Guest",
+          sourceId: "row-1",
+        },
+      ],
+    },
+  ],
+  execute: (input, ctx) => importEmailList(input, actor(ctx)),
 });

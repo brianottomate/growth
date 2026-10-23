@@ -356,6 +356,7 @@ export const growthActionPolicies = {
   },
   emailWrite: {
     addAudienceMembers: write(),
+    importList: write(),
     prepareBroadcast: write(),
     scheduleBroadcasts: write({
       approval: "user",

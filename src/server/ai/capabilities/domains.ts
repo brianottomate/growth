@@ -101,6 +101,7 @@ import {
 import {
   listEmailAudiencesAction,
   addEmailAudienceMembersAction,
+  importEmailListAction,
   previewEmailAudienceAction,
   saveEmailAudienceAction,
 } from "./email-audiences";
@@ -688,6 +689,7 @@ export const emailWrite = growthDomainTool({
     recoverSequence,
     cancelSequenceEnrollment,
     addAudienceMembers: addEmailAudienceMembersAction,
+    importList: importEmailListAction,
     saveAudience: saveEmailAudienceAction,
     createSlot: EMAIL_TOOLS.createEmailSlot,
     sharePreview: shareEmailPreviewAction,
