@@ -202,6 +202,54 @@ export async function listWanderOsListings(input: {
   return listings;
 }
 
+/**
+ * Listing ids the site can book for exactly these dates, as its own search
+ * answers a guest. Minimum stays apply, so a one-night search can come back
+ * empty while the weekend around it has homes open.
+ */
+export async function availableWanderOsListingIds(input: {
+  websiteId: string;
+  checkIn: string;
+  checkOut: string;
+  guests?: number | null;
+}): Promise<string[]> {
+  const ids: string[] = [];
+  for (let page = 1; page <= 12; page++) {
+    const response = await fetch(`${SEARCH_URL}?page=${page}&take=24`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-wander-client": "wander-customer-website",
+        "x-website-id": input.websiteId,
+      },
+      body: JSON.stringify({
+        filters: {
+          dates: [
+            {
+              type: "STRICT",
+              checkIn: input.checkIn,
+              checkOut: input.checkOut,
+            },
+          ],
+          ...(input.guests ? { minOccupancy: input.guests } : {}),
+        },
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok)
+      throw new Error(`WanderOS search failed (${response.status}).`);
+    const body = (await response.json()) as {
+      results?: { id?: string | number }[];
+      pagination?: { has_more?: boolean };
+    };
+    for (const row of body.results ?? [])
+      if (row.id != null) ids.push(String(row.id));
+    if (!body.pagination?.has_more) break;
+  }
+  return ids;
+}
+
 /** One photo on a listing, with the room it belongs to when the feed names it. */
 export type WanderOsPhoto = {
   url: string;

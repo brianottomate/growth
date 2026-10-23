@@ -4,8 +4,10 @@ import { growthAction } from "./types";
 import { bookingTargetInputSchema } from "@/lib/booking-target";
 import {
   attachBookingTarget,
+  bookingTargetAvailability,
   changeGroupHomes,
   deleteHomeGroup,
+  groupOpenHomes,
   homeGroupContext,
   listBookingTargets,
   saveBookingTarget,
@@ -110,6 +112,34 @@ export const saveBookingTargetAction = growthAction({
   }),
   outputSchema: z.object({ targetId: z.string() }),
   execute: (input, ctx) => saveBookingTarget(input, ctx.orgId),
+});
+const availabilityHome = z.object({ id: z.string(), name: z.string() });
+export const bookingTargetAvailabilityAction = growthAction({
+  description:
+    "Check, live on the brand's WanderOS booking site, which of a dated booking target's homes are still open for its exact dates (and guests), and which are booked. A target with no home or group checks every WanderOS home. Read-only; reserves nothing.",
+  inputSchema: z.object({ targetId: z.string().min(1) }),
+  outputSchema: z.object({
+    targetId: z.string(),
+    checkIn: z.string(),
+    checkOut: z.string(),
+    checkedAt: z.string(),
+    open: z.array(availabilityHome),
+    booked: z.array(availabilityHome),
+  }),
+  execute: (input, ctx) => bookingTargetAvailability(input.targetId, ctx.orgId),
+});
+export const groupOpenHomesAction = growthAction({
+  description:
+    "Check every WanderOS home of a dated booking target's brand for the target's dates, save the open ones as the group \"<target name> · open homes\" (created, or refreshed when it exists) and point the target at that group, so its booking link and ads made from it cover only homes that can be booked. Run again to refresh as homes book. Changes no ads.",
+  inputSchema: z.object({ targetId: z.string().min(1) }),
+  outputSchema: z.object({
+    groupId: z.string(),
+    targetId: z.string(),
+    checkedAt: z.string(),
+    open: z.array(availabilityHome),
+    booked: z.array(availabilityHome),
+  }),
+  execute: (input, ctx) => groupOpenHomes(input.targetId, ctx.orgId),
 });
 export const attachBookingTargetAction = growthAction({
   description:

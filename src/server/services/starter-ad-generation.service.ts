@@ -1,4 +1,9 @@
 import { operatorSteeringSection } from "@/lib/generation-steer";
+import {
+  bookingTargetUrl,
+  datedStaySection,
+  type BookingStay,
+} from "@/lib/booking-target";
 import type { CreativeDirection } from "@/lib/brand-direction";
 import {
   startWorkflowRun,
@@ -209,6 +214,7 @@ export function homeCompositionRequest(input: {
   brandStory: string | null;
   creativeDirection?: CreativeDirection | null;
   steer?: string;
+  stay?: BookingStay | null;
   voice: unknown;
   campaign: string;
   home: {
@@ -245,6 +251,7 @@ export function homeCompositionRequest(input: {
         story: input.brandStory,
         creativeDirection: input.creativeDirection,
       }) +
+      datedStaySection(input.stay) +
       operatorSteeringSection(input.steer),
     content: [
       {
@@ -253,6 +260,7 @@ export function homeCompositionRequest(input: {
           brand: input.brandName,
           voice: input.voice,
           campaign: input.campaign,
+          stay: input.stay ?? undefined,
           home: input.home,
           curated: input.curated,
           photoCount: input.photoCount,
@@ -271,6 +279,7 @@ export function brandConceptsRequest(input: {
   story: string | null;
   creativeDirection?: CreativeDirection | null;
   steer?: string;
+  stay?: BookingStay | null;
   brandContext: unknown;
   campaign: string;
 }): CopyRequest<z.infer<typeof brandStarterCopySchema>> {
@@ -290,6 +299,7 @@ export function brandConceptsRequest(input: {
         story: input.story,
         creativeDirection: input.creativeDirection,
       }) +
+      datedStaySection(input.stay) +
       operatorSteeringSection(input.steer),
     content: [
       {
@@ -297,6 +307,7 @@ export function brandConceptsRequest(input: {
         text: JSON.stringify({
           brand: input.brandName,
           website: input.website,
+          stay: input.stay ?? undefined,
           brandContext: input.brandContext,
           campaign: input.campaign,
         }),
@@ -346,7 +357,12 @@ export async function runStarterGeneration(runId: string, input: Input) {
       "url" in snapshot &&
       typeof snapshot.targetId === "string" &&
       typeof snapshot.url === "string"
-        ? { targetId: snapshot.targetId, url: snapshot.url }
+        ? {
+            targetId: snapshot.targetId,
+            url: snapshot.url,
+            stay:
+              "stay" in snapshot ? (snapshot.stay as BookingStay | null) : null,
+          }
         : !Object.hasOwn(run.input, "bookingDestination") &&
             campaign?.bookingTargetId
           ? await studioBookingDestination(
@@ -365,6 +381,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           brandName: brand.name,
           creativeDirection: fullBrand?.creativeDirection,
           steer: input.steer,
+          stay: booking?.stay,
           website: brand.website,
           story: fullBrand?.story ?? null,
           brandContext: { fingerprint: fullBrand?.brandFingerprint, strategy },
@@ -443,7 +460,20 @@ export async function runStarterGeneration(runId: string, input: Input) {
         document.shapes = [...input.exportShapes];
         document.exportShapes = [...input.exportShapes];
       }
-      if (booking) document.copy.linkUrl = booking.url;
+      // A dated stay sends each home's own ad to that home's page with the
+      // dates chosen; shared ads keep the target's search of every open home.
+      const homeUrl = homes.find((h) => h.id === homeId)?.url;
+      if (booking)
+        document.copy.linkUrl =
+          booking.stay && homeUrl && brand.website
+            ? bookingTargetUrl({
+                website: brand.website,
+                homeUrl,
+                checkIn: booking.stay.checkIn,
+                checkOut: booking.stay.checkOut,
+                guests: booking.stay.guests,
+              })
+            : booking.url;
       await db.insert(adTable).values({
         brandId: brand.id,
         campaignId: null,
@@ -485,6 +515,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           brandName: brand.name,
           creativeDirection: fullBrand?.creativeDirection,
           steer: input.steer,
+          stay: booking?.stay,
           brandStory: `${fullBrand?.story ?? ""}\nBrand strategy reference: ${strategy}`,
           voice: fullBrand?.brandFingerprint,
           campaign: campaign?.name ?? `${brand.name} ad studio`,
@@ -570,9 +601,11 @@ export async function runStarterGeneration(runId: string, input: Input) {
             story: fullBrand?.story ?? null,
             creativeDirection: fullBrand?.creativeDirection,
           }) +
+          datedStaySection(booking?.stay) +
           operatorSteeringSection(input.steer),
         prompt: JSON.stringify({
           brand: brand.name,
+          stay: booking?.stay ?? undefined,
           homes: homeCopies,
           clientNotes,
         }),

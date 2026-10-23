@@ -26,6 +26,7 @@ import {
   type BookingTargetInput,
 } from "@/lib/booking-target";
 import { projectIdea } from "@/lib/ad-idea-studio";
+import { availableWanderOsListingIds } from "@/server/clients/wanderos-site.client";
 
 export async function groupBrand(brandId: string, orgId: string) {
   const brand = await db.query.brandTable.findFirst({
@@ -531,6 +532,106 @@ export async function listBookingTargets(brandId: string, orgId: string) {
     ),
   };
 }
+/**
+ * Which of a dated target's homes the booking site can still sell for its
+ * dates, in the site's own search order. A target with no home or group asks
+ * about every WanderOS home the brand has.
+ */
+export async function bookingTargetAvailability(
+  targetId: string,
+  orgId: string,
+  wholeBrand = false,
+) {
+  const target = await db.query.bookingTargetTable.findFirst({
+    where: eq(bookingTargetTable.id, targetId),
+  });
+  if (!target) throw new Error("Booking target not found.");
+  const brand = await bookingBrand(target.brandId, orgId);
+  if (!target.checkIn || !target.checkOut)
+    throw new Error("Give this booking target stay dates first.");
+  const context = await homeGroupContext(brand.id, orgId);
+  const scopeIds = wholeBrand
+    ? context.homes.map((h) => h.id)
+    : target.homeId
+      ? [target.homeId]
+      : target.homeGroupId
+        ? (context.groups.find((g) => g.id === target.homeGroupId)?.homeIds ??
+          [])
+        : context.homes.map((h) => h.id);
+  const scope = context.homes.filter(
+    (h) => scopeIds.includes(h.id) && h.source === "wanderos" && h.externalId,
+  );
+  const openIds = await availableWanderOsListingIds({
+    websiteId: brand.wanderOsWebsiteId!,
+    checkIn: target.checkIn,
+    checkOut: target.checkOut,
+    guests: target.guests,
+  });
+  const home = (h: (typeof scope)[number]) => ({ id: h.id, name: h.name });
+  return {
+    targetId: target.id,
+    checkIn: target.checkIn,
+    checkOut: target.checkOut,
+    checkedAt: new Date().toISOString(),
+    open: openIds.flatMap((id) =>
+      scope.filter((h) => h.externalId === id).map(home),
+    ),
+    booked: scope.filter((h) => !openIds.includes(h.externalId)).map(home),
+  };
+}
+
+/**
+ * Make (or refresh) the group of every brand home still open for a dated
+ * target, and point the target at it. Re-running drops homes that have since
+ * booked and adds ones that opened up; it always asks about the whole brand,
+ * never just the group's previous members.
+ */
+export async function groupOpenHomes(targetId: string, orgId: string) {
+  const target = await db.query.bookingTargetTable.findFirst({
+    where: eq(bookingTargetTable.id, targetId),
+  });
+  if (!target) throw new Error("Booking target not found.");
+  const name = `${target.name} · open homes`;
+  const existing = await db.query.homeGroupTable.findFirst({
+    where: and(
+      eq(homeGroupTable.brandId, target.brandId),
+      eq(homeGroupTable.name, name),
+    ),
+  });
+  const availability = await bookingTargetAvailability(target.id, orgId, true);
+  if (!availability.open.length)
+    throw new Error("No homes are open on the booking site for these dates.");
+  const description = `Open ${target.checkIn} to ${target.checkOut} on the booking site, checked ${availability.checkedAt.slice(0, 16).replace("T", " ")} UTC.`;
+  const { groupId } = await saveHomeGroup(
+    {
+      brandId: target.brandId,
+      groupId: existing?.id,
+      name,
+      description,
+    },
+    orgId,
+  );
+  await changeGroupHomes(
+    {
+      groupId,
+      homeIds: availability.open.map((h) => h.id),
+      operation: "replace",
+    },
+    orgId,
+  );
+  await db
+    .update(bookingTargetTable)
+    .set({ homeGroupId: groupId, homeId: null, updatedAt: new Date() })
+    .where(eq(bookingTargetTable.id, target.id));
+  return {
+    groupId,
+    targetId: target.id,
+    open: availability.open,
+    booked: availability.booked,
+    checkedAt: availability.checkedAt,
+  };
+}
+
 /** Explicitly apply a URL to local draft copy. Approved/pushed ads retain their reviewed URL. */
 export async function attachBookingTarget(
   input: {
@@ -662,5 +763,18 @@ export async function studioBookingDestination(
   const resolved = await resolveBookingTarget(targetId, orgId);
   if (resolved.target.brandId !== brandId)
     throw new Error("Choose this brand's booking target.");
-  return { targetId: resolved.target.id, url: resolved.url };
+  const { target } = resolved;
+  return {
+    targetId: target.id,
+    url: resolved.url,
+    stay:
+      target.checkIn && target.checkOut
+        ? {
+            name: target.name,
+            checkIn: target.checkIn,
+            checkOut: target.checkOut,
+            guests: target.guests,
+          }
+        : null,
+  };
 }

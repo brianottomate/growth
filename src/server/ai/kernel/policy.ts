@@ -229,6 +229,8 @@ export const growthActionPolicies = {
     homeGroups: read(),
     launchChecklist: read(),
     bookingTargets: read(),
+    // Live search on the brand's own booking site; reserves nothing.
+    bookingTargetAvailability: read(),
     // BigQuery reads plus one look at the shortlist's hero photos.
     suggestFeaturedHomes: read("model-read"),
     // Renders cards onto sheets and asks one model call; writes nothing.
@@ -253,6 +255,9 @@ export const growthActionPolicies = {
     setPrimaryHomeGroup: write({ idempotent: true }),
     saveBookingTarget: write(),
     attachBookingTarget: write({ idempotent: true }),
+    // Replaces one named group's members with what is open now; re-running
+    // with nothing booked in between is a no-op.
+    groupOpenHomes: write({ idempotent: true }),
     setWanderOsEnabled: write({ idempotent: true }),
     createAccount: write(),
     updateAccount: write({ idempotent: true }),

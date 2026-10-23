@@ -1,9 +1,11 @@
 import { actionProcedure } from "@/server/api/orpc";
 import {
   attachBookingTargetAction,
+  bookingTargetAvailabilityAction,
   bookingTargetsAction,
   changeHomeGroupHomesAction,
   deleteHomeGroupAction,
+  groupOpenHomesAction,
   homeGroupsAction,
   saveBookingTargetAction,
   saveHomeGroupAction,
@@ -19,5 +21,7 @@ export const homeGroupsRouter = {
   targets: actionProcedure(bookingTargetsAction),
   saveTarget: actionProcedure(saveBookingTargetAction),
   attachTarget: actionProcedure(attachBookingTargetAction),
+  targetAvailability: actionProcedure(bookingTargetAvailabilityAction),
+  groupOpenHomes: actionProcedure(groupOpenHomesAction),
   setWanderOsEnabled: actionProcedure(setWanderOsEnabledAction),
 };

@@ -118,9 +118,11 @@ import {
 import { getPitchAction, savePitchAction, draftPitchAction } from "./pitch";
 import {
   attachBookingTargetAction,
+  bookingTargetAvailabilityAction,
   bookingTargetsAction,
   changeHomeGroupHomesAction,
   deleteHomeGroupAction,
+  groupOpenHomesAction,
   setPrimaryHomeGroupAction,
   homeGroupsAction,
   saveBookingTargetAction,
@@ -536,6 +538,7 @@ export const performanceRead = growthDomainTool({
     homeGroups: homeGroupsAction,
     launchChecklist: launchChecklistAction,
     bookingTargets: bookingTargetsAction,
+    bookingTargetAvailability: bookingTargetAvailabilityAction,
     suggestFeaturedHomes: suggestFeaturedHomesAction,
     reviewPortfolio: reviewPortfolioAction,
     intakes: listIntakesAction,
@@ -571,6 +574,7 @@ export const performanceWrite = growthDomainTool({
     setPrimaryHomeGroup: setPrimaryHomeGroupAction,
     saveBookingTarget: saveBookingTargetAction,
     attachBookingTarget: attachBookingTargetAction,
+    groupOpenHomes: groupOpenHomesAction,
     setWanderOsEnabled: setWanderOsEnabledAction,
   },
 });

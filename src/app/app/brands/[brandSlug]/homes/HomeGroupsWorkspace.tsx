@@ -103,6 +103,17 @@ export function HomeGroupsWorkspace({
       onError: (e) => toast.error(e.message),
     }),
   );
+  const groupOpen = useMutation(
+    orpc.homeGroups.groupOpenHomes.mutationOptions({
+      onSuccess: async (result) => {
+        await refresh();
+        toast.success(
+          `${result.open.length} open · ${result.booked.length} booked`,
+        );
+      },
+      onError: (e) => toast.error(e.message),
+    }),
+  );
   if (context.isPending) return <ClientWorkspaceSkeleton />;
   if (context.error) return <p role="alert">{context.error.message}</p>;
   const data = context.data;
@@ -354,6 +365,19 @@ export function HomeGroupsWorkspace({
                 section="booking target"
                 resource={{ id: target.id, name: target.name }}
               />
+              {target.checkIn && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!data.connected || groupOpen.isPending}
+                  onClick={() => groupOpen.mutate({ targetId: target.id })}
+                >
+                  {groupOpen.isPending &&
+                  groupOpen.variables?.targetId === target.id
+                    ? "Checking…"
+                    : "Group open homes"}
+                </Button>
+              )}
               {target.url && (
                 <Button
                   size="sm"
