@@ -270,24 +270,28 @@ export function PerformanceClientCard({
         </div>
       )}
       {context === "client" ? (
-        <div
-          id="payments"
-          className="mt-3 flex scroll-mt-4 flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-xs"
-        >
-          {card.effectiveDate ? (
-            <span className="text-muted-foreground">
-              Effective · {trackerDate(card.effectiveDate)}
-            </span>
-          ) : null}
-          {card.terms ? (
-            <span className="text-muted-foreground">Terms · {card.terms}</span>
-          ) : null}
-          {card.endDate ? (
-            <span className="text-muted-foreground">
-              Ends · {trackerDate(card.endDate)}
-            </span>
-          ) : null}
-        </div>
+        card.effectiveDate || card.terms || card.endDate ? (
+          <div
+            id="payments"
+            className="mt-3 flex scroll-mt-4 flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-xs"
+          >
+            {card.effectiveDate ? (
+              <span className="text-muted-foreground">
+                Effective · {trackerDate(card.effectiveDate)}
+              </span>
+            ) : null}
+            {card.terms ? (
+              <span className="text-muted-foreground">
+                Terms · {card.terms}
+              </span>
+            ) : null}
+            {card.endDate ? (
+              <span className="text-muted-foreground">
+                Ends · {trackerDate(card.endDate)}
+              </span>
+            ) : null}
+          </div>
+        ) : null
       ) : compact ? (
         <div className="mt-2 space-y-1.5">
           {show("Creative") && (

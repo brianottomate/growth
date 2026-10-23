@@ -21,6 +21,7 @@ import { BrandTasks } from "@/components/brand-tasks";
 
 import { ReadinessChecklist } from "../../ReadinessChecklist";
 import { PerformanceClientCard } from "../../PerformanceClientCard";
+import { loadPerformanceConnections } from "@/server/services/performance-connections.service";
 import { performanceCardFromBrand } from "@/lib/performance-card";
 
 import { MediaStrip } from "./MediaStrip";
@@ -48,22 +49,24 @@ export default async function PerformanceBrandPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [media, account, people, avatarUrl, readiness] = await Promise.all([
-    listMedia({ brandId: brand.id, kind: "image" }),
-    db.query.performanceAccountTable.findFirst({
-      where: and(
-        eq(performanceAccountTable.brandId, brand.id),
-        isNull(performanceAccountTable.deletedAt),
-      ),
-      columns: { id: true, contactName: true, contactEmail: true },
-    }),
-    loadBrandContacts({
-      leadDomain: brand.leadDomain,
-      website: brand.website,
-    }),
-    brandAvatarUrl(brand),
-    deskBrand ? loadBrandReadiness([deskBrand]) : Promise.resolve(null),
-  ]);
+  const [media, account, people, avatarUrl, readiness, connections] =
+    await Promise.all([
+      listMedia({ brandId: brand.id, kind: "image" }),
+      db.query.performanceAccountTable.findFirst({
+        where: and(
+          eq(performanceAccountTable.brandId, brand.id),
+          isNull(performanceAccountTable.deletedAt),
+        ),
+        columns: { id: true, contactName: true, contactEmail: true },
+      }),
+      loadBrandContacts({
+        leadDomain: brand.leadDomain,
+        website: brand.website,
+      }),
+      brandAvatarUrl(brand),
+      deskBrand ? loadBrandReadiness([deskBrand]) : Promise.resolve(null),
+      loadPerformanceConnections(org.id, [brand.id]),
+    ]);
   const intake = account
     ? await db.query.performanceIntakeTable.findFirst({
         where: eq(performanceIntakeTable.accountId, account.id),
@@ -141,7 +144,10 @@ export default async function PerformanceBrandPage({
       {deskBrand && (
         <section className="space-y-2.5">
           <PerformanceClientCard
-            card={performanceCardFromBrand(deskBrand)}
+            card={performanceCardFromBrand({
+              ...deskBrand,
+              connections: connections.get(brand.id),
+            })}
             context="client"
           />
         </section>
