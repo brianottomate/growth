@@ -33,6 +33,7 @@ import {
   type LogoImage,
 } from "@/server/services/composition-source";
 import type { BrandMark } from "@/server/db/schema";
+import { PaperComposition } from "./composition-paper";
 import { importImageBuffer } from "@/server/services/media.service";
 
 export type CompositionContext = {
@@ -895,7 +896,28 @@ export function renderComposition(
   const scrim = scrimRgba(spec.scrim);
 
   let content: React.ReactNode;
-  if (spec.templateId === "hero-overlay") {
+  if (spec.templateId === "editorial-paper") {
+    content = (
+      <PaperComposition
+        spec={spec}
+        source={context.sourceImage!}
+        width={format.width}
+        height={format.height}
+        imagePosition={imagePosition}
+        headingWeight={context.headingWeight}
+        bodyFamily={context.bodyFont}
+        brandMark={
+          <BrandMark
+            brandName={context.brand.name}
+            logo={context.logo}
+            tone={spec.mark}
+            inverse
+            markSize={portrait ? 38 : 30}
+          />
+        }
+      />
+    );
+  } else if (spec.templateId === "hero-overlay") {
     // Silvina's awareness template (2026-09): headline top left over a soft
     // top scrim, a white pill at the foot; the story canvas centres the
     // headline and drops the pill for plain text.
@@ -3040,6 +3062,7 @@ export async function openComposition(input: {
     pills: stored.pills ?? undefined,
     mark: stored.mark ?? "auto",
     tier: stored.tier ?? undefined,
+    paperPlacement: stored.paperPlacement ?? undefined,
   });
   if (!parsed.success) {
     throw new CompositionAccessError(

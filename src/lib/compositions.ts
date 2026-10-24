@@ -64,6 +64,13 @@ export const STORY_SAFE_ZONE = { top: 0.14, bottom: 0.35, side: 0.06 } as const;
 
 const COMPOSITION_TEMPLATE_DEFINITIONS = [
   {
+    id: "editorial-paper",
+    version: 1,
+    label: "Editorial · paper caption",
+    description:
+      "A continuous photo essay with movable paper captions, an opening cover, and a closing page.",
+  },
+  {
     id: "photo-only",
     version: 1,
     label: "Photo only",
@@ -272,6 +279,7 @@ export type CompositionTemplateId =
   (typeof COMPOSITION_TEMPLATE_DEFINITIONS)[number]["id"];
 
 export type CompositionFieldKey =
+  | "paperPlacement"
   | "mark"
   | "eyebrow"
   | "title"
@@ -550,6 +558,11 @@ export const COMPOSITION_FIELDS: Record<
     { key: "cta", label: "Button", hint: "Optional" },
   ],
   "editorial-overlay": [mark, ...message, accent("colours the CTA")],
+  "editorial-paper": [
+    mark,
+    { key: "paperPlacement", label: "Caption placement" },
+    ...message,
+  ],
   "product-proof": [mark, ...message, accent("colours the card edge")],
   "statement-dark": [
     mark,
@@ -673,6 +686,9 @@ const compositionShape = {
    * Which version of the brand mark a card draws. `auto` picks white over a
    * photo and colour on a light ground; the rest force it or drop it.
    */
+  paperPlacement: z
+    .enum(["cover", "lower-left", "lower-right", "upper-right", "footer"])
+    .optional(),
   mark: z.enum(["auto", "color", "white", "dark", "none"]).default("auto"),
   /** The wander.com tier pill: "Luxury" with a sparkle, "Iconic" with a crown. */
   tier: z.enum(["luxury", "iconic"]).optional(),
@@ -802,6 +818,9 @@ export function getCompositionIdentity(spec: FreezeCompositionInput) {
     scrim: spec.scrim ?? null,
     rating: spec.rating ?? null,
     mark: spec.mark,
+    ...(spec.templateId === "editorial-paper"
+      ? { paperPlacement: spec.paperPlacement ?? "lower-left" }
+      : {}),
     // Only blueprints that draw it carry it, so every other card's identity
     // (and every render cached under it) is unchanged.
     ...(spec.tier ? { tier: spec.tier } : {}),
@@ -850,6 +869,7 @@ export function compositionPreviewFromParams(params: URLSearchParams) {
       pills: params.getAll("pill").length ? params.getAll("pill") : undefined,
       location: params.get("location") || undefined,
       mark: params.get("mark") || "auto",
+      paperPlacement: params.get("paperPlacement") || undefined,
       tier: params.get("tier") || undefined,
     }),
   };

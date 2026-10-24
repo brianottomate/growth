@@ -23,6 +23,7 @@ import {
   getCompositionFields,
   type CompositionFieldKey,
   type CompositionFormatId,
+  type CompositionSpec,
   type CompositionTemplateId,
   PHOTO_FREE_TEMPLATES,
 } from "@/lib/compositions";
@@ -194,6 +195,8 @@ export function CompositionWorkbench({
   );
   const [eyebrow, setEyebrow] = useState(initialEyebrow ?? "Stay with Wander");
   const [cta, setCta] = useState(initialCta ?? "Explore the stay");
+  const [paperPlacement, setPaperPlacement] =
+    useState<NonNullable<CompositionSpec["paperPlacement"]>>("lower-left");
   const [rating, setRating] = useState<number | undefined>(initialRating ?? 5);
   const [pills, setPills] = useState<string[]>([]);
   const [assetTitle, setAssetTitle] = useState(
@@ -245,6 +248,7 @@ export function CompositionWorkbench({
     setRating(saved.rating);
     setPills(saved.pills ?? []);
     setMark(saved.mark);
+    setPaperPlacement(saved.paperPlacement ?? "lower-left");
     setFocal(saved.focal ?? null);
     setScrim(saved.scrim ?? null);
     setAssetTitle(data.assetTitle);
@@ -385,6 +389,7 @@ export function CompositionWorkbench({
             .filter(Boolean)
         : undefined,
       mark: has("mark") ? mark : ("auto" as const),
+      paperPlacement: has("paperPlacement") ? paperPlacement : undefined,
       imagePosition,
       focal: focal ?? undefined,
       scrim: scrim ?? undefined,
@@ -403,6 +408,7 @@ export function CompositionWorkbench({
       accent,
       rating,
       pills,
+      paperPlacement,
       mark,
       imagePosition,
       focal,
@@ -428,6 +434,7 @@ export function CompositionWorkbench({
     if (spec.subtitle) params.set("subtitle", spec.subtitle);
     if (spec.eyebrow) params.set("eyebrow", spec.eyebrow);
     if (spec.cta) params.set("cta", spec.cta);
+    if (spec.paperPlacement) params.set("paperPlacement", spec.paperPlacement);
     if (spec.accent) params.set("accent", spec.accent);
     if (spec.rating) params.set("rating", String(spec.rating));
     for (const pill of spec.pills ?? []) params.append("pill", pill);
@@ -787,7 +794,22 @@ export function CompositionWorkbench({
                   </span>
                 ) : null}
               </Label>
-              {field.key === "mark" ? (
+              {field.key === "paperPlacement" ? (
+                <SimpleSelect
+                  value={paperPlacement}
+                  onValueChange={(value) =>
+                    setPaperPlacement(value as typeof paperPlacement)
+                  }
+                  options={[
+                    { value: "cover", label: "Opening cover" },
+                    { value: "lower-left", label: "Lower left" },
+                    { value: "lower-right", label: "Lower right" },
+                    { value: "upper-right", label: "Upper right" },
+                    { value: "footer", label: "Closing page" },
+                  ]}
+                  className="w-full"
+                />
+              ) : field.key === "mark" ? (
                 <SimpleSelect
                   value={mark}
                   onValueChange={(value) => setMark(value as typeof mark)}
