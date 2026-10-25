@@ -79,7 +79,10 @@ qualified, send `Marketing Qualified Lead` to pixel
 `340252052212435` (CRM event keyed on `lead_id`, `event_id`
 `Marketing Qualified Lead:<leadgen id>`) → if the lead was created at or after
 `META_LEADGEN_ROUTE_FROM`, hand it to `osInboundLeadRouter` (HubSpot upsert,
-round robin, Slack).
+round robin, Slack). The router posts to Slack right away only for leads above 5
+units, with a booked meeting, or on an active deal, active lead or closed-won
+account; smaller leads appear in the 5pm Mountain summary, which reads them back
+from HubSpot (`/api/cron/inbound-digest`).
 
 Each step claims its stamp (`capi_sent_at`, `routed_at`) with a conditional
 update before it runs, so a webhook redelivery and a backfill run on the same

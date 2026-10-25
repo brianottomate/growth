@@ -320,6 +320,9 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 - `/api/cron/meta-leadgen` — `*/20` during ET business hours, hourly otherwise, on marks the
   sweep and the HubSpot rail already wake for, so it adds no wake windows (meeting-link Meta
   leads waiting on their RevenueHero booking before routing; see `docs/meta-leadgen.md`)
+- `/api/cron/inbound-digest` — 23:00 and 00:00 UTC; only the run at 17:00 America/Denver
+  posts (daily Slack summary of the last 24 h of "Inbound - Sites" HubSpot contacts with 5 or
+  fewer units, which the inbound router no longer alerts on in real time)
 - `/api/cron/instagram` — daily 19:00 UTC (Instagram account watch)
 - `/api/cron/x` — every 6h (X listening scan)
 - `/api/cron/affiliate` — daily 09:00 + weekly report Mon 14:00 (Impact.com monitor)

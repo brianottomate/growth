@@ -969,6 +969,87 @@ export async function findContactsByPhone(phone: string): Promise<
   }
 }
 
+export type InboundSitesContact = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
+  companyId: string | null;
+  /** `portfolio_size_inbound_form`; null when the lead gave no count. */
+  units: number | null;
+  leadType: string | null;
+  ownerId: string | null;
+  inboundDate: number;
+};
+
+/**
+ * WanderOS inbound contacts the router assigned since `sinceMs` — the same
+ * `inbound_date` + `inbound_outbound = "Inbound - Sites"` pair the round
+ * robin counts.
+ */
+export async function findInboundSitesContactsSince(
+  sinceMs: number,
+): Promise<InboundSitesContact[]> {
+  const contacts: InboundSitesContact[] = [];
+  let after: string | undefined;
+  do {
+    const result = await client().crm.contacts.searchApi.doSearch({
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: "inbound_date",
+              operator: FilterOperatorEnum.Gte,
+              value: String(sinceMs),
+            },
+            {
+              propertyName: "inbound_outbound",
+              operator: FilterOperatorEnum.Eq,
+              value: "Inbound - Sites",
+            },
+          ],
+        },
+      ],
+      properties: [
+        "email",
+        "firstname",
+        "lastname",
+        "company",
+        "associatedcompanyid",
+        "portfolio_size_inbound_form",
+        "lead_type",
+        "hubspot_owner_id",
+        "inbound_date",
+      ],
+      limit: 100,
+      sorts: [],
+      ...(after ? { after } : {}),
+    });
+    for (const c of result.results) {
+      const p = c.properties ?? {};
+      const units = Number(p.portfolio_size_inbound_form);
+      contacts.push({
+        id: c.id,
+        email: p.email ?? null,
+        firstName: p.firstname ?? null,
+        lastName: p.lastname ?? null,
+        company: p.company ?? null,
+        companyId: p.associatedcompanyid ?? null,
+        units:
+          p.portfolio_size_inbound_form && Number.isFinite(units) && units > 0
+            ? units
+            : null,
+        leadType: p.lead_type ?? null,
+        ownerId: p.hubspot_owner_id ?? null,
+        inboundDate: Date.parse(p.inbound_date ?? ""),
+      });
+    }
+    after = (result.paging?.next as { after?: string } | undefined)?.after;
+  } while (after);
+  return contacts;
+}
+
 /** Contacts associated with a company (decision-makers for the merge view). */
 export async function getCompanyContacts(
   companyId: string,

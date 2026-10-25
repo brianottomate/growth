@@ -21,7 +21,9 @@ import {
   createDeal,
   findCompany,
   findContactByEmail,
+  findInboundSitesContactsSince,
   findOwnerByEmail,
+  type InboundSitesContact,
   newestAssociatedDeal,
   nextRepInRR,
   resolveHsLabel,
@@ -30,10 +32,14 @@ import {
   updateDeal,
 } from "@/server/clients/hubspot.client";
 import { envSelect } from "@/env";
-import { postOnSlack } from "@/server/clients/slack.client";
+import { postOnSlack, type SlackBlock } from "@/server/clients/slack.client";
 import { mapPmsToHsValues } from "@/server/services/pms-mapping.service";
 import { getEmailDomain, isPersonalEmail } from "@/lib/email";
 import { resolveOnboardingSlackHeadline } from "@/lib/onboarding-slack";
+import {
+  type InboundLeadType,
+  postsInboundAlertImmediately,
+} from "@/lib/inbound-lead-digest";
 
 // =====================================================
 // INBOUND LEAD ROUTER
@@ -120,15 +126,6 @@ function isWosDeal(
     deal?.contract_type != null && WOS_CONTRACT_TYPES.has(deal.contract_type)
   );
 }
-
-type LeadType =
-  | "Closed Won wOS Deal"
-  | "Active wOS Deal"
-  | "Inactive wOS Deal"
-  | "Active Lead"
-  | "Resubmission"
-  | "Inactive Lead"
-  | "New Inbound Lead";
 
 /** Parse a HubSpot date value to ms — handles ISO strings and epoch-ms-as-string (inbound_date). */
 function parseDateMs(dateStr: string | null): number | null {
@@ -514,7 +511,7 @@ export async function osInboundLeadRouter({
     );
   }
 
-  let leadType: LeadType = "New Inbound Lead";
+  let leadType: InboundLeadType = "New Inbound Lead";
 
   let tagAsInbound = true;
   let officialInboundUnits: number = numberOfProperties;
@@ -876,6 +873,20 @@ export async function osInboundLeadRouter({
     return { contactId, companyId };
   }
 
+  // Small leads skip the live alert; the 5pm digest reads them back from
+  // HubSpot. Test traffic and non-production deployments still post to the
+  // testing channel.
+  if (
+    envSelect({ prod: !test, test: false }) &&
+    !postsInboundAlertImmediately({
+      units: officialInboundUnits,
+      meetingBooked: Boolean(salesRepEmail),
+      leadType,
+    })
+  ) {
+    return { contactId, companyId };
+  }
+
   // Small footer identifying where this message came from — debugging aid for
   // the gateway era, where the sender is no longer the same app as the form.
   const envLabel = `via wander-growth ${envSelect({ prod: "production", test: "preview" })}${test ? " · test traffic" : ""}`;
@@ -902,4 +913,84 @@ export async function osInboundLeadRouter({
     );
   }
   return { contactId, companyId };
+}
+
+// Slack caps a section at 3000 characters and a message at 50 blocks.
+const DIGEST_SECTION_CHARS = 2800;
+const DIGEST_SECTIONS_PER_MESSAGE = 45;
+
+function mrkdwnSection(text: string): SlackBlock {
+  return { type: "section", text: { type: "mrkdwn", text } };
+}
+
+function digestLine(lead: InboundSitesContact): string {
+  const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ");
+  const links = [
+    `<https://app.hubspot.com/contacts/${HUBSPOT_ACCOUNT_ID}/record/0-1/${lead.id}|Contact>`,
+    ...(lead.companyId
+      ? [
+          `<https://app.hubspot.com/contacts/${HUBSPOT_ACCOUNT_ID}/record/0-2/${lead.companyId}|Company>`,
+        ]
+      : []),
+  ];
+  // Owners by name, not mention, so the digest doesn't ping every rep.
+  return [
+    `• *${esc(name || (lead.email ?? "Unknown"))}*`,
+    ...(lead.company ? [esc(lead.company)] : []),
+    ...(lead.email ? [esc(lead.email)] : []),
+    lead.units === null
+      ? "units unknown"
+      : `${lead.units} ${lead.units === 1 ? "unit" : "units"}`,
+    ...(lead.leadType ? [esc(lead.leadType)] : []),
+    esc(resolveHsLabel(HS_OWNER_NAMES, lead.ownerId ?? undefined)),
+    links.join(" "),
+  ].join(" · ");
+}
+
+/**
+ * Posts the last 24 hours of small WanderOS inbound leads to the inbound
+ * channel. HubSpot is the record: the router stamps `inbound_date` and
+ * `inbound_outbound = "Inbound - Sites"` on every lead it assigns, so this
+ * reads those back and keeps the ones with 5 or fewer units (or no count).
+ */
+export async function postInboundLeadDigest(): Promise<{ posted: number }> {
+  const contacts = await findInboundSitesContactsSince(
+    Date.now() - 24 * 60 * 60 * 1000,
+  );
+  const leads = contacts
+    .filter((contact) => contact.units === null || contact.units <= 5)
+    .sort((a, b) => a.inboundDate - b.inboundDate);
+  if (leads.length === 0) return { posted: 0 };
+
+  const sections: string[][] = [];
+  for (const line of leads.map(digestLine)) {
+    const last = sections.at(-1);
+    if (
+      last &&
+      last.join("\n").length + line.length + 1 <= DIGEST_SECTION_CHARS
+    ) {
+      last.push(line);
+    } else {
+      sections.push([line]);
+    }
+  }
+
+  const text = `:wander: *Today's smaller inbound leads (5 units or fewer): ${leads.length}*`;
+  for (let i = 0; i < sections.length; i += DIGEST_SECTIONS_PER_MESSAGE) {
+    const result = await postOnSlack({
+      text,
+      channel: OS_INBOUND_RADIO_CHANNEL_ID,
+      unfurl_links: false,
+      blocks: [
+        ...(i === 0 ? [mrkdwnSection(text)] : []),
+        ...sections
+          .slice(i, i + DIGEST_SECTIONS_PER_MESSAGE)
+          .map((lines) => mrkdwnSection(lines.join("\n"))),
+      ],
+    });
+    if (!result.success) {
+      throw new Error(`Inbound digest Slack post failed: ${result.error}`);
+    }
+  }
+  return { posted: leads.length };
 }
