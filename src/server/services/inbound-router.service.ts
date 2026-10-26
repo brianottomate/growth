@@ -21,9 +21,10 @@ import {
   createDeal,
   findCompany,
   findContactByEmail,
-  findInboundSitesContactsSince,
+  findInboundContactsSince,
   findOwnerByEmail,
-  type InboundSitesContact,
+  type InboundContact,
+  type InboundOutbound,
   newestAssociatedDeal,
   nextRepInRR,
   resolveHsLabel,
@@ -38,6 +39,7 @@ import { getEmailDomain, isPersonalEmail } from "@/lib/email";
 import { resolveOnboardingSlackHeadline } from "@/lib/onboarding-slack";
 import {
   type InboundLeadType,
+  isDigestSizedLead,
   postsInboundAlertImmediately,
 } from "@/lib/inbound-lead-digest";
 
@@ -54,6 +56,10 @@ import {
 // unchanged from the wander.com original — diff against it when reviewing.
 
 const OS_INBOUND_RADIO_CHANNEL_ID = "C0A3PMXE3MG";
+// #radio-listing — where the wander monorepo posts each "New Wander Listed
+// Signup" live (src/wos-saas/module/src/actions/onboarding/forward-growth-gateway-lead.ts).
+// It only posts leads above 5 units; the rest land in the Listed digest below.
+const LISTED_RADIO_CHANNEL_ID = "C05CL7UTW75";
 // Test traffic goes here instead — same channel growth's postOnSlack redirects
 // to on non-prod deployments. Covers the gap where test traffic (e.g. a
 // wander.com preview) hits growth PROD, which envSelect can't detect.
@@ -923,7 +929,7 @@ function mrkdwnSection(text: string): SlackBlock {
   return { type: "section", text: { type: "mrkdwn", text } };
 }
 
-function digestLine(lead: InboundSitesContact): string {
+function digestLine(lead: InboundContact): string {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ");
   const links = [
     `<https://app.hubspot.com/contacts/${HUBSPOT_ACCOUNT_ID}/record/0-1/${lead.id}|Contact>`,
@@ -948,17 +954,34 @@ function digestLine(lead: InboundSitesContact): string {
 }
 
 /**
- * Posts the last 24 hours of small WanderOS inbound leads to the inbound
- * channel. HubSpot is the record: the router stamps `inbound_date` and
- * `inbound_outbound = "Inbound - Sites"` on every lead it assigns, so this
- * reads those back and keeps the ones with 5 or fewer units (or no count).
+ * One digest per inbound channel. HubSpot is the record for both: the router
+ * stamps `inbound_date` and `inbound_outbound` on every lead it assigns, and
+ * the live alerts — growth's own for WanderOS, the wander monorepo's for Listed
+ * — skip leads at 5 units or fewer, so the digest reads those back.
  */
-export async function postInboundLeadDigest(): Promise<{ posted: number }> {
-  const contacts = await findInboundSitesContactsSince(
+const INBOUND_DIGESTS = {
+  "Inbound - Sites": {
+    channel: OS_INBOUND_RADIO_CHANNEL_ID,
+    noun: "inbound leads",
+  },
+  Inbound: { channel: LISTED_RADIO_CHANNEL_ID, noun: "Listed signups" },
+} satisfies Record<InboundOutbound, { channel: string; noun: string }>;
+
+/**
+ * Posts the last 24 hours of small inbound leads of one kind: WanderOS
+ * ("Inbound - Sites") to the inbound channel, Listed ("Inbound") to
+ * #radio-listing.
+ */
+export async function postInboundLeadDigest(
+  inboundOutbound: InboundOutbound,
+): Promise<{ posted: number }> {
+  const digest = INBOUND_DIGESTS[inboundOutbound];
+  const contacts = await findInboundContactsSince(
     Date.now() - 24 * 60 * 60 * 1000,
+    inboundOutbound,
   );
   const leads = contacts
-    .filter((contact) => contact.units === null || contact.units <= 5)
+    .filter((contact) => isDigestSizedLead(contact.units))
     .sort((a, b) => a.inboundDate - b.inboundDate);
   if (leads.length === 0) return { posted: 0 };
 
@@ -975,11 +998,11 @@ export async function postInboundLeadDigest(): Promise<{ posted: number }> {
     }
   }
 
-  const text = `:wander: *Today's smaller inbound leads (5 units or fewer): ${leads.length}*`;
+  const text = `:wander: *Today's smaller ${digest.noun} (5 units or fewer): ${leads.length}*`;
   for (let i = 0; i < sections.length; i += DIGEST_SECTIONS_PER_MESSAGE) {
     const result = await postOnSlack({
       text,
-      channel: OS_INBOUND_RADIO_CHANNEL_ID,
+      channel: digest.channel,
       unfurl_links: false,
       blocks: [
         ...(i === 0 ? [mrkdwnSection(text)] : []),
@@ -989,7 +1012,9 @@ export async function postInboundLeadDigest(): Promise<{ posted: number }> {
       ],
     });
     if (!result.success) {
-      throw new Error(`Inbound digest Slack post failed: ${result.error}`);
+      throw new Error(
+        `Inbound digest Slack post to ${digest.channel} failed: ${result.error}`,
+      );
     }
   }
   return { posted: leads.length };

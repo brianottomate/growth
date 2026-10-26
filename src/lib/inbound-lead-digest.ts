@@ -19,6 +19,17 @@ const LIVE_LEAD_TYPES = new Set<InboundLeadType>([
   "Resubmission",
 ]);
 
+/** Leads at or under this many units wait for the digest instead of alerting live. */
+export const INBOUND_DIGEST_MAX_UNITS = 5;
+
+/**
+ * True for a lead the digest should list: 5 units or fewer, or no unit count
+ * at all. Used both by the WanderOS inbound summary and the Listed summary.
+ */
+export function isDigestSizedLead(units: number | null): boolean {
+  return units === null || units <= INBOUND_DIGEST_MAX_UNITS;
+}
+
 /**
  * Sales asked for real-time alerts only on leads above 5 units, a booked
  * meeting, or an account someone is already working. Everything else,
@@ -30,7 +41,7 @@ export function postsInboundAlertImmediately(input: {
   leadType: InboundLeadType;
 }): boolean {
   return (
-    input.units > 5 ||
+    input.units > INBOUND_DIGEST_MAX_UNITS ||
     input.meetingBooked ||
     LIVE_LEAD_TYPES.has(input.leadType)
   );

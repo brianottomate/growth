@@ -1,9 +1,18 @@
 import { expect, test } from "bun:test";
 
 import {
+  isDigestSizedLead,
   isInboundDigestHour,
   postsInboundAlertImmediately,
 } from "./inbound-lead-digest";
+
+test("the digest lists leads at 5 units or fewer and leads with no count", () => {
+  expect(isDigestSizedLead(null)).toBe(true);
+  expect(isDigestSizedLead(1)).toBe(true);
+  expect(isDigestSizedLead(5)).toBe(true);
+  expect(isDigestSizedLead(6)).toBe(false);
+  expect(isDigestSizedLead(19)).toBe(false);
+});
 
 test("only leads above 5 units, with a meeting, already worked or resubmitted alert in real time", () => {
   const lead = {

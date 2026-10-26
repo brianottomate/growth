@@ -969,7 +969,9 @@ export async function findContactsByPhone(phone: string): Promise<
   }
 }
 
-export type InboundSitesContact = {
+export type InboundOutbound = "Inbound" | "Inbound - Sites";
+
+export type InboundContact = {
   id: string;
   email: string | null;
   firstName: string | null;
@@ -984,14 +986,15 @@ export type InboundSitesContact = {
 };
 
 /**
- * WanderOS inbound contacts the router assigned since `sinceMs` — the same
- * `inbound_date` + `inbound_outbound = "Inbound - Sites"` pair the round
- * robin counts.
+ * Inbound contacts the router assigned since `sinceMs` — the same
+ * `inbound_date` + `inbound_outbound` pair the round robin counts.
+ * `"Inbound - Sites"` is WanderOS inbound, `"Inbound"` is Listed inbound.
  */
-export async function findInboundSitesContactsSince(
+export async function findInboundContactsSince(
   sinceMs: number,
-): Promise<InboundSitesContact[]> {
-  const contacts: InboundSitesContact[] = [];
+  inboundOutbound: InboundOutbound,
+): Promise<InboundContact[]> {
+  const contacts: InboundContact[] = [];
   let after: string | undefined;
   do {
     const result = await client().crm.contacts.searchApi.doSearch({
@@ -1006,7 +1009,7 @@ export async function findInboundSitesContactsSince(
             {
               propertyName: "inbound_outbound",
               operator: FilterOperatorEnum.Eq,
-              value: "Inbound - Sites",
+              value: inboundOutbound,
             },
           ],
         },

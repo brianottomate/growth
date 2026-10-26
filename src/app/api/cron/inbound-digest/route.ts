@@ -16,13 +16,13 @@ function isAuthorized(request: NextRequest): boolean {
 
 /**
  * Daily 5pm Mountain summaries of the small leads the live alerts held back:
- * WanderOS inbound leads to #radio-core-inbound and Performance beta
- * applications to #radio-performance. Scheduled at 23:00 and 00:00 UTC so one
+ * WanderOS inbound leads to #radio-core-inbound, Listed signups to
+ * #radio-listing and Performance beta applications to #radio-performance. Scheduled at 23:00 and 00:00 UTC so one
  * of them is 5pm in both MDT and MST; the other returns without touching the
  * database. Both are `:00` marks the hourly crons already wake Neon for.
  * `?force=1` posts outside the hour, for a manual run.
  *
- * The two digests are independent: a failure in one is reported without
+ * The digests are independent: a failure in one is reported without
  * costing the other its post for the day.
  */
 export async function GET(request: NextRequest) {
@@ -36,12 +36,14 @@ export async function GET(request: NextRequest) {
   if (!force && !isInboundDigestHour(new Date())) {
     return NextResponse.json({ success: true, skipped: "not 5pm Mountain" });
   }
-  const [inbound, performance] = await Promise.allSettled([
-    postInboundLeadDigest(),
+  const [inbound, listed, performance] = await Promise.allSettled([
+    postInboundLeadDigest("Inbound - Sites"),
+    postInboundLeadDigest("Inbound"),
     postPerformanceLeadDigest(),
   ]);
   const digests = {
     inbound: settled("inbound", inbound),
+    listed: settled("listed", listed),
     performance: settled("performance", performance),
   };
   const failed = Object.values(digests).some((digest) => "error" in digest);
