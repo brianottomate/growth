@@ -142,10 +142,13 @@ export function EmailDnsConnection({
               : "Finish email authentication"}
         </h2>
         {!status.verified && connection.automaticAvailable && (
-          <p className="text-sm text-muted-foreground">
-            Entri will guide you through the DNS connection. You will sign in
-            with your domain provider and approve the email records.
-          </p>
+          <ol className="space-y-2 text-sm text-muted-foreground">
+            <li>1. Click Connect with Entri.</li>
+            <li>
+              2. Sign in with your domain provider and approve the records.
+            </li>
+            <li>3. Return to this page and click Check again.</li>
+          </ol>
         )}
         {!status.verified &&
           connection.automaticAvailable &&
@@ -159,8 +162,8 @@ export function EmailDnsConnection({
                 disabled={busy !== null}
               />
               <span>
-                Also add the starter DMARC record for {status.sendingDomain}{" "}
-                (optional, details below)
+                Also add recommended email protection for {status.sendingDomain}{" "}
+                (optional)
               </span>
             </label>
           )}
@@ -204,59 +207,73 @@ export function EmailDnsConnection({
         )}
       </section>
 
-      <EmailDmarcGuidance
-        dmarc={dmarc}
-        rootDomain={connection.rootDomain}
-        sendingDomain={status.sendingDomain}
-      />
+      <details
+        className="mt-8 rounded-xl border p-5"
+        open={!connection.automaticAvailable && !status.verified}
+      >
+        <summary className="cursor-pointer font-semibold">
+          Manual setup and technical details
+        </summary>
+        <div className="mt-5 space-y-6">
+          {dmarc.state !== "found" && (
+            <EmailDmarcGuidance
+              dmarc={dmarc}
+              rootDomain={connection.rootDomain}
+              sendingDomain={status.sendingDomain}
+            />
+          )}
 
-      <section className="mt-8 space-y-4">
-        <h2 className="text-lg font-semibold">
-          {status.verified ? "DNS records" : "Set up manually"}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Add these records in the {connection.rootDomain} DNS zone. Hosts below
-          are relative to that domain; some DNS providers ask for the full
-          hostname instead. Set the CNAME to DNS only (unproxied).
-        </p>
-        {status.records.map((record, index) => (
-          <div
-            key={`${record.type}:${record.host}`}
-            className="space-y-3 rounded-xl border p-4"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <strong>{record.type}</strong>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyRecord(index)}
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">
+              {status.verified ? "DNS records" : "Set up manually"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Add these records in the {connection.rootDomain} DNS zone. Hosts
+              below are relative to that domain; some DNS providers ask for the
+              full hostname instead. Set the CNAME to DNS only (unproxied).
+            </p>
+            {status.records.map((record, index) => (
+              <div
+                key={`${record.type}:${record.host}`}
+                className="space-y-3 rounded-xl border p-4"
               >
-                {copied === index ? "Copied" : "Copy record"}
-              </Button>
-            </div>
-            <dl className="space-y-2 text-sm">
-              <div>
-                <dt className="text-muted-foreground">
-                  Host in {connection.rootDomain}
-                </dt>
-                <dd className="font-mono break-all">{record.host}</dd>
-                <dt className="mt-2 text-muted-foreground">Full hostname</dt>
-                <dd className="font-mono break-all">
-                  {record.host}.{connection.rootDomain}
-                </dd>
+                <div className="flex items-center justify-between gap-4">
+                  <strong>{record.type}</strong>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyRecord(index)}
+                  >
+                    {copied === index ? "Copied" : "Copy record"}
+                  </Button>
+                </div>
+                <dl className="space-y-2 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">
+                      Host in {connection.rootDomain}
+                    </dt>
+                    <dd className="font-mono break-all">{record.host}</dd>
+                    <dt className="mt-2 text-muted-foreground">
+                      Full hostname
+                    </dt>
+                    <dd className="font-mono break-all">
+                      {record.host}.{connection.rootDomain}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Value</dt>
+                    <dd className="font-mono break-all">{record.value}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">TTL</dt>
+                    <dd>{record.ttl} seconds</dd>
+                  </div>
+                </dl>
               </div>
-              <div>
-                <dt className="text-muted-foreground">Value</dt>
-                <dd className="font-mono break-all">{record.value}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">TTL</dt>
-                <dd>{record.ttl} seconds</dd>
-              </div>
-            </dl>
-          </div>
-        ))}
-      </section>
+            ))}
+          </section>
+        </div>
+      </details>
     </main>
   );
 }

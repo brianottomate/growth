@@ -28,7 +28,7 @@ export function EmailDmarcGuidance({
     }
   }
   return (
-    <section className="mt-8 space-y-3 rounded-xl border p-5">
+    <section className="space-y-3">
       <h2 className="text-lg font-semibold">Email protection (DMARC)</h2>
       {dmarc.state === "found" ? (
         <>
