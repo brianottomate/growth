@@ -40,7 +40,14 @@ submitted portfolio/site/PMS, Performance summary in the existing `message` text
 The WanderOS `intent_inbound_form` enum is not used for Performance text.
 No WanderOS lifecycle stages, deals, companies, round robin or meeting waits are
 triggered. Alerts post to `#radio-performance` (website and Meta alike, qualified
-or not), tagging Jenny and Kyle and linking the contact. Only a successfully routed, qualified Meta lead sends the existing
+or not), tagging Jenny and Kyle and linking the contact. Since 2026-10-26 the
+live alert posts only for applications above 5 properties
+(`postsPerformanceAlertImmediately`); smaller ones, and those with no count,
+appear in the 5pm Mountain summary that `/api/cron/inbound-digest` (shared with
+the WanderOS inbound digest) reads back from `performance_application` and the
+Meta lead ledger (`routed_at`).
+Meta forms answer in ranges and the lower endpoint decides, so 1-9 waits for
+the summary. Only a successfully routed, qualified Meta lead sends the existing
 `Marketing Qualified Lead` CRM CAPI event with its original Meta lead id. A
 retry after CAPI failure does not reroute the contact or repost the alert.
 

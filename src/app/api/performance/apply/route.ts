@@ -1,6 +1,8 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { envSelect } from "@/env";
+import { postsPerformanceAlertImmediately } from "@/lib/performance-lead";
 import { escapeSlackMrkdwn, postOnSlack } from "@/server/clients/slack.client";
 import { db } from "@/server/db";
 import { performanceApplicationTable } from "@/server/db/performance-schema";
@@ -113,6 +115,15 @@ export async function POST(request: NextRequest) {
         applicationId: application!.id,
         error,
       });
+    }
+    // Small applications skip the live alert; the 5pm digest reads them back
+    // from performance_application. Test traffic and non-production
+    // deployments still post to the testing channel.
+    if (
+      envSelect({ prod: !input.test, test: false }) &&
+      !postsPerformanceAlertImmediately(application!.propertyCount)
+    ) {
+      return;
     }
     // Alert the desk even when normalization or CRM is temporarily unavailable.
     await notify(application!, input.test, contactId);

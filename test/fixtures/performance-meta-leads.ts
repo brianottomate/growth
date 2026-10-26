@@ -10,10 +10,15 @@ const noNetwork = (): never => {
 };
 globalThis.fetch = Object.assign(noNetwork, { preconnect: noNetwork });
 await mock.module("server-only", () => ({}));
+// Production semantics: the live-alert hold only applies to real traffic in
+// production, which is the branch this acceptance has to prove.
 await mock.module("@/env", () => ({
   env: { META_LEADGEN_ROUTE_FROM: "2026-01-01T00:00:00Z" },
+  envSelect: <T>(values: { prod: T; test: T }) => values.prod,
 }));
 const { metaLeadgenLeadTable } = await import("@/server/db/leads-schema");
+const { performanceApplicationTable } =
+  await import("@/server/db/performance-schema");
 const pg = new PGlite();
 await pg.exec(`CREATE SCHEMA leads; CREATE TABLE leads.meta_leadgen_lead (
  id text PRIMARY KEY, leadgen_id text NOT NULL UNIQUE, brand_id text, page_id text NOT NULL,
@@ -21,9 +26,14 @@ await pg.exec(`CREATE SCHEMA leads; CREATE TABLE leads.meta_leadgen_lead (
  lead_created_at timestamp, field_data jsonb, email text, units integer, qualified boolean,
  capi_sent_at timestamp, routed_at timestamp, meeting_rep_email text, meeting_checked_at timestamp,
  last_error text, created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE performance_application (
+ id text PRIMARY KEY, email text NOT NULL, name text, website_url text, property_count integer,
+ markets_today text, monthly_spend text, source text NOT NULL, query_params text,
+ created_at timestamptz NOT NULL DEFAULT now()
 );`);
 const db = drizzle(pg, {
-  schema: { metaLeadgenLeadTable },
+  schema: { metaLeadgenLeadTable, performanceApplicationTable },
   casing: "snake_case",
 });
 let zernioBrand = {
@@ -85,8 +95,18 @@ await mock.module("@/server/services/meta-lead-normalization.service", () => ({
 let failCrm = false;
 let crmCalls = 0;
 const updates: Record<string, unknown>[] = [];
+let contactLookups = 0;
 await mock.module("@/server/clients/hubspot.client", () => ({
   HUBSPOT_ACCOUNT_ID: "test",
+  findContactsByEmails: async (emails: string[]) => {
+    contactLookups++;
+    return new Map(
+      emails.map((email) => [
+        email.toLowerCase(),
+        { id: `hs-${email}`, email, firstName: "Hub", lastName: "Spot" },
+      ]),
+    );
+  },
   upsertContact: async () => {
     crmCalls++;
     if (failCrm) throw new Error("CRM unavailable");
@@ -140,7 +160,7 @@ await mock.module("@/server/services/inbound-router.service", () => ({
 }));
 const { recordLeadNotifications, processLead } =
   await import("@/server/services/meta-leadgen.service");
-const { routePerformanceLead } =
+const { routePerformanceLead, postPerformanceLeadDigest } =
   await import("@/server/services/performance-lead.service");
 const { isPerformanceMetaForm, isQualifiedPerformanceLead } =
   await import("@/lib/performance-lead");
@@ -221,6 +241,115 @@ assert.equal(pending?.routedAt, null);
 failCrm = false;
 await deliver("10002");
 assert.equal(capiCalls, 2);
+// Applications of 5 properties or fewer (or no count) still reach HubSpot but
+// wait for the digest instead of a live alert; above 5 posts right away.
+const beforeSmall = { crm: crmCalls, alerts: alerts.length };
+await routePerformanceLead({
+  lead: { ...facts, minimumUnits: 5, email: "five@example.com" },
+  source: "Meta Lead Ad · Performance beta",
+});
+await routePerformanceLead({
+  lead: { ...facts, minimumUnits: null, email: "unknown@example.com" },
+  source: "Meta Lead Ad · Performance beta",
+});
+assert.equal(crmCalls, beforeSmall.crm + 2);
+assert.equal(alerts.length, beforeSmall.alerts);
+await routePerformanceLead({
+  lead: { ...facts, minimumUnits: 6, email: "six@example.com" },
+  source: "Meta Lead Ad · Performance beta",
+});
+assert.equal(alerts.length, beforeSmall.alerts + 1);
+// The digest reads Growth back: website applications by created_at, Meta
+// leads by routed_at, keeping only the small ones from the last 24 hours.
+const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+await db.insert(performanceApplicationTable).values([
+  {
+    email: "web-small@example.com",
+    name: "Web Small",
+    propertyCount: 3,
+    source: "performance-beta",
+    createdAt: hourAgo,
+  },
+  {
+    email: "web-none@example.com",
+    name: null,
+    propertyCount: null,
+    source: "performance-beta",
+    createdAt: hourAgo,
+  },
+  {
+    email: "web-big@example.com",
+    name: "Web Big",
+    propertyCount: 12,
+    source: "performance-beta",
+    createdAt: hourAgo,
+  },
+  {
+    email: "web-old@example.com",
+    name: "Web Old",
+    propertyCount: 2,
+    source: "performance-beta",
+    createdAt: twoDaysAgo,
+  },
+]);
+await db.insert(metaLeadgenLeadTable).values([
+  {
+    leadgenId: "d1",
+    pageId,
+    formId,
+    formName: "Performance beta",
+    receivedVia: "zernio",
+    email: "meta-small@example.com",
+    units: 1,
+    routedAt: hourAgo,
+  },
+  {
+    leadgenId: "d2",
+    pageId,
+    formId,
+    formName: "Performance beta",
+    receivedVia: "zernio",
+    email: "meta-big@example.com",
+    units: 10,
+    routedAt: hourAgo,
+  },
+  {
+    leadgenId: "d3",
+    pageId,
+    formId,
+    formName: "Performance beta",
+    receivedVia: "zernio",
+    email: "meta-unrouted@example.com",
+    units: 1,
+    routedAt: null,
+  },
+  {
+    leadgenId: "d4",
+    pageId,
+    formId: "1087046654230215",
+    formName: "WanderOS",
+    receivedVia: "webhook",
+    email: "wos@example.com",
+    units: 1,
+    routedAt: hourAgo,
+  },
+]);
+const beforeDigest = alerts.length;
+const digest = await postPerformanceLeadDigest();
+assert.equal(digest.posted, 3);
+assert.equal(contactLookups, 1);
+assert.equal(alerts.length, beforeDigest + 1);
+assert.equal(alerts.at(-1)?.channel, "C0CB9K4LM0T");
+const digestText = JSON.stringify(alerts.at(-1)?.blocks);
+for (const email of ["web-small", "web-none", "meta-small"])
+  assert.match(digestText, new RegExp(`${email}@example.com`));
+for (const email of ["web-big", "web-old", "meta-big", "meta-unrouted", "wos"])
+  assert.doesNotMatch(digestText, new RegExp(`${email}@example.com`));
+assert.match(digestText, /Web Small/);
+assert.match(digestText, /Hub Spot/); // Meta applicants are named from HubSpot.
+assert.match(digestText, /properties unknown/);
+assert.doesNotMatch(digestText, /<@U/); // No pings in the summary.
 // Test sends may reach the testing channel, but cannot create/reassign a contact.
 const beforeTest = crmCalls;
 await routePerformanceLead({ lead: facts, source: "test", test: true });

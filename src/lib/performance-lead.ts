@@ -21,3 +21,19 @@ export function isQualifiedPerformanceLead(input: {
     input.minimumUnits >= 10
   );
 }
+
+/** Applications at or below this many properties wait for the daily digest. */
+export const PERFORMANCE_DIGEST_MAX_UNITS = 5;
+
+/**
+ * Kyle asked (2026-10-26) for real-time Performance alerts only above 5
+ * properties, the same cutoff as the WanderOS inbound router; smaller
+ * applications, and those with no count yet, wait for the 5pm Mountain digest.
+ * Meta forms ask for a range and `minimumUnits` is its lower endpoint, so a
+ * 1-9 answer waits and 10-24 posts right away.
+ */
+export function postsPerformanceAlertImmediately(
+  units: number | null | undefined,
+): boolean {
+  return typeof units === "number" && units > PERFORMANCE_DIGEST_MAX_UNITS;
+}

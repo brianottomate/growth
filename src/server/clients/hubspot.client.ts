@@ -1050,6 +1050,47 @@ export async function findInboundSitesContactsSince(
   return contacts;
 }
 
+export type ContactByEmail = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+};
+
+/**
+ * Contacts keyed by lower-cased email, for linking a Growth record to the
+ * CRM contact it was projected to. One batch read per 100 emails; an email
+ * HubSpot has never seen is simply absent from the map.
+ */
+export async function findContactsByEmails(
+  emails: string[],
+): Promise<Map<string, ContactByEmail>> {
+  const found = new Map<string, ContactByEmail>();
+  const unique = [...new Set(emails.map((email) => email.toLowerCase()))];
+  for (let index = 0; index < unique.length; index += 100) {
+    const chunk = unique.slice(index, index + 100);
+    // Unknown emails come back as 207 with an `errors` array alongside the
+    // results, which the SDK resolves rather than throws.
+    const response = await client().crm.contacts.batchApi.read({
+      idProperty: "email",
+      properties: ["email", "firstname", "lastname"],
+      propertiesWithHistory: [],
+      inputs: chunk.map((id) => ({ id })),
+    });
+    for (const contact of response.results ?? []) {
+      const email = contact.properties?.email?.toLowerCase();
+      if (!email) continue;
+      found.set(email, {
+        id: contact.id,
+        email,
+        firstName: contact.properties?.firstname ?? null,
+        lastName: contact.properties?.lastname ?? null,
+      });
+    }
+  }
+  return found;
+}
+
 /** Contacts associated with a company (decision-makers for the merge view). */
 export async function getCompanyContacts(
   companyId: string,

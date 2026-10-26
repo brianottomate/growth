@@ -2,16 +2,33 @@ import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
+import { and, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 
+import { envSelect } from "@/env";
 import type { LeadFieldData } from "@/lib/meta-leadgen";
-import { isQualifiedPerformanceLead } from "@/lib/performance-lead";
 import {
+  isQualifiedPerformanceLead,
+  PERFORMANCE_DIGEST_MAX_UNITS,
+  PERFORMANCE_META_FORM_IDS,
+  postsPerformanceAlertImmediately,
+} from "@/lib/performance-lead";
+import {
+  type ContactByEmail,
+  findContactsByEmails,
   HUBSPOT_ACCOUNT_ID,
   updateContact,
   upsertContact,
 } from "@/server/clients/hubspot.client";
-import { escapeSlackMrkdwn, postOnSlack } from "@/server/clients/slack.client";
+import { WANDER_PAGE_ID } from "@/server/clients/meta-leadgen.client";
+import {
+  escapeSlackMrkdwn,
+  postOnSlack,
+  type SlackBlock,
+} from "@/server/clients/slack.client";
+import { db } from "@/server/db";
+import { metaLeadgenLeadTable } from "@/server/db/leads-schema";
+import { performanceApplicationTable } from "@/server/db/performance-schema";
 import {
   META_LEAD_NORMALIZATION_SYSTEM,
   metaLeadNormalizationSchema,
@@ -119,6 +136,15 @@ export async function routePerformanceLead(
   const siteUrl = lead.bookingSite
     ? `https://${lead.bookingSite.hostname}${lead.bookingSite.pathname}`
     : null;
+  // Small applications skip the live alert; the 5pm digest reads them back
+  // from the Meta lead ledger. Test traffic and non-production deployments
+  // still post to the testing channel.
+  if (
+    envSelect({ prod: !input.test, test: false }) &&
+    !postsPerformanceAlertImmediately(lead.minimumUnits)
+  ) {
+    return contactId;
+  }
   const qualified = isQualifiedPerformanceLead(lead);
   const esc = escapeSlackMrkdwn;
   const name =
@@ -150,4 +176,167 @@ export async function routePerformanceLead(
   if (!posted.success)
     throw new Error(`Performance Slack alert failed: ${posted.error}`);
   return contactId;
+}
+
+// Slack caps a section at 3000 characters and a message at 50 blocks.
+const DIGEST_SECTION_CHARS = 2800;
+const DIGEST_SECTIONS_PER_MESSAGE = 45;
+
+function mrkdwnSection(text: string): SlackBlock {
+  return { type: "section", text: { type: "mrkdwn", text } };
+}
+
+type PerformanceDigestLead = {
+  email: string;
+  /** The applicant's own name on the website form; Meta leads use HubSpot's. */
+  name: string | null;
+  units: number | null;
+  source: string;
+  receivedAt: Date;
+};
+
+/**
+ * Performance applications from the last `since` that the live alert held
+ * back. Growth is the record for both senders: the website form writes
+ * `performance_application` and the Meta/Zernio path stamps `routed_at` on
+ * the lead ledger once HubSpot has the contact, so no new table or HubSpot
+ * stamp is needed to find them again.
+ */
+async function findSmallPerformanceLeadsSince(
+  since: Date,
+): Promise<PerformanceDigestLead[]> {
+  const [applications, metaLeads] = await Promise.all([
+    db
+      .select()
+      .from(performanceApplicationTable)
+      .where(
+        and(
+          gte(performanceApplicationTable.createdAt, since),
+          or(
+            isNull(performanceApplicationTable.propertyCount),
+            lte(
+              performanceApplicationTable.propertyCount,
+              PERFORMANCE_DIGEST_MAX_UNITS,
+            ),
+          ),
+        ),
+      ),
+    db
+      .select()
+      .from(metaLeadgenLeadTable)
+      .where(
+        and(
+          eq(metaLeadgenLeadTable.pageId, WANDER_PAGE_ID),
+          inArray(metaLeadgenLeadTable.formId, [...PERFORMANCE_META_FORM_IDS]),
+          gte(metaLeadgenLeadTable.routedAt, since),
+          or(
+            isNull(metaLeadgenLeadTable.units),
+            lte(metaLeadgenLeadTable.units, PERFORMANCE_DIGEST_MAX_UNITS),
+          ),
+        ),
+      ),
+  ]);
+  return [
+    ...applications.map((application) => ({
+      email: application.email,
+      name: application.name,
+      units: application.propertyCount,
+      source: application.source,
+      receivedAt: application.createdAt,
+    })),
+    ...metaLeads.flatMap((lead) =>
+      // Routing requires an email, so a routed lead without one is a ledger
+      // inconsistency rather than an applicant to list.
+      lead.email && lead.routedAt
+        ? [
+            {
+              email: lead.email,
+              name: null,
+              units: lead.units,
+              source: `Meta Lead Ad · ${lead.formName ?? lead.formId ?? "unknown form"}`,
+              receivedAt: lead.routedAt,
+            },
+          ]
+        : [],
+    ),
+  ].sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime());
+}
+
+/**
+ * Posts the last 24 hours of small Performance beta applications (5 or fewer
+ * properties, or no count) to #radio-performance, one line per application.
+ * Runs from `/api/cron/inbound-digest` alongside the WanderOS inbound digest.
+ * HubSpot is read only to link the contact and name Meta applicants; when
+ * that lookup fails the digest still posts, saying so, rather than going
+ * missing for the day.
+ */
+export async function postPerformanceLeadDigest(): Promise<{
+  posted: number;
+}> {
+  const leads = await findSmallPerformanceLeadsSince(
+    new Date(Date.now() - 24 * 60 * 60 * 1000),
+  );
+  if (leads.length === 0) return { posted: 0 };
+
+  let contacts = new Map<string, ContactByEmail>();
+  let lookupFailed = false;
+  try {
+    contacts = await findContactsByEmails(leads.map((lead) => lead.email));
+  } catch (error) {
+    lookupFailed = true;
+    console.error("[performance-digest] HubSpot contact lookup failed", error);
+  }
+
+  const esc = escapeSlackMrkdwn;
+  const sections: string[][] = [];
+  for (const lead of leads) {
+    const contact = contacts.get(lead.email.toLowerCase());
+    const name =
+      lead.name ??
+      [contact?.firstName, contact?.lastName].filter(Boolean).join(" ");
+    const line = [
+      `• *${esc(name || lead.email)}*`,
+      esc(lead.email),
+      lead.units === null
+        ? "properties unknown"
+        : `${lead.units} ${lead.units === 1 ? "property" : "properties"}`,
+      `from ${esc(lead.source)}`,
+      contact
+        ? `<https://app.hubspot.com/contacts/${HUBSPOT_ACCOUNT_ID}/contact/${contact.id}|HubSpot>`
+        : lookupFailed
+          ? null
+          : "not in HubSpot",
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join(" · ");
+    const last = sections.at(-1);
+    if (
+      last &&
+      last.join("\n").length + line.length + 1 <= DIGEST_SECTION_CHARS
+    ) {
+      last.push(line);
+    } else {
+      sections.push([line]);
+    }
+  }
+
+  const text = `🎯 *Today's smaller Performance beta applications (${PERFORMANCE_DIGEST_MAX_UNITS} properties or fewer): ${leads.length}*${lookupFailed ? "\n_HubSpot lookup failed; contact links omitted._" : ""}`;
+  for (let i = 0; i < sections.length; i += DIGEST_SECTIONS_PER_MESSAGE) {
+    const result = await postOnSlack({
+      text,
+      channel: PERFORMANCE_APPLICATIONS_CHANNEL,
+      unfurl_links: false,
+      unfurl_media: false,
+      blocks: [
+        ...(i === 0 ? [mrkdwnSection(text)] : []),
+        ...sections
+          .slice(i, i + DIGEST_SECTIONS_PER_MESSAGE)
+          .map((lines) => mrkdwnSection(lines.join("\n"))),
+      ],
+    });
+    if (!result.success) {
+      throw new Error(`Performance digest Slack post failed: ${result.error}`);
+    }
+  }
+  return { posted: leads.length };
 }
