@@ -27,7 +27,7 @@ export function CatalogFilter({
     option.label.toLowerCase().includes(search.trim().toLowerCase()),
   );
   return (
-    <Popover>
+    <Popover modal>
       <PopoverTrigger asChild>
         <Button
           type="button"
