@@ -7,18 +7,10 @@ export function EmailDmarcGuidance({
   dmarc,
   rootDomain,
   sendingDomain,
-  automaticAvailable,
-  includeStarter,
-  onIncludeStarter,
-  busy,
 }: {
   dmarc: EmailDmarcStatus;
   rootDomain: string;
   sendingDomain: string;
-  automaticAvailable: boolean;
-  includeStarter: boolean;
-  onIncludeStarter: (include: boolean) => void;
-  busy: boolean;
 }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle",
@@ -103,20 +95,6 @@ export function EmailDmarcGuidance({
             <p role="alert" className="text-sm">
               Select the record text to copy it manually.
             </p>
-          )}
-          {automaticAvailable && (
-            <label className="flex items-start gap-3 text-sm">
-              <input
-                className="mt-1"
-                type="checkbox"
-                checked={includeStarter}
-                onChange={(event) => onIncludeStarter(event.target.checked)}
-                disabled={busy}
-              />
-              <span>
-                Include this starter DMARC record when I connect automatically
-              </span>
-            </label>
           )}
         </>
       ) : (

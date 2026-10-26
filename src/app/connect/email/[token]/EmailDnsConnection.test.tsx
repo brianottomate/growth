@@ -46,10 +46,14 @@ describe("EmailDnsConnection", () => {
     );
 
     const entri = html.indexOf("Connect automatically with Entri");
+    const optIn = html.indexOf("Also add the starter DMARC record");
+    const button = html.indexOf("Connect with Entri<");
     const dmarc = html.indexOf("Email protection (DMARC)");
     const manual = html.indexOf("Set up manually");
 
     expect(entri).toBeGreaterThan(-1);
+    expect(optIn).toBeGreaterThan(entri);
+    expect(button).toBeGreaterThan(optIn);
     expect(dmarc).toBeGreaterThan(entri);
     expect(manual).toBeGreaterThan(dmarc);
   });

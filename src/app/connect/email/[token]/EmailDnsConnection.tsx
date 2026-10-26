@@ -147,6 +147,23 @@ export function EmailDnsConnection({
             with your domain provider and approve the email records.
           </p>
         )}
+        {!status.verified &&
+          connection.automaticAvailable &&
+          dmarc.state === "missing" && (
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={includeStarter}
+                onChange={(event) => setIncludeStarter(event.target.checked)}
+                disabled={busy !== null}
+              />
+              <span>
+                Also add the starter DMARC record for {status.sendingDomain}{" "}
+                (optional, details below)
+              </span>
+            </label>
+          )}
         {!status.verified && (
           <div className="flex flex-wrap gap-3">
             {connection.automaticAvailable && (
@@ -191,10 +208,6 @@ export function EmailDnsConnection({
         dmarc={dmarc}
         rootDomain={connection.rootDomain}
         sendingDomain={status.sendingDomain}
-        automaticAvailable={connection.automaticAvailable && !status.verified}
-        includeStarter={includeStarter}
-        onIncludeStarter={setIncludeStarter}
-        busy={busy !== null}
       />
 
       <section className="mt-8 space-y-4">
