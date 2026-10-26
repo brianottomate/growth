@@ -70,6 +70,12 @@ These record progress with provenance without performing the underlying tasks.
 See [recorded launch checklist](performance-launch-checklist.md) for item IDs,
 workflow completion points, and revision handling.
 
+`emailWrite__sendTest` projects Growth's existing brand test-send service into
+the canonical MCP catalog. After explicit host approval, it sends the current
+saved draft only to the signed-in Growth user's account email through the
+brand's existing Postmark server and stream. It accepts no recipient address,
+never targets an audience, and creates no message-send record.
+
 Amplifier contacts are available in chat and MCP through
 `amplificationRead__list` and `amplificationWrite__saveContact`. Creation needs
 only a name and creates no brand workspace. Later calls pass the contact ID

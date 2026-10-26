@@ -190,6 +190,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   emailWrite: [
     "addAudienceMembers",
     "setSenderIdentity",
+    "sendTest",
     "importList",
     "prepareBroadcast",
     "scheduleBroadcasts",

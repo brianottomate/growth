@@ -711,6 +711,7 @@ export const emailWrite = growthDomainTool({
     importList: importEmailListAction,
     saveAudience: saveEmailAudienceAction,
     setSenderIdentity: EMAIL_TOOLS.setEmailSenderIdentity,
+    sendTest: EMAIL_TOOLS.sendEmailTest,
     createSlot: EMAIL_TOOLS.createEmailSlot,
     sharePreview: shareEmailPreviewAction,
     createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,

@@ -376,6 +376,13 @@ export const growthActionPolicies = {
   emailWrite: {
     addAudienceMembers: write(),
     setSenderIdentity: write({ idempotent: true }),
+    sendTest: write({
+      approval: "user",
+      consequence: "provider-write",
+      idempotent: false,
+      reversible: false,
+      surfaces: CONFIRMED,
+    }),
     importList: write(),
     prepareBroadcast: write(),
     scheduleBroadcasts: write({

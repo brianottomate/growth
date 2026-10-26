@@ -11,6 +11,7 @@ import {
   generateEmailDraftOutputSchema,
   deleteEmailDraftOutputSchema,
   setEmailSenderIdentityOutputSchema,
+  sendEmailTestOutputSchema,
 } from "./outputs/email";
 
 import "server-only";
@@ -44,6 +45,7 @@ import {
   startEmailGeneration,
 } from "@/server/services/email-document.service";
 import { setBrandEmailIdentity } from "@/server/services/brand-email-identity.service";
+import { sendBrandTestEmail } from "@/server/services/brand-email-send.service";
 import {
   ContentService,
   deliveryBlockReason,
@@ -142,6 +144,21 @@ export const setEmailSenderIdentity = growthAction({
       organizationId: ctx.orgId,
     });
   },
+});
+
+export const sendEmailTest = growthAction({
+  outputSchema: sendEmailTestOutputSchema,
+  description:
+    "Send the current saved email through the brand's existing Postmark server and broadcast stream to the signed-in Growth user's own account email only. This is a real provider send and requires explicit approval. It never accepts another recipient, never sends to an audience, and does not create a message-send record. Existing brand sender, footer, provider and unsubscribe checks still apply.",
+  inputSchema: z.strictObject({
+    platformPostId: z.string().min(1),
+  }),
+  execute: async (input, ctx) =>
+    sendBrandTestEmail({
+      ...input,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+    }),
 });
 
 export const createEmailSlot = growthAction({
@@ -661,4 +678,5 @@ export const EMAIL_TOOLS = {
   generateEmailDraft,
   deleteEmailDraft,
   setEmailSenderIdentity,
+  sendEmailTest,
 } as const;

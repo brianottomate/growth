@@ -30,6 +30,11 @@ export const setEmailSenderIdentityOutputSchema = z.strictObject({
   configurationBlockers: z.array(z.string()),
 });
 
+export const sendEmailTestOutputSchema = z.strictObject({
+  to: z.email(),
+  messageId: z.string().nullable(),
+});
+
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
 const digestSchema = listingsDigestSchema;
 

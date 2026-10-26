@@ -63,6 +63,24 @@ async function assertToolCatalog(client: Client) {
   expect(names).not.toContain("discoverTools");
   expect(names).toContain("sourceSyncWrite__syncWebsite");
   expect(names).toContain("adsWrite__setDelivery");
+  expect(names).toContain("emailWrite__sendTest");
+  const emailTestTool = tools.find(
+    (tool) => tool.name === "emailWrite__sendTest",
+  );
+  expect(emailTestTool?.inputSchema).toMatchObject({
+    type: "object",
+    additionalProperties: false,
+    required: ["platformPostId"],
+  });
+  expect(Object.keys(emailTestTool?.inputSchema.properties ?? {})).toEqual([
+    "platformPostId",
+  ]);
+  expect(emailTestTool?.annotations).toMatchObject({
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  });
   expect(names).not.toContain("brandWrite__purge");
   expect(names).toContain("operationRead__status");
   const brandSchema = JSON.stringify(
