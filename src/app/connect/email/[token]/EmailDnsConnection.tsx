@@ -124,40 +124,29 @@ export function EmailDnsConnection({
       </h1>
       <p className="mt-3 text-muted-foreground">
         Send branded newsletters from <strong>{status.sendingDomain}</strong>.
-        Connect the DNS account for {connection.rootDomain}, or share the
-        records below with the person who manages it.
+        {connection.automaticAvailable && !status.verified
+          ? ` Connect the DNS account for ${connection.rootDomain} automatically with Entri, or share this page with the person who manages it.`
+          : ` Connect the DNS account for ${connection.rootDomain}, or share the records below with the person who manages it.`}
       </p>
       <p className="mt-3 text-sm text-muted-foreground">
         This setup adds email authentication records. Your website and existing
         email inboxes keep their current configuration.
       </p>
 
-      <EmailDmarcGuidance
-        dmarc={dmarc}
-        rootDomain={connection.rootDomain}
-        sendingDomain={status.sendingDomain}
-        automaticAvailable={connection.automaticAvailable && !status.verified}
-        includeStarter={includeStarter}
-        onIncludeStarter={setIncludeStarter}
-        busy={busy !== null}
-      />
-
       <section className="mt-8 space-y-4 rounded-xl border p-5">
         <h2 className="text-lg font-semibold">
           {status.verified
             ? "Your domain is connected"
-            : "Finish email authentication"}
+            : connection.automaticAvailable
+              ? "Connect automatically with Entri"
+              : "Finish email authentication"}
         </h2>
-        <ul className="space-y-2 text-sm">
-          <li>
-            Sending signature (DKIM):{" "}
-            {status.dkimVerified ? "Verified" : "Pending"}
-          </li>
-          <li>
-            Bounce handling (return-path):{" "}
-            {status.returnPathVerified ? "Verified" : "Pending"}
-          </li>
-        </ul>
+        {!status.verified && connection.automaticAvailable && (
+          <p className="text-sm text-muted-foreground">
+            Entri will guide you through the DNS connection. You will sign in
+            with your domain provider and approve the email records.
+          </p>
+        )}
         {!status.verified && (
           <div className="flex flex-wrap gap-3">
             {connection.automaticAvailable && (
@@ -170,6 +159,16 @@ export function EmailDnsConnection({
             </Button>
           </div>
         )}
+        <ul className="space-y-2 text-sm">
+          <li>
+            Sending signature (DKIM):{" "}
+            {status.dkimVerified ? "Verified" : "Pending"}
+          </li>
+          <li>
+            Bounce handling (return-path):{" "}
+            {status.returnPathVerified ? "Verified" : "Pending"}
+          </li>
+        </ul>
         {!connection.automaticAvailable && !status.verified && (
           <p className="text-sm text-muted-foreground">
             Automatic connection is not available yet. You can use the manual
@@ -187,6 +186,16 @@ export function EmailDnsConnection({
           </p>
         )}
       </section>
+
+      <EmailDmarcGuidance
+        dmarc={dmarc}
+        rootDomain={connection.rootDomain}
+        sendingDomain={status.sendingDomain}
+        automaticAvailable={connection.automaticAvailable && !status.verified}
+        includeStarter={includeStarter}
+        onIncludeStarter={setIncludeStarter}
+        busy={busy !== null}
+      />
 
       <section className="mt-8 space-y-4">
         <h2 className="text-lg font-semibold">
