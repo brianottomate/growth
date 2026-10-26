@@ -6,10 +6,13 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 
 import { cn } from "./lib/utils";
 
+// Modal by default: a non-modal popover portals outside an open dialog or
+// sheet, whose scroll lock then swallows wheel and touch scrolling inside it.
 function Popover({
+  modal = true,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />;
+  return <PopoverPrimitive.Root data-slot="popover" modal={modal} {...props} />;
 }
 
 const popoverTriggerStyleVariants = cva("", {

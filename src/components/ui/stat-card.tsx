@@ -25,7 +25,7 @@ function ExplainerTip({
   explainer: string;
 }) {
   return (
-    <Popover>
+    <Popover modal={false}>
       <PopoverTrigger
         aria-label={`About ${label}`}
         className="cursor-help rounded-full opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
